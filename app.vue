@@ -1,7 +1,13 @@
+<script setup lang="ts">
+</script>
+
 <template>
-  <div>
-    Hello World
-  </div>
+  <header>
+    <h1>MONOPOLY UA</h1>
+  </header>
+  <main>
+    <GameBase />
+  </main>
 </template>
 
 <style lang="scss">
