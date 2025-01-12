@@ -1,3 +1,3 @@
-import { ref } from 'vue'
+import { ref } from "vue";
 
-export const games = ref<CreatedGame[]>([])
+export const games = ref<CreatedGame[]>([]);

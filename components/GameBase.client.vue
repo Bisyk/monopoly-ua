@@ -128,7 +128,7 @@ const createGame = async () => {
       </div>
     </div>
   </div>
-  <button v-if="!isUserAlreadyCreateGame && !isConnectedToRoom" @click="createGame">CREATE GAME</button>
+  <BaseButton v-if="!isUserAlreadyCreateGame && !isConnectedToRoom" @click="createGame">CREATE GAME</BaseButton>
   <div>
     <div v-for="game in availableGames">
       <p>Game #{{ game.id }} <button v-if="!isConnectedToRoom" @click="handleRoomConnection(game.id)">JOIN</button></p>

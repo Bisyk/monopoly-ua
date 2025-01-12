@@ -7,5 +7,5 @@ export default defineNuxtConfig({
       websocket: true
     }
   },
-  modules: ['@pinia/nuxt']
+  modules: ['@pinia/nuxt', '@nuxt/fonts']
 })

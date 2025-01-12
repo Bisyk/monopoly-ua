@@ -1,19 +1,19 @@
-const rooms = 'Rooms'
+import { games } from "../routes/gamesList";
 
-import { games } from '../routes/gamesList'
+const rooms = "Rooms";
 
 export default defineWebSocketHandler({
   open(peer) {
-    peer.subscribe(rooms)
-    console.log(`Opened WS `)
+    peer.subscribe(rooms);
+    console.log(`Opened WS `);
   },
   close(peer) {
-    console.log(`Closed WS `)
+    console.log(`Closed WS `);
   },
   error(peer, error) {
-    console.log('error on ws', peer, error)
+    console.log("error on ws", peer, error);
   },
   message(peer, message) {
-    peer.publish(rooms, JSON.stringify(games.value))
-  }
-})
+    peer.publish(rooms, JSON.stringify(games.value));
+  },
+});
