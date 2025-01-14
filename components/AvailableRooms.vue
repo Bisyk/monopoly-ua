@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import AvailableRoomCard from './AvailableRoomCard.vue'
 import CreateRoomModal from './CreateRoomModal.vue'
 
@@ -6,17 +7,18 @@ const props = defineProps({
   username: { type: String, required: true },
 })
 
-const availableGames = ref<CreatedGame[]>([])
+const allGames = ref<CreatedGame[]>([])
+// const availableGames = ref<CreatedGame[]>([])
 const roomConnections = ref<{ [key: string]: { status: any, send: any, open: any, close: any } }>({})
-const selectedGame = ref(0)
 const isCreateGameModalActive = ref(false)
+const router = useRouter()
 
-const isUserAlreadyCreateGame = computed(() => {
-  return availableGames.value.some(game => game.createdBy === props.username)
+const availableGames = computed(() => {
+  return allGames.value.filter(game => game.status === 'PENDING')
 })
 
 const isConnectedToRoom = computed(() => {
-  return availableGames.value.some(game => game.players.includes(props.username))
+  return allGames.value.some(game => game.players.includes(props.username))
 })
 
 const createRoom = async (maxPlayers: number) => {
@@ -30,17 +32,18 @@ const createRoom = async (maxPlayers: number) => {
         players: [props.username],
         createdBy: props.username,
         maxPlayers,
+        status: 'PENDING'
       }
     })
 
-    const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${id}`)
+    // const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${id}`)
 
-    roomConnections.value[id] = { status, send, open, close }
+    // roomConnections.value[id] = { status, send, open, close }
 
-    handleMessage((message) => {
-      const { username, turnResult } = JSON.parse(message)
-      // history.value.push(`${username}: ${turnResult}`)
-    })
+    // handleMessage((message) => {
+    //   const { username, turnResult } = JSON.parse(message)
+    //   // history.value.push(`${username}: ${turnResult}`)
+    // })
 
     // selectedGame.value = i
     isCreateGameModalActive.value = false
@@ -49,7 +52,7 @@ const createRoom = async (maxPlayers: number) => {
   }
 }
 
-const handleRoomConnection = async (roomId: number) => {
+const connectRoom = async (roomId: number) => {
   if (roomConnections.value[roomId]) {
     console.log(`Already connected to room ${roomId}`);
     return
@@ -58,19 +61,32 @@ const handleRoomConnection = async (roomId: number) => {
   try {
     await $fetch('/games', {
       method: 'PUT',
-      body: { username: props.username, roomId }
+      body: { action: { type: 'JOIN_ROOM' }, payload: { username: props.username, roomId } }
     });
 
-    const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${roomId}`)
+    // const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${roomId}`)
 
-    roomConnections.value[roomId] = { status, send, open, close }
+    // roomConnections.value[roomId] = { status, send, open, close }
 
-    handleMessage((message) => {
-      const { username, turnResult } = JSON.parse(message)
-      // history.value.push(`${username}: ${turnResult}`)
-    })
+    // handleMessage((message) => {
+    //   const { username, turnResult } = JSON.parse(message)
+    //   // history.value.push(`${username}: ${turnResult}`)
+    // })
 
-    selectedGame.value = roomId
+    // selectedGame.value = roomId
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+const startGame = async (game: CreatedGame) => {
+  try {
+    console.log(`Started game in room ${game.id}`);
+    for (const player of game.players) {
+      if (player === props.username) {
+        router.push(`/game/${game.id}`)
+      }
+    }
   } catch (error) {
     console.error(error);
   }
@@ -81,25 +97,37 @@ onMounted(() => {
 
   setInterval(() => {
     send('GET_GAMES')
-  }, 1000)
+  }, 10)
 
   handleMessage((message) => {
-    availableGames.value = JSON.parse(message)
+    allGames.value = JSON.parse(message)
+
+    if (allGames.value.some(game => game.players.includes(props.username))) {
+      console.log(props.username);
+      const game = allGames.value.find(game => game.players.includes(props.username))
+      console.log(game);
+      if (game?.players.length === game?.maxPlayers) {
+        startGame(game)
+      }
+    }
   })
 })
 </script>
 
 <template>
+  <pre>
+    {{ allGames }}
+  </pre>
   <div class="container">
     <CreateRoomModal v-if="isCreateGameModalActive" @create-game="createRoom" />
     <div class="header">
       <h2>Available Games</h2>
-      <BaseButton v-if="!isUserAlreadyCreateGame && !isConnectedToRoom" @click="isCreateGameModalActive = true">CREATE
+      <BaseButton v-if="!isConnectedToRoom" @click="isCreateGameModalActive = true">CREATE
         GAME</BaseButton>
     </div>
 
     <AvailableRoomCard v-for="game in availableGames" :game-id="game.id" :max-players="game.maxPlayers"
-      :players="game.players" @joinGame="handleRoomConnection" />
+      :players="game.players" @joinGame="connectRoom" />
 
   </div>
 </template>

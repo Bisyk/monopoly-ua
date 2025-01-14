@@ -3,4 +3,5 @@ declare interface CreatedGame {
   players: string[];
   createdBy: string;
   maxPlayers: number;
+  status: string;
 }

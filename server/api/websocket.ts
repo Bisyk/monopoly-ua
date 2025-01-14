@@ -1,17 +1,6 @@
 import { parse } from 'url'
 
-const gameState = {
-  rooms: {
-    roomId1: {
-      players: [
-        { username: 'Player1', position: 0, balance: 15000, isTurn: true },
-        { username: 'Player2', position: 0, balance: 15000, isTurn: false }
-      ],
-      currentTurn: 'Player1',
-      boardState: []
-    }
-  }
-}
+const gameState = {}
 
 export default defineWebSocketHandler({
   open(peer) {
