@@ -14,12 +14,8 @@
 }
 
 body {
-  background-color: #fff;
+  background-color: #f4f4f5;
   color: #000000;
   font-family: Nunito, sans-serif;
-}
-
-main {
-  padding: 0 2rem;
 }
 </style>

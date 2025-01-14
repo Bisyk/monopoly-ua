@@ -5,7 +5,6 @@
     <div>
       <h1>MONOPOLY </h1>
       <img src="public/assets/ukr-flag.png" alt="logo">
-      <BaseButton >Clear Games</BaseButton>
     </div>
   </header>
   <main>
@@ -17,6 +16,8 @@
 header {
   border-bottom: 2px solid #ccc;
   padding: 0.5rem 2rem;
+  border-radius: 0 0 2rem 2rem;
+  background-color: white;
 
   div {
     display: flex;
