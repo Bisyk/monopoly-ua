@@ -19,9 +19,9 @@ export default defineEventHandler(async event => {
 
     game.players.push(payload.username);
 
-    if (game.players.length === game.maxPlayers) {
-      game.status = "ACTIVE";
-    }
+    // if (game.players.length === game.maxPlayers) {
+    //   game.status = "ACTIVE";
+    // }
 
     return {
       body: JSON.stringify({

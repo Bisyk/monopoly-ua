@@ -1,11 +1,9 @@
 import { games } from "../gamesList";
 
 export default defineEventHandler(async event => {
-  console.log("lol");
+  console.log(`GET /games/${event!.context!.params!.gameId}`);
 
   const gameId = event!.context!.params!.gameId;
-
-  console.log(gameId);
 
   const game = games.value.find(game => game.id === Number(gameId));
 

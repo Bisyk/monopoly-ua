@@ -1,11 +1,13 @@
 import { games } from "../routes/gamesList";
 
 const rooms = "Rooms";
+const peers = [];
 
 export default defineWebSocketHandler({
   open(peer) {
     peer.subscribe(rooms);
     console.log(`Opened WS `);
+    peers.push(peer);
   },
   close(peer) {
     console.log(`Closed WS `);
@@ -14,6 +16,8 @@ export default defineWebSocketHandler({
     console.log("error on ws", peer, error);
   },
   message(peer, message) {
-    peer.publish(rooms, JSON.stringify(games.value));
+    peers.forEach(p => {
+      peer.publish(rooms, JSON.stringify(games.value));
+    });
   },
 });

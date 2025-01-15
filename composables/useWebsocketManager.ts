@@ -1,17 +1,17 @@
-import { useWebSocket } from '@vueuse/core'
+import { useWebSocket } from "@vueuse/core";
 
 export const useWebsocketManager = (url: string) => {
-  const { status, data, send, open, close } = useWebSocket(url)
+  const { status, data, send, open, close } = useWebSocket(url);
 
   const handleMessage = (cb: (newValue: string) => void) => {
     watch(data, newValue => {
       try {
-        cb(newValue)
+        cb(newValue);
       } catch (error) {
-        console.error('Failed to parse message:', error)
+        console.error("Failed to parse message:", error);
       }
-    })
-  }
+    });
+  };
 
   return {
     status,
@@ -19,6 +19,6 @@ export const useWebsocketManager = (url: string) => {
     send,
     open,
     close,
-    handleMessage
-  }
-}
+    handleMessage,
+  };
+};

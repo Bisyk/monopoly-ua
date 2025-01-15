@@ -36,16 +36,6 @@ const createRoom = async (maxPlayers: number) => {
       }
     })
 
-    // const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${id}`)
-
-    // roomConnections.value[id] = { status, send, open, close }
-
-    // handleMessage((message) => {
-    //   const { username, turnResult } = JSON.parse(message)
-    //   // history.value.push(`${username}: ${turnResult}`)
-    // })
-
-    // selectedGame.value = i
     isCreateGameModalActive.value = false
   } catch (err) {
     console.error(err);
@@ -63,23 +53,13 @@ const connectRoom = async (roomId: number) => {
       method: 'PUT',
       body: { action: { type: 'JOIN_ROOM' }, payload: { username: props.username, roomId } }
     });
-
-    // const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${roomId}`)
-
-    // roomConnections.value[roomId] = { status, send, open, close }
-
-    // handleMessage((message) => {
-    //   const { username, turnResult } = JSON.parse(message)
-    //   // history.value.push(`${username}: ${turnResult}`)
-    // })
-
-    // selectedGame.value = roomId
   } catch (error) {
     console.error(error);
   }
 }
 
 const startGame = async (game: CreatedGame) => {
+  console.log('startGame', game);
   try {
     console.log(`Started game in room ${game.id}`);
     for (const player of game.players) {
@@ -92,24 +72,30 @@ const startGame = async (game: CreatedGame) => {
   }
 }
 
+watch(allGames, () => {
+  console.log('watcher');
+  console.log('allGames', allGames.value);
+  if (allGames.value.some(game => game.players.includes(props.username) && game.status === 'PENDING')) {
+    console.log('user to connect: ', props.username);
+    const game = allGames.value.find(game => game.players.includes(props.username) && game.status === 'PENDING')
+    console.log('finded game for connect: ', game);
+    if (game?.players.length === game?.maxPlayers) {
+      startGame(game)
+    }
+  }
+})
+
 onMounted(() => {
   const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/games`)
 
+  send('GET_GAMES')
+
   setInterval(() => {
     send('GET_GAMES')
-  }, 10)
+  }, 1000)
 
   handleMessage((message) => {
     allGames.value = JSON.parse(message)
-
-    if (allGames.value.some(game => game.players.includes(props.username))) {
-      console.log(props.username);
-      const game = allGames.value.find(game => game.players.includes(props.username))
-      console.log(game);
-      if (game?.players.length === game?.maxPlayers) {
-        startGame(game)
-      }
-    }
   })
 })
 </script>

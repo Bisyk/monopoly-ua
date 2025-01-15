@@ -2,10 +2,12 @@
 
 <template>
   <header>
-    <div>
-      <h1>MONOPOLY </h1>
-      <img src="public/assets/ukr-flag.png" alt="logo">
-    </div>
+    <NuxtLink to="/" style="text-decoration: none;">
+      <div>
+        <h1>MONOPOLY </h1>
+        <img src="public/assets/ukr-flag.png" alt="logo">
+      </div>
+    </NuxtLink>
   </header>
   <main>
     <slot />
