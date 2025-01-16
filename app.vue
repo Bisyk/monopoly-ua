@@ -1,18 +1,21 @@
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <header>
-    <h1>MONOPOLY UA</h1>
-  </header>
-  <main>
-    <GameBase />
-  </main>
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
 </template>
 
 <style lang="scss">
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body {
-  background-color: rgb(51, 51, 53);
-  color: white;
+  background-color: #f4f4f5;
+  color: #000000;
+  font-family: Nunito, sans-serif;
 }
 </style>
