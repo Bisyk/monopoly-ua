@@ -17,7 +17,6 @@ export default defineWebSocketHandler({
     console.log("error on ws", peer, error);
   },
   message(peer, message) {
-    console.log(JSON.stringify(games.value));
     peer.send(JSON.stringify(games.value));
   },
 });

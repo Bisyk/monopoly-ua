@@ -8,7 +8,6 @@ const props = defineProps({
 })
 
 const allGames = ref<CreatedGame[]>([])
-// const availableGames = ref<CreatedGame[]>([])
 const roomConnections = ref<{ [key: string]: { status: any, send: any, open: any, close: any } }>({})
 const isCreateGameModalActive = ref(false)
 const router = useRouter()
@@ -19,7 +18,6 @@ setInterval(() => {
 }, 1000)
 
 handleMessage((message) => {
-  console.log('message recieved', message);
   allGames.value = JSON.parse(message)
 })
 
@@ -29,6 +27,17 @@ const availableGames = computed(() => {
 
 const isConnectedToRoom = computed(() => {
   return allGames.value.some(game => game.players.includes(props.username))
+})
+
+watch(allGames, () => {
+  if (allGames.value.some(game => game.players.includes(props.username) && game.status === 'PENDING')) {
+    console.log('user to connect: ', props.username);
+    const game = allGames.value.find(game => game.players.includes(props.username) && game.status === 'PENDING')
+    console.log('finded game for connect: ', game);
+    if (game?.players.length === game?.maxPlayers) {
+      startGame(game)
+    }
+  }
 })
 
 const createRoom = async (maxPlayers: number) => {
@@ -82,33 +91,20 @@ const startGame = async (game: CreatedGame) => {
   }
 }
 
-watch(allGames, () => {
-  console.log('watcher');
-  console.log('allGames', allGames.value);
-  if (allGames.value.some(game => game.players.includes(props.username) && game.status === 'PENDING')) {
-    console.log('user to connect: ', props.username);
-    const game = allGames.value.find(game => game.players.includes(props.username) && game.status === 'PENDING')
-    console.log('finded game for connect: ', game);
-    if (game?.players.length === game?.maxPlayers) {
-      startGame(game)
-    }
-  }
-})
+const closeModal = () => {
+  isCreateGameModalActive.value = false
+}
+
+
 
 onMounted(() => {
-
   send('GET_GAMES')
-
-
 })
 </script>
 
 <template>
-  <pre>
-    {{ allGames }}
-  </pre>
   <div class="container">
-    <CreateRoomModal v-if="isCreateGameModalActive" @create-game="createRoom" />
+    <CreateRoomModal v-if="isCreateGameModalActive" @create-game="createRoom" @close-modal="closeModal" />
     <div class="header">
       <h2>Available Games</h2>
       <BaseButton v-if="!isConnectedToRoom" @click="isCreateGameModalActive = true">CREATE
@@ -127,7 +123,6 @@ onMounted(() => {
   background-color: white;
   padding: 0.5rem 2rem;
   border-radius: 2rem;
-
 }
 
 .header {

@@ -1,17 +1,22 @@
 <script setup lang="ts">
 const selectedOption = ref(2)
+const modalContainer = ref<HTMLElement>(null);
 
-defineEmits(['createGame'])
+defineEmits(['createGame', 'closeModal'])
+
+onMounted(() => {
+  modalContainer.value?.focus();
+});
 </script>
 
 <template>
-  <div class="modalContainer">
-    <div class="modal">
+  <div ref="modalContainer" class="modalContainer" @keydown.escape="$emit('closeModal')" tabindex="0">
+    <div class=" modal">
       <div class="header">
         <h2>Create Game</h2>
-        <BaseButton bg-color="transparent" text-color="black">X</BaseButton>
+        <BaseButton bg-color="transparent" text-color="black" @click="$emit('closeModal')">X</BaseButton>
       </div>
-      <div class="body">
+      <div class=" body">
         <h3>Choose number of players:</h3>
         <div>
           <button :class="selectedOption === playerQuantity ? 'active modalButton' : 'modalButton'"
