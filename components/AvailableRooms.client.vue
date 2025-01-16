@@ -12,6 +12,16 @@ const allGames = ref<CreatedGame[]>([])
 const roomConnections = ref<{ [key: string]: { status: any, send: any, open: any, close: any } }>({})
 const isCreateGameModalActive = ref(false)
 const router = useRouter()
+const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/games`)
+
+setInterval(() => {
+  send('GET_GAMES')
+}, 1000)
+
+handleMessage((message) => {
+  console.log('message recieved', message);
+  allGames.value = JSON.parse(message)
+})
 
 const availableGames = computed(() => {
   return allGames.value.filter(game => game.status === 'PENDING')
@@ -86,17 +96,10 @@ watch(allGames, () => {
 })
 
 onMounted(() => {
-  const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/games`)
 
   send('GET_GAMES')
 
-  setInterval(() => {
-    send('GET_GAMES')
-  }, 1000)
 
-  handleMessage((message) => {
-    allGames.value = JSON.parse(message)
-  })
 })
 </script>
 

@@ -7,6 +7,7 @@ export default defineWebSocketHandler({
   open(peer) {
     peer.subscribe(rooms);
     console.log(`Opened WS `);
+    peer.send(JSON.stringify(games.value));
     peers.push(peer);
   },
   close(peer) {
@@ -16,8 +17,7 @@ export default defineWebSocketHandler({
     console.log("error on ws", peer, error);
   },
   message(peer, message) {
-    peers.forEach(p => {
-      peer.publish(rooms, JSON.stringify(games.value));
-    });
+    console.log(JSON.stringify(games.value));
+    peer.send(JSON.stringify(games.value));
   },
 });
