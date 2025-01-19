@@ -5,8 +5,17 @@ const players = ref<string[]>([])
 const gameState = ref<GameState>({} as GameState)
 const username = sessionStorage.getItem('username')
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
+const boardState = ref<BoardState[]>([] as BoardState)
+
+watch(gameState, (newState) => {
+  console.log(newState)
+  if (Object.keys(newState).length > 0) {
+    boardState.value = newState.boardState
+  }
+})
 
 handleMessage((message) => {
+  console.log(JSON.parse(message));
   gameState.value = JSON.parse(message)
 })
 
@@ -45,231 +54,62 @@ definePageMeta({
 </script>
 
 <template>
-  <!-- <pre v-if="false">
-    {{ gameState }}
-  </pre>
-  <div v-if="false">
-    <h1>Game #{{ route.params.roomId }}</h1>
-  </div> -->
+  <div style="position: fixed; top: 0; left: 0; z-index: 9999; height: 100vh; width: fit-content; overflow-y: scroll;">
+    <pre>
+      {{ gameState }}
+    </pre>
+  </div>
 
   <div class="table">
-    <div class="board">
+    <div v-if="boardState.tiles.length" class="board">
       <div class="center">
         <h1 class="">MONOPOLY</h1>
       </div>
 
+      <div class="space corner go">
+        <div class="container">
+          {{ boardState.tiles[0].name }}
+        </div>
+      </div>
+
       <div class="row horizontal-row top-row ">
 
+        <div v-for="tile in boardState.tiles.slice(1, 10)" class="space ">
+          <div class="container">
+            {{ tile.id }}
+          </div>
+        </div>
 
-        <div class="space ">
-          <div class="container">
-            2
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            3
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            4
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            5
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            6
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            7
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            8
-          </div>
-        </div>
-        <div class="space  ">
-          <div class="container">
-            9
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            10
-          </div>
-        </div>
       </div>
 
       <div class="space corner jail">
         <div class="container">
-          JAIL
+          {{ boardState.tiles[10].name }}
         </div>
       </div>
 
       <div class="row vertical-row right-row">
-        <div class="space ">
+
+        <div v-for="tile in boardState.tiles.slice(11, 20)" class="space ">
           <div class="container">
-            12
+            {{ tile.id }}
           </div>
         </div>
-        <div class="space ">
-          <div class="container">
-            13
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            14
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            15
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            16
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            17
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            18
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            19
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            20
-          </div>
-        </div>
+
       </div>
 
 
       <div class="space corner free-parking">
         <div class="container">
-          FREE PARKING
+          {{ boardState.tiles[20].name }}
         </div>
       </div>
 
       <div class="row horizontal-row bottom-row">
-        <div class="space">
+        <div v-for="tile in boardState.tiles.slice(21, 30).reverse()" class="space">
           <div class="container">
-            30
+            {{ tile.id }}
           </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            29
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            28
-          </div>
-        </div>
-        <div class="space ">
-          <div class="container">
-            27
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            26
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            25
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            24
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            23
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            22
-          </div>
-        </div>
-      </div>
-
-
-
-      <div class="row vertical-row left-row">
-        <div class="space">
-          <div class="container">
-            40
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            39
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            38
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            37
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            36
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            35
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            34
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            33
-          </div>
-        </div>
-        <div class="space">
-          <div class="container">
-            32
-          </div>
-        </div>
-      </div>
-
-      <div class="space corner go">
-        <div class="container">
-          GO
         </div>
       </div>
 
@@ -279,7 +119,15 @@ definePageMeta({
         </div>
       </div>
 
+      <div class="row vertical-row left-row">
 
+        <div v-for="tile in boardState.tiles.slice(31, 40).reverse()" class="space">
+          <div class="container">
+            {{ tile.id }}
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -427,8 +275,9 @@ $corner-tile-size: calc(6vw + 4px);
   position: relative;
 
   .container {
-    justify-content: flex-start;
-    transform: rotate(315deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
@@ -439,8 +288,9 @@ $corner-tile-size: calc(6vw + 4px);
 
 
   .container {
+    display: flex;
     align-items: center;
-    transform: rotate(45deg);
+    justify-content: center;
   }
 }
 
@@ -449,8 +299,9 @@ $corner-tile-size: calc(6vw + 4px);
   grid-row: 1 / 2;
 
   .container {
+    display: flex;
+    align-items: center;
     justify-content: center;
-    transform: rotate(45deg);
   }
 }
 
@@ -459,8 +310,9 @@ $corner-tile-size: calc(6vw + 4px);
   grid-row: 1 / 1;
 
   .container {
+    display: flex;
+    align-items: center;
     justify-content: center;
-    transform: rotate(-45deg);
   }
 }
 </style>

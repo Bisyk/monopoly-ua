@@ -1,7 +1,9 @@
 import { useWebSocket } from "@vueuse/core";
 
 export const useWebsocketManager = (url: string) => {
-  const { status, data, send, open, close } = useWebSocket(url);
+  const { status, data, send, open, close } = useWebSocket(url, {
+    autoReconnect: true,
+  });
 
   const handleMessage = (cb: (newValue: string) => void) => {
     watch(data, newValue => {

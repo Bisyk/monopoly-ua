@@ -483,10 +483,17 @@ export default defineWebSocketHandler({
       if (gameStates[roomId].players.includes(parsedMessage.payload.username)) {
         return;
       }
-      gameStates[roomId].players.push(parsedMessage.payload.username);
+      gameStates[roomId].players.push({
+        username: parsedMessage.payload.username,
+        position: 1,
+        balance: 15000,
+        properties: [],
+        jailed: false,
+        turnsInJail: 0,
+      });
       console.log("gameState", gameStates[roomId]);
 
-      gameStates[roomId].currentTurn = gameStates[roomId].players[0];
+      gameStates[roomId].currentTurn = gameStates[roomId].players[0].username;
 
       syncGameState(roomId, peer);
     }
