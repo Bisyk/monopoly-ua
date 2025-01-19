@@ -480,7 +480,10 @@ export default defineWebSocketHandler({
     console.log(parsedMessage);
 
     if (parsedMessage.action === "JOIN_GAME") {
-      if (gameStates[roomId].players.includes(parsedMessage.payload.username)) {
+      const isUserAlreadyInGame = gameStates[roomId].players.some(
+        player => player.username === parsedMessage.payload.username
+      );
+      if (isUserAlreadyInGame) {
         return;
       }
       gameStates[roomId].players.push({

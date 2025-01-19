@@ -74,7 +74,7 @@ definePageMeta({
 
       <div class="row horizontal-row top-row ">
 
-        <div v-for="tile in boardState.tiles.slice(1, 10)" class="space ">
+        <div v-for="tile in boardState.tiles.slice(1, 10)" class="space" :key="tile.id">
           <div class="container">
             {{ tile.id }}
           </div>
@@ -90,7 +90,7 @@ definePageMeta({
 
       <div class="row vertical-row right-row">
 
-        <div v-for="tile in boardState.tiles.slice(11, 20)" class="space ">
+        <div v-for="tile in boardState.tiles.slice(11, 20)" class="space " :key="tile.id">
           <div class="container">
             {{ tile.id }}
           </div>
@@ -106,7 +106,7 @@ definePageMeta({
       </div>
 
       <div class="row horizontal-row bottom-row">
-        <div v-for="tile in boardState.tiles.slice(21, 30).reverse()" class="space">
+        <div v-for="tile in boardState.tiles.slice(21, 30).reverse()" class="space" :key="tile.id">
           <div class="container">
             {{ tile.id }}
           </div>
@@ -121,7 +121,7 @@ definePageMeta({
 
       <div class="row vertical-row left-row">
 
-        <div v-for="tile in boardState.tiles.slice(31, 40).reverse()" class="space">
+        <div v-for="tile in boardState.tiles.slice(31, 40).reverse()" class="space" :key="tile.id">
           <div class="container">
             {{ tile.id }}
           </div>
