@@ -63,8 +63,8 @@ definePageMeta({
     <div v-if="boardState.tiles.length" class="board">
       <div class="center">
         <div>
-          <BaseButton v-if="gameState?.currentTurn === username" @click="handleUserTurn">ROLL DICE</BaseButton>
-          <div v-if="gameState.gameLog && gameState?.gameLog.length">
+          <BaseButton v-if="gameState?.currentTurn === username" @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
+          <div v-if="gameState.gameLog && gameState?.gameLog.length" class="gameLog">
             <p v-for="entry in gameState?.gameLog">{{ entry.username }}: {{ entry.msg }}</p>
           </div>
         </div>
@@ -133,6 +133,7 @@ $corner-tile-size: calc(6vw + 4px);
 }
 
 .center {
+  position: relative;
   grid-column: 2 / 11;
   grid-row: 2 / 11;
   display: grid;
@@ -200,86 +201,20 @@ $corner-tile-size: calc(6vw + 4px);
   }
 }
 
-// =================
-// SPACES
-// =================
-
-// .space {
-//   background: white;
-//   text-align: center;
-//   // border: 1px solid black;
-//   border-radius: 12px;
-//   filter: drop-shadow(0 0 0.15rem rgba(0, 0, 0, 0.5));
-
-//   .container {
-//     background-color: transparent;
-//     display: flex;
-//     flex-direction: column;
-//     justify-content: space-between;
-//     position: relative;
-//     transform-origin: center;
-//     height: $corner-tile-size; // Adjust height based on viewport width
-//     width: $tile-size; // Adjust width based on viewport width
-//   }
-// }
-
-// // Corner spaces
-// .corner {
-//   .container {
-//     justify-content: space-around;
-//     height: 100%;
-//     width: 100%;
-//   }
-
-//   .name {
-//     padding: 0;
-//   }
-// }
-
-// // Specific spaces
-// .free-parking {
-//   grid-column: 11;
-//   grid-row: 11 / 12;
-//   position: relative;
-
-//   .container {
-//     display: flex;
-//     align-items: center;
-//     justify-content: center;
-//   }
-// }
-
-// .go-to-jail {
-//   grid-column: 1;
-//   grid-row: 11 / 12;
-//   display: grid;
-
-
-//   .container {
-//     display: flex;
-//     align-items: center;
-//     justify-content: center;
-//   }
-// }
-
-// .go {
-//   grid-column: 1;
-//   grid-row: 1 / 2;
-
-//   .container {
-//     display: flex;
-//     align-items: center;
-//     justify-content: center;
-//   }
-// }
-
-// .jail {
-//   grid-column: 11;
-//   grid-row: 1 / 1;
-
-//   .container {
-//     display: flex;
-//     align-items: center;
-//     justify-content: center;
-//   }
-// }</style>
+.gameLog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(126, 126, 126, 0.1);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+  border-radius: 2rem;
+}
+</style>
