@@ -1,3 +1,6 @@
 export const rollDice = () => {
-  return generateRandomNumberInRange(1, 6)
-}
+  return {
+    left: generateRandomNumberInRange(1, 6),
+    right: generateRandomNumberInRange(1, 6),
+  };
+};

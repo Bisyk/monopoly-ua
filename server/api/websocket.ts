@@ -443,7 +443,7 @@ const initialState = {
 // todo: replace with actual game state
 const MAX_PLAYERS = 2;
 
-const gameStates: { [roomId: string]: GameState } = {};
+const gameState: { [roomId: string]: GameState } = {};
 
 const connectedPeers: { [roomId: string]: any[] } = {};
 
@@ -453,8 +453,8 @@ export default defineWebSocketHandler({
     peer.subscribe(roomId);
     console.log(`Opened WS for room: ${roomId}`);
 
-    if (!gameStates[roomId]) {
-      gameStates[roomId] = initialState;
+    if (!gameState[roomId]) {
+      gameState[roomId] = initialState;
     }
 
     if (!connectedPeers[roomId]) {
@@ -480,13 +480,13 @@ export default defineWebSocketHandler({
     console.log(parsedMessage);
 
     if (parsedMessage.action === "JOIN_GAME") {
-      const isUserAlreadyInGame = gameStates[roomId].players.some(
+      const isUserAlreadyInGame = gameState[roomId].players.some(
         player => player.username === parsedMessage.payload.username
       );
       if (isUserAlreadyInGame) {
         return;
       }
-      gameStates[roomId].players.push({
+      gameState[roomId].players.push({
         username: parsedMessage.payload.username,
         position: 1,
         balance: 15000,
@@ -494,9 +494,9 @@ export default defineWebSocketHandler({
         jailed: false,
         turnsInJail: 0,
       });
-      console.log("gameState", gameStates[roomId]);
+      console.log("gameState", gameState[roomId]);
 
-      gameStates[roomId].currentTurn = gameStates[roomId].players[0].username;
+      gameState[roomId].currentTurn = gameState[roomId].players[0].username;
 
       syncGameState(roomId, peer);
     }
@@ -505,23 +505,38 @@ export default defineWebSocketHandler({
       console.log("ROLL_DICE");
       console.log(parsedMessage.payload.turnResult);
 
-      const indexOfCurrentTurn = gameStates[roomId].players.indexOf(
-        gameStates[roomId].currentTurn
-      );
+      const { left, right } = parsedMessage.payload.turnResult;
 
-      gameStates[roomId].gameLog.push({
-        username: gameStates[roomId].currentTurn,
-        msg: `got ${parsedMessage.payload.turnResult}`,
+      // const indexOfPlayerCurrentTurn = gameState[roomId].players.indexOf(
+      //   gameState[roomId].currentTurn
+      // );
+
+      const currentTurnPlayer = gameState[roomId].players.filter(
+        p => p.username === gameState[roomId].currentTurn
+      )[0];
+      const currentTurnPlayerIdx =
+        gameState[roomId].players.indexOf(currentTurnPlayer);
+
+      gameState[roomId].gameLog.push({
+        username: gameState[roomId].currentTurn,
+        msg: `got ${left} and ${right}`,
       });
 
-      if (indexOfCurrentTurn < MAX_PLAYERS - 1) {
-        gameStates[roomId].currentTurn =
-          gameStates[roomId].players[indexOfCurrentTurn + 1];
-      } else {
-        gameStates[roomId].currentTurn = gameStates[roomId].players[0];
+      const boardSize = 40;
+      currentTurnPlayer.position =
+        (currentTurnPlayer.position + left + right) % boardSize;
+      if (currentTurnPlayer.position === 0) {
+        currentTurnPlayer.position = boardSize;
       }
 
-      console.log("gameState after ROLL_DICE", gameStates[roomId]);
+      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
+        gameState[roomId].currentTurn =
+          gameState[roomId].players[currentTurnPlayerIdx + 1].username;
+      } else {
+        gameState[roomId].currentTurn = gameState[roomId].players[0].username;
+      }
+
+      console.log("gameState after ROLL_DICE", gameState[roomId]);
 
       syncGameState(roomId, peer);
     }
@@ -536,7 +551,7 @@ function getRoomIdFromPeer(url: string): string {
 
 function syncGameState(roomId: string, peer) {
   const updatedGameState = {
-    ...gameStates[roomId],
+    ...gameState[roomId],
   };
 
   connectedPeers[roomId].forEach(connectedPeer => {

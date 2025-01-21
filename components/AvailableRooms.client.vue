@@ -103,6 +103,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <pre>{{ allGames }}</pre>
   <div class="container">
     <CreateRoomModal v-if="isCreateGameModalActive" @create-game="createRoom" @close-modal="closeModal" />
     <div class="header">

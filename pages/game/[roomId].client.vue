@@ -21,16 +21,15 @@ handleMessage((message) => {
 
 const handleUserTurn = () => {
   const turnResult = rollDice()
-  send(JSON.stringify({ action: 'ROLL_DICE', payload: { turnResult } }))
+  send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
 }
 
 onMounted(async () => {
-
   const username = sessionStorage.getItem('username')
+  console.log('username: ', username);
   const { body } = await $fetch(`/games/${route.params.roomId}`)
   const { game } = JSON.parse(body)
   players.value = game.players
-
 
   if (!game.players.includes(username)) {
     router.push('/')
@@ -63,82 +62,51 @@ definePageMeta({
   <div class="table">
     <div v-if="boardState.tiles.length" class="board">
       <div class="center">
-        <h1 class="">MONOPOLY</h1>
-      </div>
-
-      <div class="space corner go">
-        <div class="container">
-          {{ boardState.tiles[0].name }}
+        <div>
+          <BaseButton v-if="gameState?.currentTurn === username" @click="handleUserTurn">ROLL DICE</BaseButton>
+          <div v-if="gameState.gameLog && gameState?.gameLog.length">
+            <p v-for="entry in gameState?.gameLog">{{ entry.username }}: {{ entry.msg }}</p>
+          </div>
         </div>
       </div>
+
+      <BoardTile :type="boardState.tiles[0].type" :name="boardState.tiles[0].name" :players="gameState.players"
+        :id="1" />
 
       <div class="row horizontal-row top-row ">
-
-        <div v-for="tile in boardState.tiles.slice(1, 10)" class="space" :key="tile.id">
-          <div class="container">
-            {{ tile.id }}
-          </div>
-        </div>
-
+        <BoardTile v-for="tile in boardState.tiles.slice(1, 10)" :type="tile.type" :name="tile.name"
+          :players="gameState.players" :id="tile.id" />
       </div>
 
-      <div class="space corner jail">
-        <div class="container">
-          {{ boardState.tiles[10].name }}
-        </div>
-      </div>
+      <BoardTile :type="boardState.tiles[10].type" :name="boardState.tiles[10].name" :players="gameState.players"
+        :id="11" />
 
       <div class="row vertical-row right-row">
-
-        <div v-for="tile in boardState.tiles.slice(11, 20)" class="space " :key="tile.id">
-          <div class="container">
-            {{ tile.id }}
-          </div>
-        </div>
-
+        <BoardTile v-for="tile in boardState.tiles.slice(11, 20)" :type="tile.type" :name="tile.name"
+          :players="gameState.players" :id="tile.id" />
       </div>
 
-
-      <div class="space corner free-parking">
-        <div class="container">
-          {{ boardState.tiles[20].name }}
-        </div>
-      </div>
+      <BoardTile :type="boardState.tiles[20].type" :name="boardState.tiles[20].name" :players="gameState.players"
+        :id="21" />
 
       <div class="row horizontal-row bottom-row">
-        <div v-for="tile in boardState.tiles.slice(21, 30).reverse()" class="space" :key="tile.id">
-          <div class="container">
-            {{ tile.id }}
-          </div>
-        </div>
+        <BoardTile v-for="tile in boardState.tiles.slice(21, 30).reverse()" :type="tile.type" :name="tile.name"
+          :players="gameState.players" :id="tile.id" />
       </div>
 
-      <div class="space corner go-to-jail">
-        <div class="container">
-          GO TO JAIL
-        </div>
-      </div>
+      <BoardTile :type="boardState.tiles[30].type" :name="boardState.tiles[30].name" :players="gameState.players"
+        :id="31" />
 
       <div class="row vertical-row left-row">
-
-        <div v-for="tile in boardState.tiles.slice(31, 40).reverse()" class="space" :key="tile.id">
-          <div class="container">
-            {{ tile.id }}
-          </div>
-        </div>
-
+        <BoardTile v-for="tile in boardState.tiles.slice(31, 40).reverse()" :type="tile.type" :name="tile.name"
+          :players="gameState.players" :id="tile.id" />
       </div>
     </div>
   </div>
 
 
 
-  <!-- <div>
-    <BaseButton v-if="gameState?.currentTurn === username" @click="handleUserTurn">ROLL DICE</BaseButton>
-    <div v-if="gameState.gameLog && gameState?.gameLog.length">
-      <p v-for="entry in gameState?.gameLog">{{ entry.username }}: {{ entry.msg }}</p>
-    </div>
-  </div> -->
+
 </template>
 
 <style scoped lang="scss">
@@ -228,7 +196,7 @@ $corner-tile-size: calc(6vw + 4px);
   grid-row: 2 / 11;
 
   .container {
-    transform: translate(50%, -50%) rotate(-90deg);
+    transform: translate(-50%, -50%) rotate(-90deg);
   }
 }
 
@@ -236,83 +204,82 @@ $corner-tile-size: calc(6vw + 4px);
 // SPACES
 // =================
 
-.space {
-  background: white;
-  text-align: center;
-  // border: 1px solid black;
-  border-radius: 12px;
-  filter: drop-shadow(0 0 0.15rem rgba(0, 0, 0, 0.5));
+// .space {
+//   background: white;
+//   text-align: center;
+//   // border: 1px solid black;
+//   border-radius: 12px;
+//   filter: drop-shadow(0 0 0.15rem rgba(0, 0, 0, 0.5));
 
-  .container {
-    background-color: transparent;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
-    transform-origin: center;
-    height: $corner-tile-size; // Adjust height based on viewport width
-    width: $tile-size; // Adjust width based on viewport width
-  }
-}
+//   .container {
+//     background-color: transparent;
+//     display: flex;
+//     flex-direction: column;
+//     justify-content: space-between;
+//     position: relative;
+//     transform-origin: center;
+//     height: $corner-tile-size; // Adjust height based on viewport width
+//     width: $tile-size; // Adjust width based on viewport width
+//   }
+// }
 
-// Corner spaces
-.corner {
-  .container {
-    justify-content: space-around;
-    height: 100%;
-    width: 100%;
-  }
+// // Corner spaces
+// .corner {
+//   .container {
+//     justify-content: space-around;
+//     height: 100%;
+//     width: 100%;
+//   }
 
-  .name {
-    padding: 0;
-  }
-}
+//   .name {
+//     padding: 0;
+//   }
+// }
 
-// Specific spaces
-.free-parking {
-  grid-column: 11;
-  grid-row: 11 / 12;
-  position: relative;
+// // Specific spaces
+// .free-parking {
+//   grid-column: 11;
+//   grid-row: 11 / 12;
+//   position: relative;
 
-  .container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
+//   .container {
+//     display: flex;
+//     align-items: center;
+//     justify-content: center;
+//   }
+// }
 
-.go-to-jail {
-  grid-column: 1;
-  grid-row: 11 / 12;
-  display: grid;
+// .go-to-jail {
+//   grid-column: 1;
+//   grid-row: 11 / 12;
+//   display: grid;
 
 
-  .container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
+//   .container {
+//     display: flex;
+//     align-items: center;
+//     justify-content: center;
+//   }
+// }
 
-.go {
-  grid-column: 1;
-  grid-row: 1 / 2;
+// .go {
+//   grid-column: 1;
+//   grid-row: 1 / 2;
 
-  .container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
+//   .container {
+//     display: flex;
+//     align-items: center;
+//     justify-content: center;
+//   }
+// }
 
-.jail {
-  grid-column: 11;
-  grid-row: 1 / 1;
+// .jail {
+//   grid-column: 11;
+//   grid-row: 1 / 1;
 
-  .container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
-</style>
+//   .container {
+//     display: flex;
+//     align-items: center;
+//     justify-content: center;
+//   }
+// }</style>
