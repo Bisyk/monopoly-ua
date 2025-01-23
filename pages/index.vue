@@ -1,5 +1,8 @@
-<script>
-export default {}
+<script setup lang="ts">
+
+definePageMeta({
+  name: 'Monopoly UA | Home',
+})
 </script>
 
 <template>

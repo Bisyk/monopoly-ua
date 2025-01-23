@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import AvailableRoomCard from './AvailableRoomCard.vue'
 import CreateRoomModal from './CreateRoomModal.vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   username: { type: String, required: true },
@@ -103,6 +104,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <pre>{{ allGames }}</pre>
   <div class="container">
     <CreateRoomModal v-if="isCreateGameModalActive" @create-game="createRoom" @close-modal="closeModal" />
     <div class="header">
