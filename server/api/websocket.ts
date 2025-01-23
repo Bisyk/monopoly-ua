@@ -20,7 +20,7 @@ const initialState = {
       {
         id: 2,
         type: "property",
-        name: "Property 2",
+        name: "atb",
         position: 2,
         owner: null,
         houses: 0,
@@ -30,8 +30,8 @@ const initialState = {
       },
       {
         id: 3,
-        type: "property",
-        name: "Property 3",
+        type: "chance",
+        name: "chance 3",
         position: 3,
         owner: null,
         houses: 0,
@@ -42,7 +42,7 @@ const initialState = {
       {
         id: 4,
         type: "property",
-        name: "Property 4",
+        name: "silpo",
         position: 4,
         owner: null,
         houses: 0,
@@ -52,8 +52,8 @@ const initialState = {
       },
       {
         id: 5,
-        type: "property",
-        name: "Property 5",
+        type: "tax",
+        name: "tax 1",
         position: 5,
         owner: null,
         houses: 0,
@@ -63,8 +63,8 @@ const initialState = {
       },
       {
         id: 6,
-        type: "property",
-        name: "Property 6",
+        type: "car",
+        name: "mercedes-benz",
         position: 6,
         owner: null,
         houses: 0,
@@ -75,7 +75,7 @@ const initialState = {
       {
         id: 7,
         type: "property",
-        name: "Property 7",
+        name: "staff",
         position: 7,
         owner: null,
         houses: 0,
@@ -85,7 +85,7 @@ const initialState = {
       },
       {
         id: 8,
-        type: "property",
+        type: "chance",
         name: "Property 8",
         position: 8,
         owner: null,
@@ -97,7 +97,7 @@ const initialState = {
       {
         id: 9,
         type: "property",
-        name: "Property 9",
+        name: "urban",
         position: 9,
         owner: null,
         houses: 0,
@@ -108,7 +108,7 @@ const initialState = {
       {
         id: 10,
         type: "property",
-        name: "Property 10",
+        name: "riotdivision",
         position: 9,
         owner: null,
         houses: 0,
@@ -130,7 +130,7 @@ const initialState = {
       {
         id: 12,
         type: "property",
-        name: "Property 12",
+        name: "depositphotos",
         position: 12,
         owner: null,
         houses: 0,
@@ -140,8 +140,8 @@ const initialState = {
       },
       {
         id: 13,
-        type: "property",
-        name: "Property 13",
+        type: "bonus-property",
+        name: "ukrnafta",
         position: 13,
         owner: null,
         houses: 0,
@@ -152,7 +152,7 @@ const initialState = {
       {
         id: 14,
         type: "property",
-        name: "Property 14",
+        name: "gitlab",
         position: 14,
         owner: null,
         houses: 0,
@@ -163,7 +163,7 @@ const initialState = {
       {
         id: 15,
         type: "property",
-        name: "Property 15",
+        name: "grammarly",
         position: 15,
         owner: null,
         houses: 0,
@@ -173,8 +173,8 @@ const initialState = {
       },
       {
         id: 16,
-        type: "property",
-        name: "Property 16",
+        type: "car",
+        name: "porsche",
         position: 16,
         owner: null,
         houses: 0,
@@ -185,7 +185,7 @@ const initialState = {
       {
         id: 17,
         type: "property",
-        name: "Property 17",
+        name: "globallogic",
         position: 17,
         owner: null,
         houses: 0,
@@ -195,8 +195,8 @@ const initialState = {
       },
       {
         id: 18,
-        type: "property",
-        name: "Property 18",
+        type: "chance",
+        name: "chance 3",
         position: 18,
         owner: null,
         houses: 0,
@@ -207,7 +207,7 @@ const initialState = {
       {
         id: 19,
         type: "property",
-        name: "Property 19",
+        name: "softserve",
         position: 19,
         owner: null,
         houses: 0,
@@ -218,7 +218,7 @@ const initialState = {
       {
         id: 20,
         type: "property",
-        name: "Property 20",
+        name: "epam",
         position: 20,
         owner: null,
         houses: 0,
@@ -228,14 +228,14 @@ const initialState = {
       },
       {
         id: 21,
-        type: "freeParking",
-        name: "Free Parking",
+        type: "parking",
+        name: "freeparking",
         position: 21,
       },
       {
         id: 22,
         type: "property",
-        name: "Property 22",
+        name: "monobank",
         position: 22,
         owner: null,
         houses: 0,
@@ -245,8 +245,8 @@ const initialState = {
       },
       {
         id: 23,
-        type: "property",
-        name: "Property 23",
+        type: "chance",
+        name: "chance 4",
         position: 23,
         owner: null,
         houses: 0,
@@ -257,7 +257,7 @@ const initialState = {
       {
         id: 24,
         type: "property",
-        name: "Property 24",
+        name: "oschadbank",
         position: 24,
         owner: null,
         houses: 0,
@@ -268,7 +268,7 @@ const initialState = {
       {
         id: 25,
         type: "property",
-        name: "Property 25",
+        name: "privatbank",
         position: 25,
         owner: null,
         houses: 0,
@@ -278,8 +278,8 @@ const initialState = {
       },
       {
         id: 26,
-        type: "property",
-        name: "Property 26",
+        type: "car",
+        name: "bmw",
         position: 26,
         owner: null,
         houses: 0,
@@ -290,7 +290,7 @@ const initialState = {
       {
         id: 27,
         type: "property",
-        name: "Property 27",
+        name: "okko",
         position: 27,
         owner: null,
         houses: 0,
@@ -301,7 +301,7 @@ const initialState = {
       {
         id: 28,
         type: "property",
-        name: "Property 28",
+        name: "wog",
         position: 28,
         owner: null,
         houses: 0,
@@ -311,8 +311,8 @@ const initialState = {
       },
       {
         id: 29,
-        type: "property",
-        name: "Property 29",
+        type: "bonus-property",
+        name: "naftogaz",
         position: 29,
         owner: null,
         houses: 0,
@@ -323,7 +323,7 @@ const initialState = {
       {
         id: 30,
         type: "property",
-        name: "Property 30",
+        name: "socar",
         position: 30,
         owner: null,
         houses: 0,
@@ -334,13 +334,13 @@ const initialState = {
       {
         id: 31,
         type: "goToJail",
-        name: "Go To Jail",
+        name: "goToJail",
         position: 31,
       },
       {
         id: 32,
         type: "property",
-        name: "Property 32",
+        name: "ukrposhta",
         position: 32,
         owner: null,
         houses: 0,
@@ -351,7 +351,7 @@ const initialState = {
       {
         id: 33,
         type: "property",
-        name: "Property 33",
+        name: "meest",
         position: 33,
         owner: null,
         houses: 0,
@@ -361,8 +361,8 @@ const initialState = {
       },
       {
         id: 34,
-        type: "property",
-        name: "Property 34",
+        type: "chance",
+        name: "chance 5",
         position: 34,
         owner: null,
         houses: 0,
@@ -373,7 +373,7 @@ const initialState = {
       {
         id: 35,
         type: "property",
-        name: "Property 35",
+        name: "novaposhta",
         position: 35,
         owner: null,
         houses: 0,
@@ -383,8 +383,8 @@ const initialState = {
       },
       {
         id: 36,
-        type: "property",
-        name: "Property 36",
+        type: "car",
+        name: "toyota",
         position: 36,
         owner: null,
         houses: 0,
@@ -394,8 +394,8 @@ const initialState = {
       },
       {
         id: 37,
-        type: "property",
-        name: "Property 37",
+        type: "luxury-tax",
+        name: "luxurytax",
         position: 37,
         owner: null,
         houses: 0,
@@ -406,7 +406,7 @@ const initialState = {
       {
         id: 38,
         type: "property",
-        name: "Property 38",
+        name: "metinvest",
         position: 38,
         owner: null,
         houses: 0,
@@ -416,8 +416,8 @@ const initialState = {
       },
       {
         id: 39,
-        type: "property",
-        name: "Property 39",
+        type: "chance",
+        name: "chance 6",
         position: 39,
         owner: null,
         houses: 0,
@@ -428,7 +428,7 @@ const initialState = {
       {
         id: 40,
         type: "property",
-        name: "Property 40",
+        name: "dtek",
         position: 40,
         owner: null,
         houses: 0,

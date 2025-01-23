@@ -21,20 +21,20 @@ defineEmits(['joinGame'])
   <div class="card">
     <h3>Game #{{ gameId }}</h3>
     <div class="playersContainer">
-      <p v-for="player in maxPlayers">
-      <div class="playerCard">
-        <div class="avatarContainer">
-          <div v-if="players[player - 1]" class="avatar"></div>
-          <BaseButton v-else @click="$emit('joinGame', gameId)" class="avatarPlaceholder" bg-color="transparent"
-            text-color="black">+</BaseButton>
+      <div v-for="player in maxPlayers">
+        <div class="playerCard">
+          <div class="avatarContainer">
+            <div v-if="players[player - 1]" class="avatar"></div>
+            <BaseButton v-else @click="$emit('joinGame', gameId)" class="avatarPlaceholder" bg-color="transparent"
+              text-color="black">+</BaseButton>
 
+          </div>
+          <p class="playerName" v-if="players[player - 1]">
+            {{ players[player - 1] }}
+          </p>
+          <p class="playerName" v-else>Join now</p>
         </div>
-        <p class="playerName" v-if="players[player - 1]">
-          {{ players[player - 1] }}
-        </p>
-        <p class="playerName" v-else>Join now</p>
       </div>
-      </p>
     </div>
   </div>
 </template>
