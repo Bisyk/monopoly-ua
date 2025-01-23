@@ -72,7 +72,7 @@ definePageMeta({
       <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
     </GameModal>
     <div class="table">
-      <div v-if="boardState.tiles.length" class="board">
+      <div v-if="boardState.tiles && boardState.tiles.length" class="board">
         <div class="center">
           <div>
             <div v-if="gameState.gameLog && gameState?.gameLog.length" class="gameLog">

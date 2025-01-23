@@ -6,7 +6,7 @@ export default defineNuxtConfig({
   alias: {
     "@": resolve(__dirname, "/"),
   },
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   nitro: {
     experimental: {
       websocket: true,
