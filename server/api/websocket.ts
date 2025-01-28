@@ -1,6 +1,7 @@
 import { parse } from "url";
 import prisma from "~/lib/prisma";
 import {
+  colors,
   initialGroupsState,
   initialPlayersState,
   initialTilesState,
@@ -36,8 +37,9 @@ export default defineWebSocketHandler({
       const game = await prisma.game.create({
         data: {
           associatedRoomId: roomId,
-          players: room!.players.map(player => ({
+          players: room!.players.map((player, idx) => ({
             username: player,
+            color: colors[idx],
             ...initialPlayersState,
           })),
           currentTurn: room!.players[0],

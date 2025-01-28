@@ -451,3 +451,14 @@ export const initialPlayersState = {
   jailed: false,
   turnsInJail: 0,
 };
+
+export const colors = [
+  "#0000FF", // blue
+  "#008000", // green
+  "#FF0000", // red
+  "#FFFF00", // yellow
+  "#800080", // purple
+  "#FFA500", // orange
+  "#8B4513", // brown
+  "#FFC0CB", // pink
+];

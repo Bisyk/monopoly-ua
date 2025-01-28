@@ -30,6 +30,7 @@ model Game {
 
 type Player {
   username             String
+  color                String
   position             Int
   balance              Int
   properties           Int[]
