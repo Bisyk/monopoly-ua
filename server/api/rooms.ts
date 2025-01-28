@@ -1,5 +1,4 @@
 import prisma from "~/lib/prisma";
-// import { games } from "../routes/gamesList";
 
 const rooms = "Rooms";
 const peers = [];

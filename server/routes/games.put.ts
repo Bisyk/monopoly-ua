@@ -1,5 +1,4 @@
 import prisma from "~/lib/prisma";
-import { games } from "./gamesList";
 
 export default defineEventHandler(async event => {
   console.log("PUT /games");
@@ -10,7 +9,6 @@ export default defineEventHandler(async event => {
 
   if (action.type === "JOIN_ROOM") {
     console.log("PUT /games JOIN_ROOM");
-    // const game = games.value.find(game => game.id === payload.roomId);
     const game = await prisma.room.findUnique({
       where: {
         id: payload.roomId,
@@ -33,10 +31,6 @@ export default defineEventHandler(async event => {
         players: [...game.players, payload.username],
       },
     });
-
-    // if (game.players.length === game.maxPlayers) {
-    //   game.status = "ACTIVE";
-    // }
 
     return {
       body: JSON.stringify({

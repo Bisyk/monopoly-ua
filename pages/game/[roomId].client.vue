@@ -18,7 +18,10 @@ watch(gameState, (newState) => {
 })
 
 const tilesState = computed(() => {
-  return boardState.value[0].tiles
+  if (boardState.value[0]) {
+    return boardState.value[0].tiles
+  }
+  return []
 })
 
 handleMessage((message) => {
@@ -37,9 +40,10 @@ onMounted(async () => {
   console.log('username: ', username);
   const { body } = await $fetch(`/games/${route.params.roomId}`)
   const { game } = JSON.parse(body)
+
   players.value = game.players
 
-  if (!game.players.includes(username)) {
+  if (!game.players.some(u => u.username === username)) {
     router.push('/')
   }
 
