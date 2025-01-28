@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -17,7 +17,12 @@ watch(gameState, (newState) => {
   }
 })
 
+const tilesState = computed(() => {
+  return boardState.value[0].tiles
+})
+
 handleMessage((message) => {
+  console.log('received message')
   console.log(JSON.parse(message));
   gameState.value = JSON.parse(message)
 })
@@ -72,7 +77,7 @@ definePageMeta({
       <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
     </GameModal>
     <div class="table">
-      <div v-if="boardState.tiles && boardState.tiles.length" class="board">
+      <div v-if="tilesState && tilesState.length" class="board">
         <div class="center">
           <div>
             <div v-if="gameState.gameLog && gameState?.gameLog.length" class="gameLog">
@@ -80,28 +85,28 @@ definePageMeta({
             </div>
           </div>
         </div>
-        <BoardTile :type="boardState.tiles[0].type" :name="boardState.tiles[0].name" :players="gameState.players"
-          :id="1" isHorizontal />
+        <BoardTile :type="tilesState[0].type" :name="tilesState[0].name" :players="gameState.players" :id="1"
+          isHorizontal />
         <div class="row horizontal-row top-row ">
-          <BoardTile v-for="tile in boardState.tiles.slice(1, 10)" :type="tile.type" :name="tile.name"
+          <BoardTile v-for="tile in tilesState.slice(1, 10)" :type="tile.type" :name="tile.name"
             :players="gameState.players" :id="tile.id" inTopRow isHorizontal />
         </div>
-        <BoardTile :type="boardState.tiles[10].type" :name="boardState.tiles[10].name" :players="gameState.players"
-          :id="11" isHorizontal />
+        <BoardTile :type="tilesState[10].type" :name="tilesState[10].name" :players="gameState.players" :id="11"
+          isHorizontal />
         <div class="row vertical-row right-row">
-          <BoardTile v-for="tile in boardState.tiles.slice(11, 20)" :type="tile.type" :name="tile.name"
+          <BoardTile v-for="tile in tilesState.slice(11, 20)" :type="tile.type" :name="tile.name"
             :players="gameState.players" :id="tile.id" inRightRow isVertical />
         </div>
-        <BoardTile :type="boardState.tiles[20].type" :name="boardState.tiles[20].name" :players="gameState.players"
-          :id="21" isHorizontal />
+        <BoardTile :type="tilesState[20].type" :name="tilesState[20].name" :players="gameState.players" :id="21"
+          isHorizontal />
         <div class="row horizontal-row bottom-row">
-          <BoardTile v-for="tile in boardState.tiles.slice(21, 30).reverse()" :type="tile.type" :name="tile.name"
+          <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :type="tile.type" :name="tile.name"
             :players="gameState.players" :id="tile.id" inBottomRow isHorizontal />
         </div>
-        <BoardTile :type="boardState.tiles[30].type" :name="boardState.tiles[30].name" :players="gameState.players"
-          :id="31" isHorizontal />
+        <BoardTile :type="tilesState[30].type" :name="tilesState[30].name" :players="gameState.players" :id="31"
+          isHorizontal />
         <div class="row vertical-row left-row">
-          <BoardTile v-for="tile in boardState.tiles.slice(31, 40).reverse()" :type="tile.type" :name="tile.name"
+          <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :type="tile.type" :name="tile.name"
             :players="gameState.players" :id="tile.id" isLeftRow isVertical />
         </div>
       </div>
