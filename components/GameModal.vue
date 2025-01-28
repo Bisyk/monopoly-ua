@@ -18,20 +18,16 @@ onMounted(() => {
 
 <style lang="scss">
 .game-modal {
-  position: absolute; // Changed from absolute to fixed
-  top: 0;
-  left: 0;
+  position: absolute;
   z-index: 9999;
-  width: 100%;
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%)
 }
 
 .modal-content {
-  width: 30vw;
-  height: 40vh;
+  width: 25vw;
+  height: 50vh;
   background-color: white;
   padding: 2rem;
   border-radius: 8px;
