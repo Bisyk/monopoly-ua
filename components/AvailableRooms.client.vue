@@ -12,7 +12,7 @@ const allGames = ref<CreatedGame[]>([])
 const roomConnections = ref<{ [key: string]: { status: any, send: any, open: any, close: any } }>({})
 const isCreateGameModalActive = ref(false)
 const router = useRouter()
-const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/games`)
+const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/rooms`)
 
 setInterval(() => {
   send('GET_GAMES')
@@ -42,17 +42,14 @@ watch(allGames, () => {
 })
 
 const createRoom = async (maxPlayers: number) => {
-  const id = Math.floor(Math.random() * 1000000000)
 
   try {
     const { body } = await $fetch('/games', {
       method: 'POST',
       body: {
-        id,
         players: [props.username],
         createdBy: props.username,
         maxPlayers,
-        status: 'PENDING'
       }
     })
 

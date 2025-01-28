@@ -12,7 +12,7 @@ export default defineNuxtConfig({
       websocket: true,
     },
   },
-  modules: ["@pinia/nuxt", "@nuxt/fonts"],
+  modules: ["@pinia/nuxt", "@nuxt/fonts", "@prisma/nuxt"],
   vite: {
     css: {
       preprocessorOptions: {
