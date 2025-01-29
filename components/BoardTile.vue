@@ -2,105 +2,31 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  type: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String,
+  tile: {
+    type: Object,
     required: true
   },
   players: {
     type: Array,
     required: true
   },
-  id: {
-    type: Number,
-    required: true
-  },
-  inTopRow: {
-    type: Boolean,
-    default: false
-  },
-  inRightRow: {
-    type: Boolean,
-    default: false
-  },
-  inBottomRow: {
-    type: Boolean,
-    default: false
-  },
-  inLeftRow: {
-    type: Boolean,
-    default: false
-  },
-  isHorizontal: {
-    type: Boolean,
-    default: false
-  },
-  isVertical: {
-    type: Boolean,
-    default: false
-  }
 })
 
-const positionCss = computed(() => {
-  if (props.inTopRow) {
-    return 'transform: rotate(270deg)'
-  } else if (props.inRightRow) {
-    return 'right-row'
-  } else if (props.inBottomRow) {
-    return 'transform: rotate(270deg)'
-  } else if (props.inLeftRow) {
-    return 'left-row'
-  } else {
-    return ''
-  }
+const isCorner = computed(() => {
+  return ['go', 'jail', 'parking', 'goToJail'].includes(props.tile.type)
 })
 
-const isCorner = (() => {
-  if (props.type === 'go' || props.type === 'jail' || props.type === 'parking' || props.type === 'goToJail') {
-    return true
-  }
-  return false
-})
 
-const heroImageClass = computed(() => {
-  if (props.isHorizontal) {
-    return "heroImage horizontal"
-  }
-  if (props.isVertical) {
-    return "heroImage vertical"
-  }
-})
 
 </script>
 
 <template>
-  <div :class="`space ${isCorner.value ? 'corner' : ''} ${props.type}`">
-    <div class=" container" :style="`width: 100%; ${props.type === 'property' || props.type === 'car' || props.type === 'bonus-property' ?
-      positionCss : ''}`">
+  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`">
+    <div class=" container">
       <div class="heroSprite">
-        <img :class="heroImageClass"
-          v-if="props.type === 'property' || props.type === 'go' || props.type === 'bonus-property'"
-          :src="`/assets/${props.name}-sprite.webp`" alt="tile" />
-        <img :class="heroImageClass" v-if="props.type === 'chance'" src="/assets/chance-sprite.webp"
-          :style="`${inRightRow ? 'transform: rotate(90deg)' : ''}`" alt="chance" />
-        <img :class="heroImageClass" v-if="props.type === 'tax'" src="/assets/tax-sprite.webp" alt="tax" />
-        <img :class="heroImageClass" v-if="props.type === 'luxury-tax'" src="/assets/luxurytax-sprite.webp" alt="tax" />
-        <img :class="heroImageClass" v-if="props.type === 'car'" :src="`/assets/${props.name}-sprite.webp`" alt="car" />
-        <div v-if="props.type === 'jail'">
-          <img class="heroImage" src=" /assets/jail-sprite.webp" style="width: 50%; aspect-ratio: 1/1;" alt="jail" />
-          <img class="heroImage" src="/assets/doughnut-sprite.webp" style="width: 50%; aspect-ratio: 1/1;" alt="jail" />
-        </div>
-        <div v-if="props.type === 'parking'">
-          <img :class="heroImageClass" src="/assets/freeparking-sprite.webp" alt="parking" />
-        </div>
-        <div v-if="props.type === 'goToJail'">
-          <img :class="heroImageClass" src="/assets/goToJail-sprite.webp" alt="goToJail" />
-        </div>
+        <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" style="width: 100%;" />
         <div class="player-container">
-          <PlayerBase v-for="player in props.players" :key="player.id" :player="player" :tile-id="props.id" />
+          <PlayerBase v-for="player in props.players" :key="player.id" :player="player" :tile-id="props.tile.id" />
         </div>
       </div>
     </div>
@@ -115,7 +41,6 @@ $corner-tile-size: calc(6vw + 4px);
 .space {
   background: white;
   text-align: center;
-  // border: 1px solid black;
   border-radius: 12px;
   filter: drop-shadow(0 0 0.15rem rgba(0, 0, 0, 0.5));
   width: 100%;

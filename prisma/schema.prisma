@@ -45,15 +45,16 @@ type gameState {
 }
 
 type Tile {
-  id        Int
-  type      String
-  name      String
-  position  Int
-  owner     String?
-  houses    Int?
-  price     Int?
-  rent      Int?
-  mortgaged Boolean?
+  id         Int
+  type       String
+  spriteName String
+  position   Int
+  owner      String?
+  houses     Int?
+  price      Int?
+  rent       Int?
+  mortgaged  Boolean?
+  name       String
 }
 
 type Groups {

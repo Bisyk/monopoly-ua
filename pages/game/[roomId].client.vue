@@ -89,30 +89,40 @@ definePageMeta({
             </div>
           </div>
         </div>
-        <BoardTile :type="tilesState[0].type" :name="tilesState[0].name" :players="gameState.players" :id="1"
-          isHorizontal />
+        
+        <!-- Go Tile -->
+        <BoardTile :tile="tilesState[0]" :players="gameState.players" />
+
+        <!-- Top Row -->
         <div class="row horizontal-row top-row ">
-          <BoardTile v-for="tile in tilesState.slice(1, 10)" :type="tile.type" :name="tile.name"
-            :players="gameState.players" :id="tile.id" inTopRow isHorizontal />
+          <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"  />
         </div>
-        <BoardTile :type="tilesState[10].type" :name="tilesState[10].name" :players="gameState.players" :id="11"
-          isHorizontal />
+        
+        <!-- Jail Tile -->
+        <BoardTile :tile="tilesState[10]" :type="tilesState[10].type" :players="gameState.players"/>
+
+        <!-- Right Row -->
         <div class="row vertical-row right-row">
-          <BoardTile v-for="tile in tilesState.slice(11, 20)" :type="tile.type" :name="tile.name"
+          <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :type="tile.type" :name="tile.name"
             :players="gameState.players" :id="tile.id" inRightRow isVertical />
         </div>
-        <BoardTile :type="tilesState[20].type" :name="tilesState[20].name" :players="gameState.players" :id="21"
-          isHorizontal />
+        
+        <!-- Free Parking Tile -->
+        <BoardTile  :tile="tilesState[20]" :players="gameState.players" />
+        
+        <!-- Bottom Row -->
         <div class="row horizontal-row bottom-row">
-          <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :type="tile.type" :name="tile.name"
-            :players="gameState.players" :id="tile.id" inBottomRow isHorizontal />
+          <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players" />
         </div>
-        <BoardTile :type="tilesState[30].type" :name="tilesState[30].name" :players="gameState.players" :id="31"
-          isHorizontal />
+
+        <!-- Go to Jail Tile -->
+        <BoardTile :tile="tilesState[30]" :players="gameState.players" />
+
+        <!-- Left Row -->
         <div class="row vertical-row left-row">
-          <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :type="tile.type" :name="tile.name"
-            :players="gameState.players" :id="tile.id" isLeftRow isVertical />
+          <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players" />
         </div>
+
       </div>
     </div>
   </div>
