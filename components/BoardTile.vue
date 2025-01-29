@@ -16,6 +16,9 @@ const isCorner = computed(() => {
   return ['go', 'jail', 'parking', 'goToJail'].includes(props.tile.type)
 })
 
+const isHorizontalProperty = computed(() => {
+  return ['property', "bonus-property"].includes(props.tile.type) && [2, 3, 4, 5, 6, 7, 8, 9, 10, 22, 23, 24, 25, 26, 27, 28, 29, 30].includes(props.tile.id)
+})
 
 
 </script>
@@ -23,8 +26,9 @@ const isCorner = computed(() => {
 <template>
   <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`">
     <div class=" container">
-      <div class="heroSprite">
-        <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" style="width: 100%;" />
+      <div class="heroContainer">
+        <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" class="heroImage"
+          :style="isHorizontalProperty ? { transform: 'rotate(270deg)' } : {}" />
         <div class="player-container">
           <PlayerBase v-for="player in props.players" :key="player.id" :player="player" :tile-id="props.tile.id" />
         </div>
@@ -56,7 +60,7 @@ $corner-tile-size: calc(6vw + 4px);
     height: 100%;
     width: 100%;
 
-    .heroSprite {
+    .heroContainer {
       padding: 0;
       margin: 0;
       display: flex;
@@ -64,11 +68,14 @@ $corner-tile-size: calc(6vw + 4px);
       align-items: center;
       width: 100%;
       height: 100%;
+      overflow: hidden;
 
       .heroImage {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        width: auto;
+        height: auto;
       }
 
       .vertical {
