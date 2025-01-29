@@ -17,8 +17,10 @@ const isCorner = computed(() => {
 })
 
 const isHorizontalProperty = computed(() => {
-  return ['property', "bonus-property"].includes(props.tile.type) && [2, 3, 4, 5, 6, 7, 8, 9, 10, 22, 23, 24, 25, 26, 27, 28, 29, 30].includes(props.tile.id)
-})
+  const horizontalPropertyTypes = ['property', 'bonus-property'];
+  const horizontalPropertyIds = [2, 3, 4, 5, 6, 7, 8, 9, 10, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+  return horizontalPropertyTypes.includes(props.tile.type) && horizontalPropertyIds.includes(props.tile.id);
+});
 
 
 </script>
