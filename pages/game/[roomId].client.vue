@@ -98,7 +98,7 @@ definePageMeta({
       <h3>Name: {{ currentTilePlayerOn.name }}</h3>
       <h3>Price: {{ currentTilePlayerOn.price }}</h3>
       <div style="display: flex; gap: 1rem;">
-        <BaseButton
+        <BaseButton :disabled="player.balance < currentTilePlayerOn.price"
           @click="send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, property: { ...currentTilePlayerOn } } }))"
           bgColor="green">BUY
         </BaseButton>

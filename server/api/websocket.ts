@@ -93,6 +93,14 @@ export default defineWebSocketHandler({
 
     const currentTurnPlayerIdx = game.players.indexOf(currentTurnPlayer);
 
+    const changePlayerTurn = () => {
+      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
+        game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
+      } else {
+        game.currentTurn = game.players[0].username;
+      }
+    };
+
     if (parsedMessage.action === "ROLL_DICE") {
       console.log("ROLL_DICE");
       console.log(parsedMessage.payload.turnResult);
@@ -154,15 +162,23 @@ export default defineWebSocketHandler({
         t => t.id === parsedMessage.payload.property.id
       );
 
-      boughtProperty!.owner = game.currentTurn;
-      currentTurnPlayer.balance =
-        currentTurnPlayer.balance - boughtProperty!.price;
+      if (currentTurnPlayer.balance >= boughtProperty!.price!) {
+        console.log("buy");
+        boughtProperty!.owner = game.currentTurn;
 
-      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
-        game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
-      } else {
-        game.currentTurn = game.players[0].username;
+        currentTurnPlayer.properties.push(boughtProperty!.id);
+
+        currentTurnPlayer.balance =
+          currentTurnPlayer.balance - boughtProperty!.price!;
+
+        changePlayerTurn();
+
+        game.currentAction = "roll";
       }
+    }
+
+    if (parsedMessage.action === "PASS_PROPERTY") {
+      changePlayerTurn();
 
       game.currentAction = "roll";
     }
