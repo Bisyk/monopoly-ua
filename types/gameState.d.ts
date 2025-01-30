@@ -7,6 +7,7 @@ declare interface GameState {
   roomId: number | null;
   players: Array<string>;
   currentTurn: string | null;
+  currentAction: string | null;
   boardState: Array<object>;
   gameLog: Array<gameLogEntry>;
 }

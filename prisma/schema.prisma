@@ -26,6 +26,7 @@ model Game {
   currentTurn      String
   gameLog          GameLogMsg[]
   boardState       gameState[]
+  currentAction    String       
 }
 
 type Player {

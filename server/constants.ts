@@ -431,12 +431,12 @@ export const initialPlayersState = {
 };
 
 export const colors = [
-  "#0000FF", // blue
-  "#008000", // green
-  "#FF0000", // red
-  "#FFFF00", // yellow
-  "#800080", // purple
-  "#FFA500", // orange
-  "#8B4513", // brown
-  "#FFC0CB", // pink
+  "#6666FF", // blue
+  "#66B266", // green
+  "#FF6666", // red
+  "#FFFF66", // yellow
+  "#B266B2", // purple
+  "#FFB266", // orange
+  "#B2735B", // brown
+  "#FFD9E1", // pink
 ];

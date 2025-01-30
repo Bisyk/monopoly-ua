@@ -43,6 +43,7 @@ export default defineWebSocketHandler({
             ...initialPlayersState,
           })),
           currentTurn: room!.players[0],
+          currentAction: "roll",
           gameLog: [],
           boardState: {
             tiles: initialTilesState,
@@ -76,12 +77,23 @@ export default defineWebSocketHandler({
 
     console.log(parsedMessage);
 
+    const game = await prisma.game.findUnique({
+      where: {
+        associatedRoomId: roomId,
+      },
+    });
+
+    if (!game) {
+      return;
+    }
+
+    const currentTurnPlayer = game.players.filter(
+      p => p.username === game.currentTurn
+    )[0];
+
+    const currentTurnPlayerIdx = game.players.indexOf(currentTurnPlayer);
+
     if (parsedMessage.action === "ROLL_DICE") {
-      const game = await prisma.game.findUnique({
-        where: {
-          associatedRoomId: roomId,
-        },
-      });
       console.log("ROLL_DICE");
       console.log(parsedMessage.payload.turnResult);
       console.log(game);
@@ -92,26 +104,59 @@ export default defineWebSocketHandler({
       //   gameState[roomId].currentTurn
       // );
 
-      if (!game) {
-        return;
-      }
-
-      const currentTurnPlayer = game.players.filter(
-        p => p.username === game.currentTurn
-      )[0];
-      const currentTurnPlayerIdx = game.players.indexOf(currentTurnPlayer);
-
       game.gameLog.push({
         username: game.currentTurn,
         msg: `got ${left} and ${right}`,
       });
 
       const boardSize = 40;
-      currentTurnPlayer.position =
+
+      const newPlayerPosition =
         (currentTurnPlayer.position + left + right) % boardSize;
       if (currentTurnPlayer.position === 0) {
         currentTurnPlayer.position = boardSize;
       }
+
+      currentTurnPlayer.position = newPlayerPosition + 1;
+
+      console.log(game.boardState[0].tiles[newPlayerPosition]);
+
+      console.log(
+        "is buyable",
+        ["property", "car", "bonus-property"].includes(
+          game.boardState[0].tiles[newPlayerPosition].type
+        )
+      );
+      console.log(game.boardState[0].tiles[newPlayerPosition].type);
+
+      console.log(
+        "isNoOwner",
+        !game.boardState[0].tiles[newPlayerPosition].owner
+      );
+      console.log(game.boardState[0].tiles[newPlayerPosition].owner);
+
+      if (
+        ["property", "car", "bonus-property"].includes(
+          game.boardState[0].tiles[newPlayerPosition].type
+        ) &&
+        !game.boardState[0].tiles[newPlayerPosition].owner
+      ) {
+        console.log("it works");
+        console.log("game.currentAction", game.currentAction);
+        game.currentAction = "buy";
+        console.log("game.currentAction", game.currentAction);
+      }
+    }
+
+    if (parsedMessage.action === "BUY_PROPERTY") {
+      console.log("id", parsedMessage.payload.property.id);
+      const boughtProperty = game.boardState[0].tiles.find(
+        t => t.id === parsedMessage.payload.property.id
+      );
+
+      boughtProperty!.owner = game.currentTurn;
+      currentTurnPlayer.balance =
+        currentTurnPlayer.balance - boughtProperty!.price;
 
       if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
@@ -119,10 +164,10 @@ export default defineWebSocketHandler({
         game.currentTurn = game.players[0].username;
       }
 
-      console.log("gameState after ROLL_DICE", game);
-
-      await syncGameState(roomId, peer, game);
+      game.currentAction = "roll";
     }
+
+    await syncGameState(roomId, peer, game);
   },
 });
 
@@ -143,6 +188,7 @@ async function syncGameState(roomId: string, peer, newGameState) {
       currentTurn: newGameState.currentTurn,
       gameLog: newGameState.gameLog,
       boardState: newGameState.boardState,
+      currentAction: newGameState.currentAction,
     },
   });
 

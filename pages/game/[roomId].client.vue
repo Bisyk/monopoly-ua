@@ -7,8 +7,9 @@ const router = useRouter()
 const players = ref<string[]>([])
 const gameState = ref<GameState>({} as GameState)
 const username = sessionStorage.getItem('username')
-const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 const boardState = ref<BoardState[]>([] as BoardState)
+
+const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
 watch(gameState, (newState) => {
   console.log(newState)
@@ -22,6 +23,14 @@ const tilesState = computed(() => {
     return boardState.value[0].tiles
   }
   return []
+})
+
+const player = computed(() => {
+  return gameState.value.players.find(p => p.username === username)
+})
+
+const currentTilePlayerOn = computed(() => {
+  return tilesState.value[player.value.position - 1]
 })
 
 handleMessage((message) => {
@@ -73,13 +82,31 @@ definePageMeta({
   </div>
 
   <div class="gameContainer" style="position: relative;">
-    <GameModal v-if="gameState.currentTurn === username">
+
+    <!-- ROLL MODAL -->
+    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll'">
       <div>
         <h1>It's your turn!</h1>
         <h3 style="margin-bottom: 1rem;">Roll the dice to move your piece.</h3>
       </div>
       <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
     </GameModal>
+
+    <!-- BUY MODAL -->
+    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'buy'">
+      <h1>Do you want to buy this property?</h1>
+      <h3>Name: {{ currentTilePlayerOn.name }}</h3>
+      <h3>Price: {{ currentTilePlayerOn.price }}</h3>
+      <div style="display: flex; gap: 1rem;">
+        <BaseButton
+          @click="send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, property: { ...currentTilePlayerOn } } }))"
+          bgColor="green">BUY
+        </BaseButton>
+        <BaseButton @click="send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username } }))" bgColor="red">PASS
+        </BaseButton>
+      </div>
+    </GameModal>
+
     <div class="table">
       <div v-if="tilesState && tilesState.length" class="board">
         <div class="center">

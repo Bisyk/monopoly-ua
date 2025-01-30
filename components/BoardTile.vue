@@ -51,10 +51,14 @@ const priceStyle = computed(() => {
   }
 })
 
+const tileBgColor = computed(() => {
+  return props.tile.owner ? props.players.find(player => player.username === props.tile.owner)?.color : 'white';
+})
+
 </script>
 
 <template>
-  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`">
+  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`">
     <div v-if="props.tile.price" :style="priceStyle">
       {{ props.tile.price }}
     </div>
