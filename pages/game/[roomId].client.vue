@@ -89,27 +89,27 @@ definePageMeta({
             </div>
           </div>
         </div>
-        
+
         <!-- Go Tile -->
         <BoardTile :tile="tilesState[0]" :players="gameState.players" />
 
         <!-- Top Row -->
         <div class="row horizontal-row top-row ">
-          <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"  />
+          <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players" />
         </div>
-        
+
         <!-- Jail Tile -->
-        <BoardTile :tile="tilesState[10]" :type="tilesState[10].type" :players="gameState.players"/>
+        <BoardTile :tile="tilesState[10]" :type="tilesState[10].type" :players="gameState.players" />
 
         <!-- Right Row -->
         <div class="row vertical-row right-row">
           <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :type="tile.type" :name="tile.name"
             :players="gameState.players" :id="tile.id" inRightRow isVertical />
         </div>
-        
+
         <!-- Free Parking Tile -->
-        <BoardTile  :tile="tilesState[20]" :players="gameState.players" />
-        
+        <BoardTile :tile="tilesState[20]" :players="gameState.players" />
+
         <!-- Bottom Row -->
         <div class="row horizontal-row bottom-row">
           <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players" />
@@ -133,8 +133,9 @@ definePageMeta({
 </template>
 
 <style scoped lang="scss">
-$tile-size: 3.5vw;
-$corner-tile-size: calc(6vw + 4px);
+$tile-size: 3.2vw;
+$corner-tile-size: 6.4vw;
+
 
 .table {
   display: flex;
@@ -151,8 +152,8 @@ $corner-tile-size: calc(6vw + 4px);
   grid-template-rows: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for rows
   grid-gap: 2px;
   margin: 0 auto;
-  max-width: 90vw; // Ensure it doesn't exceed a maximum size
-  max-height: 90vw; // Ensure it doesn't exceed a maximum size  
+  max-width: 50vw; // Ensure it doesn't exceed a maximum size
+  max-height: 95vh; // Ensure it doesn't exceed a maximum size  
 }
 
 .center {
@@ -178,7 +179,7 @@ $corner-tile-size: calc(6vw + 4px);
 
 .horizontal-row {
   grid-template-columns: repeat(9, $tile-size); // Adjust column size based on viewport width
-  grid-template-rows: $corner-tile-size;
+  grid-template-rows: calc($corner-tile-size);
 }
 
 .vertical-row {

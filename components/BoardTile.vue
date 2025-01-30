@@ -22,12 +22,43 @@ const isHorizontalProperty = computed(() => {
   return horizontalPropertyTypes.includes(props.tile.type) && horizontalPropertyIds.includes(props.tile.id);
 });
 
+const isTopRow = computed(() => {
+  return props.tile.id >= 1 && props.tile.id <= 10;
+});
+
+const isRightRow = computed(() => {
+  return props.tile.id >= 11 && props.tile.id <= 20;
+});
+
+const isBottomRow = computed(() => {
+  return props.tile.id >= 21 && props.tile.id <= 30;
+});
+
+const isLeftRow = computed(() => {
+  return props.tile.id >= 31 && props.tile.id <= 40;
+})
+
+const priceStyle = computed(() => {
+  return {
+    width: '100%',
+    position: 'absolute',
+    textAlign: 'center',
+    top: isTopRow.value ? '-20%' : '',
+    bottom: isBottomRow.value ? '-20%' : '',
+    left: isLeftRow.value ? '-80%' : '',
+    right: isRightRow.value ? '-80%' : '',
+    transform: isLeftRow.value ? 'rotate(270deg) translate(-15%, 80%)' : isRightRow.value ? 'rotate(90deg) translate(15%, 80%)' : '',
+  }
+})
 
 </script>
 
 <template>
   <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`">
-    <div class=" container">
+    <div v-if="props.tile.price" :style="priceStyle">
+      {{ props.tile.price }}
+    </div>
+    <div class="container">
       <div class="heroContainer">
         <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" class="heroImage"
           :style="isHorizontalProperty ? { transform: 'rotate(270deg)' } : {}" />
@@ -41,8 +72,8 @@ const isHorizontalProperty = computed(() => {
 
 
 <style lang="scss" scoped>
-$tile-size: 3.5vw;
-$corner-tile-size: calc(6vw + 4px);
+$tile-size: 3vw;
+$corner-tile-size: 6vw;
 
 .space {
   background: white;
