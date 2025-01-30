@@ -6,14 +6,14 @@
 import { defineProps, computed } from 'vue'
 
 const colorMap = {
-  "#6666FF": "#0000FF", // blue
-  "#66B266": "#008000", // green
-  "#FF6666": "#FF0000", // red
-  "#FFFF66": "#FFFF00", // yellow
-  "#B266B2": "#800080", // purple
-  "#FFB266": "#FFA500", // orange
-  "#B2735B": "#8B4513", // brown
-  "#FFD9E1": "#FFC0CB", // pink
+  "#9999FF": "#0000FF", // blue
+  "#99CC99": "#008000", // green
+  "#FF9999": "#FF0000", // red
+  "#FFFF99": "#FFFF00", // yellow
+  "#CC99CC": "#800080", // purple
+  "#FFCC99": "#FFA500", // orange
+  "#CC9980": "#8B4513", // brown
+  "#FFE6EB": "#FFC0CB", // pink
 }
 
 const props = defineProps({
