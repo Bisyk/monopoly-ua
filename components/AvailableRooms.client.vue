@@ -110,14 +110,18 @@ onMounted(() => {
         GAME</BaseButton>
     </div>
 
-    <AvailableRoomCard v-for="game in availableGames" :game-id="game.id" :max-players="game.maxPlayers"
-      :players="game.players" @joinGame="connectRoom" />
+    <AvailableRoomCard v-if="!!availableGames.length" v-for="game in availableGames" :game-id="game.id"
+      :max-players="game.maxPlayers" :players="game.players" @joinGame="connectRoom" />
 
+    <div v-else style="text-align: center; height: 70vh;">
+      <p>No available games. Create one!</p>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
 .container {
+  min-height: 70vh;
   margin: 2rem 2rem 0 2rem;
   background-color: white;
   padding: 0.5rem 2rem;
