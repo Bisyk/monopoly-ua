@@ -12,6 +12,8 @@ const props = defineProps({
   },
 })
 
+defineEmits(['showTileInfo'])
+
 const isCorner = computed(() => {
   return ['go', 'jail', 'parking', 'goToJail'].includes(props.tile.type)
 })
@@ -58,7 +60,8 @@ const tileBgColor = computed(() => {
 </script>
 
 <template>
-  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`">
+  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`"
+    @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
     <div v-if="props.tile.price" :style="priceStyle">
       {{ props.tile.price }}
     </div>

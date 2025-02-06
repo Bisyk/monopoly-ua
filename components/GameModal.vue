@@ -19,7 +19,7 @@ onMounted(() => {
 <style lang="scss">
 .game-modal {
   position: absolute;
-  z-index: 9999;
+  z-index: 10;
   top: 50%;
   right: 50%;
   transform: translate(50%, -50%)

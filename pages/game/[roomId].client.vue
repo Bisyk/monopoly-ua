@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, computed } from 'vue'
+import { onMounted, ref, watch, computed, useTemplateRef, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { getTilePosition } from '../../utils/board'
+import { onClickOutside } from '@vueuse/core'
 
 const route = useRoute()
 const router = useRouter()
@@ -8,6 +10,8 @@ const players = ref<string[]>([])
 const gameState = ref<GameState>({} as GameState)
 const username = sessionStorage.getItem('username')
 const boardState = ref<BoardState[]>([] as BoardState)
+const selectedTile = ref(null)
+const tileInfo = ref(null)
 
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
@@ -43,6 +47,42 @@ const handleUserTurn = () => {
   const turnResult = rollDice()
   send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
 }
+
+const showTileInfo = async (event, tile) => {
+  const tileRect = event.target.getBoundingClientRect();
+  const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
+  selectedTile.value = tile;
+  const position = getTilePosition(tile.id)
+  await nextTick();
+
+  let top = tileRect.top - containerRect.top;
+  let left = tileRect.left - containerRect.left;
+
+  if (position === 'top') {
+    top += tileRect.height
+  }
+
+  if (position === 'right') {
+    left -= tileRect.width
+  }
+
+  if (position === 'bottom') {
+    top -= tileRect.height / 2
+  }
+
+  if (position === 'left') {
+    left += tileRect.width
+  }
+
+  if (tileInfo.value) {
+    tileInfo.value.style.top = `${top}px`;
+    tileInfo.value.style.left = `${left}px`;
+  }
+}
+
+onClickOutside(tileInfo, event => {
+  selectedTile.value = null
+})
 
 onMounted(async () => {
   const username = sessionStorage.getItem('username')
@@ -81,7 +121,13 @@ definePageMeta({
     </pre>
   </div>
 
-  <div class="gameContainer" style="position: relative;">
+  <div class="gameContainer">
+
+    <!-- Tile Info -->
+    <div v-if="selectedTile" class="tileInfo" ref="tileInfo">
+      <h3>{{ selectedTile.name }}</h3>
+      <p>Price: {{ selectedTile.price }}</p>
+    </div>
 
     <!-- ROLL MODAL -->
     <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll'">
@@ -107,7 +153,8 @@ definePageMeta({
       </div>
     </GameModal>
 
-    <GameBoard :tilesState="tilesState" :gameState="gameState" />
+    <!-- GAME BOARD -->
+    <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" />
   </div>
 
 
@@ -115,4 +162,21 @@ definePageMeta({
 
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.gameContainer {
+  position: relative;
+  max-width: fit-content + 1rem;
+  max-height: fit-content;
+  margin: 0 auto;
+
+  .tileInfo {
+    position: absolute;
+    z-index: 11;
+    background-color: white;
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    min-width: 10vw;
+  }
+}
+</style>

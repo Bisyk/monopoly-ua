@@ -8,6 +8,10 @@ defineProps({
     type: Object,
     required: true,
   },
+  showTileInfo: {
+    type: Function,
+    required: true,
+  },
 })
 </script>
 
@@ -27,7 +31,8 @@ defineProps({
 
       <!-- Top Row -->
       <div class="row horizontal-row top-row ">
-        <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players" />
+        <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
       </div>
 
       <!-- Jail Tile -->
@@ -35,8 +40,8 @@ defineProps({
 
       <!-- Right Row -->
       <div class="row vertical-row right-row">
-        <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :type="tile.type" :name="tile.name"
-          :players="gameState.players" :id="tile.id" inRightRow isVertical />
+        <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :players="gameState.players"
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
       </div>
 
       <!-- Free Parking Tile -->
@@ -44,7 +49,8 @@ defineProps({
 
       <!-- Bottom Row -->
       <div class="row horizontal-row bottom-row">
-        <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players" />
+        <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players"
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
       </div>
 
       <!-- Go to Jail Tile -->
@@ -52,7 +58,8 @@ defineProps({
 
       <!-- Left Row -->
       <div class="row vertical-row left-row">
-        <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players" />
+        <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players"
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
       </div>
 
     </div>
@@ -71,6 +78,7 @@ $corner-tile-size: 6.4vw;
   align-items: center;
   height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 .board {
