@@ -126,7 +126,14 @@ definePageMeta({
     <!-- Tile Info -->
     <div v-if="selectedTile" class="tileInfo" ref="tileInfo">
       <h3>{{ selectedTile.name }}</h3>
+      <!-- {{ gameState.currentTurn === username }}
+      {{ player.properties.includes(selectedTile.id) }}
+      {{ player }}
+      {{ selectedTile.id }} -->
+      <BaseButton v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id)">SELL
+      </BaseButton>
       <p>Price: {{ selectedTile.price }}</p>
+      <p>Rent: {{ selectedTile.rent }}</p>
     </div>
 
     <!-- ROLL MODAL -->
