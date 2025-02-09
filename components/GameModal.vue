@@ -18,27 +18,25 @@ onMounted(() => {
 
 <style lang="scss">
 .game-modal {
-  position: fixed; 
+  position: fixed;
   z-index: 10;
   top: 50%;
-  left: 50%; 
-  transform: translate(-50%, -50%); 
-  width: 100%; 
-  height: 100%; 
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .modal-content {
-  min-height: 40vh; 
+  min-height: 40vh;
   max-height: 80vh;
-  min-width: 30vw; 
+  min-width: 30vw;
   max-width: 90vw;
   background-color: white;
-  padding: 2vmin; 
-  border-radius: 2vmin; 
+  padding: 2vmin;
+  border-radius: 2vmin;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow-y: auto; 
+  overflow-y: auto;
 }
 </style>
