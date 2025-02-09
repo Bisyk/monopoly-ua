@@ -67,8 +67,8 @@ defineProps({
 </template>
 
 <style lang="scss" scoped>
-$tile-size: 3.2vw;
-$corner-tile-size: 6.4vw;
+$tile-size: 7vmin; 
+$corner-tile-size: 14vmin; 
 
 
 .table {
@@ -87,8 +87,8 @@ $corner-tile-size: 6.4vw;
   grid-template-rows: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for rows
   grid-gap: 2px;
   margin: 0 auto;
-  max-width: 50vw; // Ensure it doesn't exceed a maximum size
-  max-height: 95vh; // Ensure it doesn't exceed a maximum size  
+  max-width: 95vmin; 
+  max-height: 95vmin;
 }
 
 .center {
