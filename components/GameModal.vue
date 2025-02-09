@@ -31,8 +31,8 @@ onMounted(() => {
 .modal-content {
   min-height: 40vh;
   max-height: 80vh;
-  min-width: 30vw;
-  max-width: 90vw;
+  min-width: 25vw;
+  max-width: 80vw;
   background-color: white;
   padding: 2vmin;
   border-radius: 2vmin;

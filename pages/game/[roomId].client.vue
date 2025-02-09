@@ -48,6 +48,14 @@ const handleUserTurn = () => {
   send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
 }
 
+const handleBuyProperty = () => {
+  send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, property: { ...currentTilePlayerOn.value } } }))
+}
+
+const handlePassProperty = () => {
+  send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username } }))
+}
+
 const showTileInfo = async (event, tile) => {
   const tileRect = event.target.getBoundingClientRect();
   const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
@@ -130,7 +138,8 @@ definePageMeta({
       {{ player.properties.includes(selectedTile.id) }}
       {{ player }}
       {{ selectedTile.id }} -->
-      <BaseButton v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id)">SELL
+      <BaseButton v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id)"
+        bgColor="red">SELL
       </BaseButton>
       <p>Price: {{ selectedTile.price }}</p>
       <p>Rent: {{ selectedTile.rent }}</p>
@@ -151,11 +160,10 @@ definePageMeta({
       <h3>Name: {{ currentTilePlayerOn.name }}</h3>
       <h3>Price: {{ currentTilePlayerOn.price }}</h3>
       <div style="display: flex; gap: 1rem;">
-        <BaseButton :disabled="player.balance < currentTilePlayerOn.price"
-          @click="send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, property: { ...currentTilePlayerOn } } }))"
-          bgColor="green">BUY
+        <BaseButton :disabled="player.balance < currentTilePlayerOn.price" @click="handleBuyProperty" bgColor="green">
+          BUY
         </BaseButton>
-        <BaseButton @click="send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username } }))" bgColor="red">PASS
+        <BaseButton @click="handlePassProperty" bgColor="red">PASS
         </BaseButton>
       </div>
     </GameModal>
