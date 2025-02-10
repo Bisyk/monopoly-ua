@@ -10,7 +10,13 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  tileGroups: {
+    type: Array,
+    required: false
+  }
 })
+
+console.log(props.tileGroups);
 
 defineEmits(['showTileInfo'])
 
@@ -40,16 +46,25 @@ const isLeftRow = computed(() => {
   return props.tile.id >= 31 && props.tile.id <= 40;
 })
 
-const priceStyle = computed(() => {
+import type { CSSProperties } from 'vue';
+
+const tileGroup = computed(() => {
+  return props.tileGroups?.find(group => group.properties.includes(props.tile.id));
+})
+
+const priceStyle = computed<CSSProperties>(() => {
   return {
     width: '100%',
+    "max-width": '7vmin',
     position: 'absolute',
     textAlign: 'center',
     top: isTopRow.value ? '-20%' : '',
     bottom: isBottomRow.value ? '-20%' : '',
-    left: isLeftRow.value ? '-80%' : '',
-    right: isRightRow.value ? '-80%' : '',
-    transform: isLeftRow.value ? 'rotate(270deg) translate(-15%, 80%)' : isRightRow.value ? 'rotate(90deg) translate(15%, 80%)' : '',
+    left: isLeftRow.value ? '-50%' : '',
+    right: isRightRow.value ? '-50%' : '',
+    transform: isLeftRow.value ? 'rotate(270deg) translate(-35%, 80%)' : isRightRow.value ? 'rotate(90deg) translate(35%, 80%)' : '',
+    'background-color': tileGroup.value?.color || 'darkgray',
+    'border-radius': '12px',
   }
 })
 
@@ -85,9 +100,6 @@ const tileBgColor = computed(() => {
 
 
 <style lang="scss" scoped>
-$tile-size: 3vw;
-$corner-tile-size: 6vw;
-
 .space {
   background: white;
   text-align: center;

@@ -42,49 +42,49 @@ class PropertyTile {
 export const initialGroupsState = [
   {
     groupId: 1,
-    color: "pink",
+    color: "#FFC0CB", // light pink
     properties: [2, 4],
     upgradePrice: 50,
   },
   {
     groupId: 2,
-    color: "yellow",
+    color: "#FFFFE0", // light yellow
     properties: [7, 9, 10],
     upgradePrice: 50,
   },
   {
     groupId: 3,
-    color: "mint",
+    color: "#E0FFFF", // light cyan
     properties: [12, 14, 15],
     upgradePrice: 100,
   },
   {
     groupId: 4,
-    color: "blue",
+    color: "#ADD8E6", // light blue
     properties: [17, 19, 20],
     upgradePrice: 100,
   },
   {
     groupId: 5,
-    color: "orange",
+    color: "#FFDAB9", // light peach
     properties: [22, 24, 25],
     upgradePrice: 150,
   },
   {
     groupId: 6,
-    color: "red",
+    color: "#FFB6C1", // light coral
     properties: [27, 28, 30],
     upgradePrice: 150,
   },
   {
     groupId: 7,
-    color: "purple",
+    color: "#DDA0DD", // plum
     properties: [32, 33, 35],
     upgradePrice: 200,
   },
   {
     groupId: 8,
-    color: "brown",
+    color: "#F5DEB3", // wheat
     properties: [38, 40],
     upgradePrice: 200,
   },

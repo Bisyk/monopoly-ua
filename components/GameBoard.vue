@@ -32,7 +32,7 @@ defineProps({
       <!-- Top Row -->
       <div class="row horizontal-row top-row ">
         <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[0],gameState.boardState[0].groups[1]]"/>
       </div>
 
       <!-- Jail Tile -->
@@ -41,7 +41,7 @@ defineProps({
       <!-- Right Row -->
       <div class="row vertical-row right-row">
         <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[2],gameState.boardState[0].groups[3]]"/>
       </div>
 
       <!-- Free Parking Tile -->
@@ -50,7 +50,7 @@ defineProps({
       <!-- Bottom Row -->
       <div class="row horizontal-row bottom-row">
         <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[4],gameState.boardState[0].groups[5]]"/>
       </div>
 
       <!-- Go to Jail Tile -->
@@ -59,7 +59,7 @@ defineProps({
       <!-- Left Row -->
       <div class="row vertical-row left-row">
         <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" />
+          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[6],gameState.boardState[0].groups[7]]"/>
       </div>
 
     </div>

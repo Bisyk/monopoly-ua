@@ -18,17 +18,13 @@ declare interface Tile {
   spriteName: string;
   name: string;
   price: number;
-  rent: number;
   type: string;
   owner: string;
   houses: number;
   mortgaged: boolean;
   position: number;
-  firstLevelRent: number;
-  secondLevelRent: number;
-  thirdLevelRent: number;
-  fourthLevelRent: number;
-  fifthLevelRent: number;
+  rentLevel: number;
+  rentLevels: number[];
   mortgagePrice: number;
   buybackPrice: number;
 }
