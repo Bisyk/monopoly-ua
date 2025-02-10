@@ -132,7 +132,8 @@ export default defineWebSocketHandler({
       if (
         ["property"].includes(tilePlayerOn.type) &&
         tilePlayerOn.owner &&
-        tilePlayerOn.owner !== currentTurnPlayer.username
+        tilePlayerOn.owner !== currentTurnPlayer.username &&
+        !tilePlayerOn.mortgaged
       ) {
         game.currentAction = "payRent";
       }
