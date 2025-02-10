@@ -26,7 +26,7 @@ model Game {
   currentTurn      String
   gameLog          GameLogMsg[]
   boardState       gameState[]
-  currentAction    String       
+  currentAction    String
 }
 
 type Player {
@@ -46,22 +46,31 @@ type gameState {
 }
 
 type Tile {
-  id         Int
-  type       String
-  spriteName String
-  position   Int
-  owner      String?
-  houses     Int?
-  price      Int?
-  rent       Int?
-  mortgaged  Boolean?
-  name       String
+  id              Int
+  groupId         Int?
+  spriteName      String
+  name            String
+  price           Int?
+  rent            Int?
+  type            String
+  owner           String?
+  houses          Int?
+  mortgaged       Boolean?
+  position        Int
+  firstLevelRent  Int?
+  secondLevelRent Int?
+  thirdLevelRent  Int?
+  fourthLevelRent Int?
+  fifthLevelRent  Int?
+  mortgagePrice   Int?
+  buybackPrice    Int?
 }
 
 type Groups {
-  groupId    Int
-  color      String
-  properties Int[]
+  groupId      Int
+  color        String
+  properties   Int[]
+  upgradePrice Int?
 }
 
 type GameLogMsg {

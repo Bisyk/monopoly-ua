@@ -183,6 +183,40 @@ export default defineWebSocketHandler({
       game.currentAction = "roll";
     }
 
+    if (parsedMessage.action === "MORTGAGE_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+
+      const propertyToMortgage = game.boardState[0].tiles.find(
+        t => t.id === propertyId
+      );
+
+      if (propertyToMortgage!.mortgaged) {
+        return;
+      }
+
+      propertyToMortgage!.mortgaged = true;
+      currentTurnPlayer.balance += propertyToMortgage!.mortgagePrice;
+    }
+
+    if (parsedMessage.action === "BUY_BACK_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+
+      const propertyToBuyBack = game.boardState[0].tiles.find(
+        t => t.id === propertyId
+      );
+
+      if (currentTurnPlayer.balance < propertyToBuyBack!.buybackPrice) {
+        return;
+      }
+
+      if (!propertyToBuyBack!.mortgaged) {
+        return;
+      }
+
+      propertyToBuyBack!.mortgaged = false;
+      currentTurnPlayer.balance -= propertyToBuyBack!.buybackPrice;
+    }
+
     await syncGameState(roomId, peer, game);
   },
 });

@@ -10,7 +10,7 @@ const players = ref<string[]>([])
 const gameState = ref<GameState>({} as GameState)
 const username = sessionStorage.getItem('username')
 const boardState = ref<BoardState[]>([] as BoardState)
-const selectedTile = ref(null)
+const selectedTile = ref<BoardTile>(null)
 const tileInfo = ref(null)
 
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
@@ -54,6 +54,16 @@ const handleBuyProperty = () => {
 
 const handlePassProperty = () => {
   send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username } }))
+}
+
+const handleMortgageProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'MORTGAGE_PROPERTY', payload: { username, propertyId } }))
+  selectedTile.value = null
+}
+
+const handleBuyBackProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'BUY_BACK_PROPERTY', payload: { username, propertyId } }))
+  selectedTile.value = null
 }
 
 const showTileInfo = async (event, tile) => {
@@ -134,15 +144,47 @@ definePageMeta({
     <!-- Tile Info -->
     <div v-if="selectedTile" class="tileInfo" ref="tileInfo">
       <h3>{{ selectedTile.name }}</h3>
-      <!-- {{ gameState.currentTurn === username }}
-      {{ player.properties.includes(selectedTile.id) }}
-      {{ player }}
-      {{ selectedTile.id }} -->
-      <BaseButton v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id)"
-        bgColor="red">SELL
-      </BaseButton>
-      <p>Price: {{ selectedTile.price }}</p>
-      <p>Rent: {{ selectedTile.rent }}</p>
+      <div style="display: flex; width: 100%; justify-content: center; gap: 1rem;">
+        <BaseButton
+          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && !selectedTile.mortgaged"
+          @click="handleMortgageProperty(selectedTile.id)" bgColor="red">SELL
+        </BaseButton>
+
+        <BaseButton
+          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && selectedTile.mortgaged"
+          @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
+          :disabled="player.balance < selectedTile.buybackPrice">BUY BACK
+        </BaseButton>
+      </div>
+
+      <div v-if="selectedTile.type === 'property'">
+        <p>💰 Base Rent: {{ selectedTile.rent }}</p>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div style="display: flex; justify-content: space-between;">
+            <div>⭐ </div>
+            <div>{{ selectedTile.firstLevelRent }}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <div>⭐⭐ </div>
+            <div>{{ selectedTile.secondLevelRent }}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <div>⭐⭐⭐ </div>
+            <div>{{ selectedTile.thirdLevelRent }}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <div>⭐⭐⭐⭐ </div>
+            <div>{{ selectedTile.fourthLevelRent }}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <div>⭐⭐⭐⭐⭐ </div>
+            <div>{{ selectedTile.fifthLevelRent }}</div>
+          </div>
+        </div>
+      </div>
+      <p>💰 Buy Price: {{ selectedTile.price }}</p>
+      <p>💰 Mortgage Price: {{ selectedTile.mortgagePrice }}</p>
+      <p>💰 Buyback Price: {{ selectedTile.buybackPrice }}</p>
     </div>
 
     <!-- ROLL MODAL -->

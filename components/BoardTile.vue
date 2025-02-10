@@ -61,7 +61,10 @@ const tileBgColor = computed(() => {
 
 <template>
   <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`"
-    @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
+  @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
+  <div v-if="props.tile.mortgaged" class="mortgaged-container">
+    🔒
+  </div>
     <div v-if="props.tile.price" :style="priceStyle">
       {{ props.tile.price }}
     </div>
@@ -208,5 +211,16 @@ $corner-tile-size: 6vw;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
+}
+
+.mortgaged-container{
+  position: absolute; 
+  inset: 0; 
+  z-index: 5; 
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.6); 
 }
 </style>

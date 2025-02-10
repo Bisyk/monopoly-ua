@@ -1,3 +1,117 @@
+class PropertyTile {
+  public id: number;
+  public groupId: number;
+  public spriteName: string;
+  public name: string;
+  public price: number;
+  public rent: number;
+  public type: string;
+  public owner: string;
+  public houses: number;
+  public mortgaged: boolean;
+  public position: number;
+  public firstLevelRent: number;
+  public secondLevelRent: number;
+  public thirdLevelRent: number;
+  public fourthLevelRent: number;
+  public fifthLevelRent: number;
+  public mortgagePrice: number;
+  public buybackPrice: number;
+
+  public constructor(
+    id: number,
+    groupId: number,
+    spriteName: string,
+    name: string,
+    price: number,
+    rent: number,
+    firstLevelRent: number,
+    secondLevelRent: number,
+    thirdLevelRent: number,
+    fourthLevelRent: number,
+    fifthLevelRent: number
+  ) {
+    this.id = id;
+    this.groupId = groupId;
+    this.spriteName = spriteName;
+    this.name = name;
+    this.price = price;
+    this.rent = rent;
+    this.type = "property";
+    this.owner = "";
+    this.houses = 0;
+    this.mortgaged = false;
+    this.position = id;
+    this.firstLevelRent = firstLevelRent;
+    this.secondLevelRent = secondLevelRent;
+    this.thirdLevelRent = thirdLevelRent;
+    this.fourthLevelRent = fourthLevelRent;
+    this.fifthLevelRent = fifthLevelRent;
+    this.mortgagePrice = price / 2;
+    this.buybackPrice = this.mortgagePrice + this.mortgagePrice / 5;
+  }
+}
+
+export const initialGroupsState = [
+  {
+    groupId: 1,
+    color: "pink",
+    properties: [2, 4],
+    upgradePrice: 50,
+  },
+  {
+    groupId: 2,
+    color: "yellow",
+    properties: [7, 9, 10],
+    upgradePrice: 50,
+  },
+  {
+    groupId: 3,
+    color: "mint",
+    properties: [12, 14, 15],
+    upgradePrice: 100,
+  },
+  {
+    groupId: 4,
+    color: "blue",
+    properties: [17, 19, 20],
+    upgradePrice: 100,
+  },
+  {
+    groupId: 5,
+    color: "orange",
+    properties: [22, 24, 25],
+    upgradePrice: 150,
+  },
+  {
+    groupId: 6,
+    color: "red",
+    properties: [27, 28, 30],
+    upgradePrice: 150,
+  },
+  {
+    groupId: 7,
+    color: "purple",
+    properties: [32, 33, 35],
+    upgradePrice: 200,
+  },
+  {
+    groupId: 8,
+    color: "brown",
+    properties: [38, 40],
+    upgradePrice: 200,
+  },
+];
+
+export const initialPlayersState = {
+  position: 1,
+  balance: 1500,
+  properties: [],
+  ownedPropertiesGroup: [],
+  jailed: false,
+  turnsInJail: 0,
+};
+
 export const initialTilesState = [
   {
     id: 1,
@@ -6,18 +120,7 @@ export const initialTilesState = [
     position: 1,
     name: "Go",
   },
-  {
-    id: 2,
-    type: "property",
-    spriteName: "atb",
-    position: 2,
-    owner: "",
-    houses: 0,
-    price: 600,
-    rent: 0,
-    mortgaged: false,
-    name: "ATB",
-  },
+  new PropertyTile(2, 1, "atb", "ATB", 60, 2, 10, 30, 90, 160, 250),
   {
     id: 3,
     type: "chance",
@@ -25,18 +128,7 @@ export const initialTilesState = [
     position: 3,
     name: "Chance",
   },
-  {
-    id: 4,
-    type: "property",
-    spriteName: "silpo",
-    position: 4,
-    owner: "",
-    houses: 0,
-    price: 600,
-    rent: 0,
-    mortgaged: false,
-    name: "Silpo",
-  },
+  new PropertyTile(4, 1, "silpo", "Silpo", 60, 4, 20, 60, 180, 320, 450),
   {
     id: 5,
     type: "tax",
@@ -54,18 +146,7 @@ export const initialTilesState = [
     mortgaged: false,
     name: "Mercedes-Benz",
   },
-  {
-    id: 7,
-    type: "property",
-    spriteName: "staff",
-    position: 7,
-    owner: "",
-    houses: 0,
-    price: 1000,
-    rent: 0,
-    mortgaged: false,
-    name: "Staff",
-  },
+  new PropertyTile(7, 2, "staff", "Staff", 100, 6, 30, 90, 270, 400, 550),
   {
     id: 8,
     type: "chance",
@@ -73,30 +154,8 @@ export const initialTilesState = [
     position: 8,
     name: "Chance",
   },
-  {
-    id: 9,
-    type: "property",
-    spriteName: "urban",
-    position: 9,
-    owner: "",
-    houses: 0,
-    price: 1000,
-    rent: 0,
-    mortgaged: false,
-    name: "Urban",
-  },
-  {
-    id: 10,
-    type: "property",
-    spriteName: "riotdivision",
-    position: 9,
-    owner: "",
-    houses: 0,
-    price: 1200,
-    rent: 0,
-    mortgaged: false,
-    name: "Riot Division",
-  },
+  new PropertyTile(9, 2, "urban", "Urban", 100, 6, 30, 90, 270, 400, 550),
+  new PropertyTile(10, 2, "riotdivision", "Riot Division", 120, 8, 40, 100, 300, 450, 600),
   {
     id: 11,
     type: "jail",
@@ -104,18 +163,7 @@ export const initialTilesState = [
     position: 11,
     name: "Jail",
   },
-  {
-    id: 12,
-    type: "property",
-    spriteName: "depositphotos",
-    position: 12,
-    owner: "",
-    houses: 0,
-    price: 1400,
-    rent: 0,
-    mortgaged: false,
-    name: "Depositphotos",
-  },
+  new PropertyTile(12, 3, "depositphotos", "Depositphotos", 140, 10, 50, 150, 450, 625, 750),
   {
     id: 13,
     type: "bonus-property",
@@ -128,30 +176,8 @@ export const initialTilesState = [
     mortgaged: false,
     name: "Ukrnafta",
   },
-  {
-    id: 14,
-    type: "property",
-    spriteName: "gitlab",
-    position: 14,
-    owner: "",
-    houses: 0,
-    price: 1400,
-    rent: 0,
-    mortgaged: false,
-    name: "GitLab",
-  },
-  {
-    id: 15,
-    type: "property",
-    spriteName: "grammarly",
-    position: 15,
-    owner: "",
-    houses: 0,
-    price: 1600,
-    rent: 0,
-    mortgaged: false,
-    name: "Grammarly",
-  },
+  new PropertyTile(14, 3, "gitlab", "GitLab", 140, 10, 50, 150, 450, 625, 750),
+  new PropertyTile(15, 3, "grammarly", "Grammarly", 160, 12, 60, 180, 500, 700, 900),
   {
     id: 16,
     type: "car",
@@ -162,18 +188,7 @@ export const initialTilesState = [
     mortgaged: false,
     name: "Porsche",
   },
-  {
-    id: 17,
-    type: "property",
-    spriteName: "globallogic",
-    position: 17,
-    owner: "",
-    houses: 0,
-    price: 1800,
-    rent: 0,
-    mortgaged: false,
-    name: "GlobalLogic",
-  },
+  new PropertyTile(17, 4, "globallogic", "GlobalLogic", 180, 14, 70, 200, 550, 750, 950),
   {
     id: 18,
     type: "chance",
@@ -181,30 +196,8 @@ export const initialTilesState = [
     position: 18,
     name: "Chance",
   },
-  {
-    id: 19,
-    type: "property",
-    spriteName: "softserve",
-    position: 19,
-    owner: "",
-    houses: 0,
-    price: 1800,
-    rent: 0,
-    mortgaged: false,
-    name: "SoftServe",
-  },
-  {
-    id: 20,
-    type: "property",
-    spriteName: "epam",
-    position: 20,
-    owner: "",
-    houses: 0,
-    price: 2000,
-    rent: 0,
-    mortgaged: false,
-    name: "EPAM",
-  },
+  new PropertyTile(19, 4, "softserve", "SoftServe", 180, 14, 70, 200, 550, 750, 950),
+  new PropertyTile(20, 4, "epam", "EPAM", 200, 16, 80, 220, 600, 800, 1000),
   {
     id: 21,
     type: "parking",
@@ -212,18 +205,7 @@ export const initialTilesState = [
     position: 21,
     name: "Parking",
   },
-  {
-    id: 22,
-    type: "property",
-    spriteName: "monobank",
-    position: 22,
-    owner: "",
-    houses: 0,
-    price: 2200,
-    rent: 0,
-    mortgaged: false,
-    name: "Monobank",
-  },
+  new PropertyTile(22, 5, "monobank", "Monobank", 220, 18, 90, 250, 700, 875, 1050),
   {
     id: 23,
     type: "chance",
@@ -231,30 +213,8 @@ export const initialTilesState = [
     position: 23,
     name: "Chance",
   },
-  {
-    id: 24,
-    type: "property",
-    spriteName: "oschadbank",
-    position: 24,
-    owner: "",
-    houses: 0,
-    price: 2200,
-    rent: 0,
-    mortgaged: false,
-    name: "Oschadbank",
-  },
-  {
-    id: 25,
-    type: "property",
-    spriteName: "privatbank",
-    position: 25,
-    owner: "",
-    houses: 0,
-    price: 2400,
-    rent: 0,
-    mortgaged: false,
-    name: "PrivatBank",
-  },
+  new PropertyTile(24, 5, "oschadbank", "Oschadbank", 220, 18, 90, 250, 700, 875, 1050),
+  new PropertyTile(25, 5, "privatbank", "PrivatBank", 240, 20, 100, 300, 750, 925, 1100),
   {
     id: 26,
     type: "car",
@@ -265,30 +225,8 @@ export const initialTilesState = [
     mortgaged: false,
     name: "BMW",
   },
-  {
-    id: 27,
-    type: "property",
-    spriteName: "okko",
-    position: 27,
-    owner: "",
-    houses: 0,
-    price: 2600,
-    rent: 0,
-    mortgaged: false,
-    name: "OKKO",
-  },
-  {
-    id: 28,
-    type: "property",
-    spriteName: "wog",
-    position: 28,
-    owner: "",
-    houses: 0,
-    price: 2600,
-    rent: 0,
-    mortgaged: false,
-    name: "WOG",
-  },
+  new PropertyTile(27, 6, "okko", "OKKO", 260, 22, 110, 330, 800, 975, 1150),
+  new PropertyTile(28, 6, "wog", "WOG", 260, 22, 110, 330, 800, 975, 1150),
   {
     id: 29,
     type: "bonus-property",
@@ -301,18 +239,7 @@ export const initialTilesState = [
     mortgaged: false,
     name: "Naftogaz",
   },
-  {
-    id: 30,
-    type: "property",
-    spriteName: "socar",
-    position: 30,
-    owner: "",
-    houses: 0,
-    price: 2800,
-    rent: 0,
-    mortgaged: false,
-    name: "SOCAR",
-  },
+  new PropertyTile(30, 6, "socar", "SOCAR", 280, 24, 120, 360, 850, 1025, 1200),
   {
     id: 31,
     type: "goToJail",
@@ -320,30 +247,8 @@ export const initialTilesState = [
     position: 31,
     name: "Go to Jail",
   },
-  {
-    id: 32,
-    type: "property",
-    spriteName: "ukrposhta",
-    position: 32,
-    owner: "",
-    houses: 0,
-    price: 3000,
-    rent: 0,
-    mortgaged: false,
-    name: "Ukrposhta",
-  },
-  {
-    id: 33,
-    type: "property",
-    spriteName: "meest",
-    position: 33,
-    owner: "",
-    houses: 0,
-    price: 3000,
-    rent: 0,
-    mortgaged: false,
-    name: "Meest",
-  },
+  new PropertyTile(32, 7, "ukrposhta", "Ukrposhta", 300, 26, 130, 390, 900, 1100, 1275),
+  new PropertyTile(33, 7, "meest", "Meest", 300, 26, 130, 390, 900, 1100, 1275),
   {
     id: 34,
     type: "chance",
@@ -351,18 +256,7 @@ export const initialTilesState = [
     position: 34,
     name: "Chance",
   },
-  {
-    id: 35,
-    type: "property",
-    spriteName: "novaposhta",
-    position: 35,
-    owner: "",
-    houses: 0,
-    price: 3200,
-    rent: 0,
-    mortgaged: false,
-    name: "Nova Poshta",
-  },
+  new PropertyTile(35, 7, "novaposhta", "Nova Poshta", 320, 28, 150, 450, 1000, 1200, 1400),
   {
     id: 36,
     type: "car",
@@ -380,18 +274,7 @@ export const initialTilesState = [
     position: 37,
     name: "Luxury Tax",
   },
-  {
-    id: 38,
-    type: "property",
-    spriteName: "metinvest",
-    position: 38,
-    owner: "",
-    houses: 0,
-    price: 3500,
-    rent: 0,
-    mortgaged: false,
-    name: "Metinvest",
-  },
+  new PropertyTile(38, 8, "metinvest", "Metinvest", 350, 35, 175, 500, 1100, 1300, 1500),
   {
     id: 39,
     type: "chance",
@@ -399,36 +282,8 @@ export const initialTilesState = [
     position: 39,
     name: "Chance",
   },
-  {
-    id: 40,
-    type: "property",
-    spriteName: "dtek",
-    position: 40,
-    owner: "",
-    houses: 0,
-    price: 4000,
-    rent: 0,
-    mortgaged: false,
-    name: "DTEK",
-  },
+  new PropertyTile(40, 8, "dtek", "DTEK", 400, 50, 200, 600, 1400, 1700, 2000),
 ];
-
-export const initialGroupsState = [
-  {
-    groupId: 1,
-    color: "blue",
-    properties: [2, 4],
-  },
-];
-
-export const initialPlayersState = {
-  position: 1,
-  balance: 15000,
-  properties: [],
-  ownedPropertiesGroup: [],
-  jailed: false,
-  turnsInJail: 0,
-};
 
 export const colors = [
   "#9999FF", // blue
