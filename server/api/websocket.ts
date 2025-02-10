@@ -103,14 +103,8 @@ export default defineWebSocketHandler({
 
     if (parsedMessage.action === "ROLL_DICE") {
       console.log("ROLL_DICE");
-      console.log(parsedMessage.payload.turnResult);
-      console.log(game);
 
       const { left, right } = parsedMessage.payload.turnResult;
-
-      // const indexOfPlayerCurrentTurn = gameState[roomId].players.indexOf(
-      //   gameState[roomId].currentTurn
-      // );
 
       game.gameLog.push({
         username: game.currentTurn,
@@ -126,44 +120,30 @@ export default defineWebSocketHandler({
       }
 
       currentTurnPlayer.position = newPlayerPosition + 1;
-
-      console.log(game.boardState[0].tiles[newPlayerPosition]);
-
-      console.log(
-        "is buyable",
-        ["property", "car", "bonus-property"].includes(
-          game.boardState[0].tiles[newPlayerPosition].type
-        )
-      );
-      console.log(game.boardState[0].tiles[newPlayerPosition].type);
-
-      console.log(
-        "isNoOwner",
-        !game.boardState[0].tiles[newPlayerPosition].owner
-      );
-      console.log(game.boardState[0].tiles[newPlayerPosition].owner);
+      const tilePlayerOn = game.boardState[0].tiles[newPlayerPosition];
 
       if (
-        ["property", "car", "bonus-property"].includes(
-          game.boardState[0].tiles[newPlayerPosition].type
-        ) &&
-        !game.boardState[0].tiles[newPlayerPosition].owner
+        ["property", "car", "bonus-property"].includes(tilePlayerOn.type) &&
+        !tilePlayerOn.owner
       ) {
-        console.log("it works");
-        console.log("game.currentAction", game.currentAction);
         game.currentAction = "buy";
-        console.log("game.currentAction", game.currentAction);
+      }
+
+      if (
+        ["property"].includes(tilePlayerOn.type) &&
+        tilePlayerOn.owner &&
+        tilePlayerOn.owner !== currentTurnPlayer.username
+      ) {
+        game.currentAction = "payRent";
       }
     }
 
     if (parsedMessage.action === "BUY_PROPERTY") {
-      console.log("id", parsedMessage.payload.property.id);
       const boughtProperty = game.boardState[0].tiles.find(
         t => t.id === parsedMessage.payload.property.id
       );
 
       if (currentTurnPlayer.balance >= boughtProperty!.price!) {
-        console.log("buy");
         boughtProperty!.owner = game.currentTurn;
 
         currentTurnPlayer.properties.push(boughtProperty!.id);
@@ -180,6 +160,31 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "PASS_PROPERTY") {
       changePlayerTurn();
 
+      game.currentAction = "roll";
+    }
+
+    if (parsedMessage.action === "PAY_RENT") {
+      const propertyId = parsedMessage.payload.propertyId;
+
+      const propertyToPayRent = game.boardState[0].tiles.find(
+        t => t.id === propertyId
+      );
+
+      const owner = game.players.find(
+        p => p.username === propertyToPayRent!.owner
+      );
+
+      const rentToPay =
+        propertyToPayRent!.rentLevels[propertyToPayRent!.rentLevel];
+
+      if (currentTurnPlayer.balance <= rentToPay) {
+        return;
+      }
+
+      currentTurnPlayer.balance -= rentToPay;
+      owner!.balance += rentToPay;
+
+      changePlayerTurn();
       game.currentAction = "roll";
     }
 
@@ -228,7 +233,6 @@ function getRoomIdFromPeer(url: string): string {
 }
 
 async function syncGameState(roomId: string, peer, newGameState) {
-  console.log(roomId);
   const updatedGame = await prisma.game.update({
     where: {
       associatedRoomId: roomId,

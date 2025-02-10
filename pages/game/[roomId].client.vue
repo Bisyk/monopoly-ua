@@ -66,6 +66,10 @@ const handleBuyBackProperty = (propertyId: number) => {
   selectedTile.value = null
 }
 
+const handlePayRent = (propertyId: number) => {
+  send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+}
+
 const showTileInfo = async (event, tile) => {
   const tileRect = event.target.getBoundingClientRect();
   const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
@@ -208,6 +212,19 @@ definePageMeta({
         <BaseButton @click="handlePassProperty" bgColor="red">PASS
         </BaseButton>
       </div>
+    </GameModal>
+
+    <!-- PAY RENT MODAL -->
+    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'payRent'">
+      <h1>Pay Rent</h1>
+      <h3>Owner: {{ currentTilePlayerOn.owner }}</h3>
+      <h3>Rent: {{ currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] }}</h3>
+      <BaseButton @click="() => handlePayRent(currentTilePlayerOn.id)" bgColor="red"
+        :disabled="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">PAY
+      </BaseButton>
+      <p v-if="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">* you don't have enough
+        money to pay rent, mortgage something</p>
+
     </GameModal>
 
     <!-- GAME BOARD -->
