@@ -158,27 +158,27 @@ definePageMeta({
       </div>
 
       <div v-if="selectedTile.type === 'property'">
-        <p>💰 Base Rent: {{ selectedTile.rent }}</p>
+        <p>💰 Base Rent: {{ selectedTile.rentLevels[0] }}</p>
         <div style="display: flex; flex-direction: column; gap: 1rem;">
           <div style="display: flex; justify-content: space-between;">
             <div>⭐ </div>
-            <div>{{ selectedTile.firstLevelRent }}</div>
+            <div>{{ selectedTile.rentLevels[1] }}</div>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <div>⭐⭐ </div>
-            <div>{{ selectedTile.secondLevelRent }}</div>
+            <div>{{ selectedTile.rentLevels[2] }}</div>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <div>⭐⭐⭐ </div>
-            <div>{{ selectedTile.thirdLevelRent }}</div>
+            <div>{{ selectedTile.rentLevels[3] }}</div>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <div>⭐⭐⭐⭐ </div>
-            <div>{{ selectedTile.fourthLevelRent }}</div>
+            <div>{{ selectedTile.rentLevels[4] }}</div>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <div>⭐⭐⭐⭐⭐ </div>
-            <div>{{ selectedTile.fifthLevelRent }}</div>
+            <div>{{ selectedTile.rentLevels[5] }}</div>
           </div>
         </div>
       </div>

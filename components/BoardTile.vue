@@ -61,12 +61,15 @@ const tileBgColor = computed(() => {
 
 <template>
   <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`"
-  @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
-  <div v-if="props.tile.mortgaged" class="mortgaged-container">
-    🔒
-  </div>
-    <div v-if="props.tile.price" :style="priceStyle">
+    @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
+    <div v-if="props.tile.mortgaged" class="mortgaged-container">
+      🔒
+    </div>
+    <div v-if="props.tile.price && !props.tile.owner" :style="priceStyle">
       {{ props.tile.price }}
+    </div>
+    <div v-if="props.tile.rentLevels.length && props.tile.owner" :style="priceStyle">
+      {{ props.tile.rentLevels[props.tile.rentLevel] }}
     </div>
     <div class="container">
       <div class="heroContainer">
@@ -213,14 +216,14 @@ $corner-tile-size: 6vw;
   align-items: center;
 }
 
-.mortgaged-container{
-  position: absolute; 
-  inset: 0; 
-  z-index: 5; 
+.mortgaged-container {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
   border-radius: 12px;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.6); 
+  background-color: rgba(0, 0, 0, 0.6);
 }
 </style>

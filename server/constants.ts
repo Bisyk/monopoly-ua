@@ -4,17 +4,13 @@ class PropertyTile {
   public spriteName: string;
   public name: string;
   public price: number;
-  public rent: number;
   public type: string;
   public owner: string;
   public houses: number;
   public mortgaged: boolean;
   public position: number;
-  public firstLevelRent: number;
-  public secondLevelRent: number;
-  public thirdLevelRent: number;
-  public fourthLevelRent: number;
-  public fifthLevelRent: number;
+  public rentLevel: number;
+  public rentLevels: number;
   public mortgagePrice: number;
   public buybackPrice: number;
 
@@ -24,29 +20,20 @@ class PropertyTile {
     spriteName: string,
     name: string,
     price: number,
-    rent: number,
-    firstLevelRent: number,
-    secondLevelRent: number,
-    thirdLevelRent: number,
-    fourthLevelRent: number,
-    fifthLevelRent: number
+    rentLevels: number[]
   ) {
     this.id = id;
     this.groupId = groupId;
     this.spriteName = spriteName;
     this.name = name;
     this.price = price;
-    this.rent = rent;
+    this.rentLevel = 0;
+    this.rentLevels = rentLevels;
     this.type = "property";
     this.owner = "";
     this.houses = 0;
     this.mortgaged = false;
     this.position = id;
-    this.firstLevelRent = firstLevelRent;
-    this.secondLevelRent = secondLevelRent;
-    this.thirdLevelRent = thirdLevelRent;
-    this.fourthLevelRent = fourthLevelRent;
-    this.fifthLevelRent = fifthLevelRent;
     this.mortgagePrice = price / 2;
     this.buybackPrice = this.mortgagePrice + this.mortgagePrice / 5;
   }
@@ -120,7 +107,7 @@ export const initialTilesState = [
     position: 1,
     name: "Go",
   },
-  new PropertyTile(2, 1, "atb", "ATB", 60, 2, 10, 30, 90, 160, 250),
+  new PropertyTile(2, 1, "atb", "ATB", 60, [2, 10, 30, 90, 160, 250]),
   {
     id: 3,
     type: "chance",
@@ -128,7 +115,7 @@ export const initialTilesState = [
     position: 3,
     name: "Chance",
   },
-  new PropertyTile(4, 1, "silpo", "Silpo", 60, 4, 20, 60, 180, 320, 450),
+  new PropertyTile(4, 1, "silpo", "Silpo", 60, [4, 20, 60, 180, 320, 450]),
   {
     id: 5,
     type: "tax",
@@ -146,7 +133,7 @@ export const initialTilesState = [
     mortgaged: false,
     name: "Mercedes-Benz",
   },
-  new PropertyTile(7, 2, "staff", "Staff", 100, 6, 30, 90, 270, 400, 550),
+  new PropertyTile(7, 2, "staff", "Staff", 100, [6, 30, 90, 270, 400, 550]),
   {
     id: 8,
     type: "chance",
@@ -154,8 +141,15 @@ export const initialTilesState = [
     position: 8,
     name: "Chance",
   },
-  new PropertyTile(9, 2, "urban", "Urban", 100, 6, 30, 90, 270, 400, 550),
-  new PropertyTile(10, 2, "riotdivision", "Riot Division", 120, 8, 40, 100, 300, 450, 600),
+  new PropertyTile(9, 2, "urban", "Urban", 100, [6, 30, 90, 270, 400, 550]),
+  new PropertyTile(
+    10,
+    2,
+    "riotdivision",
+    "Riot Division",
+    120,
+    [8, 40, 100, 300, 450, 600]
+  ),
   {
     id: 11,
     type: "jail",
@@ -163,7 +157,14 @@ export const initialTilesState = [
     position: 11,
     name: "Jail",
   },
-  new PropertyTile(12, 3, "depositphotos", "Depositphotos", 140, 10, 50, 150, 450, 625, 750),
+  new PropertyTile(
+    12,
+    3,
+    "depositphotos",
+    "Depositphotos",
+    140,
+    [10, 50, 150, 450, 625, 750]
+  ),
   {
     id: 13,
     type: "bonus-property",
@@ -172,12 +173,25 @@ export const initialTilesState = [
     owner: "",
     houses: 0,
     price: 1500,
-    rent: 0,
     mortgaged: false,
     name: "Ukrnafta",
   },
-  new PropertyTile(14, 3, "gitlab", "GitLab", 140, 10, 50, 150, 450, 625, 750),
-  new PropertyTile(15, 3, "grammarly", "Grammarly", 160, 12, 60, 180, 500, 700, 900),
+  new PropertyTile(
+    14,
+    3,
+    "gitlab",
+    "GitLab",
+    140,
+    [10, 50, 150, 450, 625, 750]
+  ),
+  new PropertyTile(
+    15,
+    3,
+    "grammarly",
+    "Grammarly",
+    160,
+    [12, 60, 180, 500, 700, 900]
+  ),
   {
     id: 16,
     type: "car",
@@ -188,7 +202,14 @@ export const initialTilesState = [
     mortgaged: false,
     name: "Porsche",
   },
-  new PropertyTile(17, 4, "globallogic", "GlobalLogic", 180, 14, 70, 200, 550, 750, 950),
+  new PropertyTile(
+    17,
+    4,
+    "globallogic",
+    "GlobalLogic",
+    180,
+    [14, 70, 200, 550, 750, 950]
+  ),
   {
     id: 18,
     type: "chance",
@@ -196,8 +217,15 @@ export const initialTilesState = [
     position: 18,
     name: "Chance",
   },
-  new PropertyTile(19, 4, "softserve", "SoftServe", 180, 14, 70, 200, 550, 750, 950),
-  new PropertyTile(20, 4, "epam", "EPAM", 200, 16, 80, 220, 600, 800, 1000),
+  new PropertyTile(
+    19,
+    4,
+    "softserve",
+    "SoftServe",
+    180,
+    [14, 70, 200, 550, 750, 950]
+  ),
+  new PropertyTile(20, 4, "epam", "EPAM", 200, [16, 80, 220, 600, 800, 1000]),
   {
     id: 21,
     type: "parking",
@@ -205,7 +233,14 @@ export const initialTilesState = [
     position: 21,
     name: "Parking",
   },
-  new PropertyTile(22, 5, "monobank", "Monobank", 220, 18, 90, 250, 700, 875, 1050),
+  new PropertyTile(
+    22,
+    5,
+    "monobank",
+    "Monobank",
+    220,
+    [18, 90, 250, 700, 875, 1050]
+  ),
   {
     id: 23,
     type: "chance",
@@ -213,8 +248,22 @@ export const initialTilesState = [
     position: 23,
     name: "Chance",
   },
-  new PropertyTile(24, 5, "oschadbank", "Oschadbank", 220, 18, 90, 250, 700, 875, 1050),
-  new PropertyTile(25, 5, "privatbank", "PrivatBank", 240, 20, 100, 300, 750, 925, 1100),
+  new PropertyTile(
+    24,
+    5,
+    "oschadbank",
+    "Oschadbank",
+    220,
+    [18, 90, 250, 700, 875, 1050]
+  ),
+  new PropertyTile(
+    25,
+    5,
+    "privatbank",
+    "PrivatBank",
+    240,
+    [20, 100, 300, 750, 925, 1100]
+  ),
   {
     id: 26,
     type: "car",
@@ -225,8 +274,8 @@ export const initialTilesState = [
     mortgaged: false,
     name: "BMW",
   },
-  new PropertyTile(27, 6, "okko", "OKKO", 260, 22, 110, 330, 800, 975, 1150),
-  new PropertyTile(28, 6, "wog", "WOG", 260, 22, 110, 330, 800, 975, 1150),
+  new PropertyTile(27, 6, "okko", "OKKO", 260, [22, 110, 330, 800, 975, 1150]),
+  new PropertyTile(28, 6, "wog", "WOG", 260, [22, 110, 330, 800, 975, 1150]),
   {
     id: 29,
     type: "bonus-property",
@@ -235,11 +284,17 @@ export const initialTilesState = [
     owner: "",
     houses: 0,
     price: 1500,
-    rent: 0,
     mortgaged: false,
     name: "Naftogaz",
   },
-  new PropertyTile(30, 6, "socar", "SOCAR", 280, 24, 120, 360, 850, 1025, 1200),
+  new PropertyTile(
+    30,
+    6,
+    "socar",
+    "SOCAR",
+    280,
+    [24, 120, 360, 850, 1025, 1200]
+  ),
   {
     id: 31,
     type: "goToJail",
@@ -247,8 +302,22 @@ export const initialTilesState = [
     position: 31,
     name: "Go to Jail",
   },
-  new PropertyTile(32, 7, "ukrposhta", "Ukrposhta", 300, 26, 130, 390, 900, 1100, 1275),
-  new PropertyTile(33, 7, "meest", "Meest", 300, 26, 130, 390, 900, 1100, 1275),
+  new PropertyTile(
+    32,
+    7,
+    "ukrposhta",
+    "Ukrposhta",
+    300,
+    [26, 130, 390, 900, 1100, 1275]
+  ),
+  new PropertyTile(
+    33,
+    7,
+    "meest",
+    "Meest",
+    300,
+    [26, 130, 390, 900, 1100, 1275]
+  ),
   {
     id: 34,
     type: "chance",
@@ -256,7 +325,14 @@ export const initialTilesState = [
     position: 34,
     name: "Chance",
   },
-  new PropertyTile(35, 7, "novaposhta", "Nova Poshta", 320, 28, 150, 450, 1000, 1200, 1400),
+  new PropertyTile(
+    35,
+    7,
+    "novaposhta",
+    "Nova Poshta",
+    320,
+    [28, 150, 450, 1000, 1200, 1400]
+  ),
   {
     id: 36,
     type: "car",
@@ -274,7 +350,14 @@ export const initialTilesState = [
     position: 37,
     name: "Luxury Tax",
   },
-  new PropertyTile(38, 8, "metinvest", "Metinvest", 350, 35, 175, 500, 1100, 1300, 1500),
+  new PropertyTile(
+    38,
+    8,
+    "metinvest",
+    "Metinvest",
+    350,
+    [35, 175, 500, 1100, 1300, 1500]
+  ),
   {
     id: 39,
     type: "chance",
@@ -282,7 +365,14 @@ export const initialTilesState = [
     position: 39,
     name: "Chance",
   },
-  new PropertyTile(40, 8, "dtek", "DTEK", 400, 50, 200, 600, 1400, 1700, 2000),
+  new PropertyTile(
+    40,
+    8,
+    "dtek",
+    "DTEK",
+    400,
+    [50, 200, 600, 1400, 1700, 2000]
+  ),
 ];
 
 export const colors = [
