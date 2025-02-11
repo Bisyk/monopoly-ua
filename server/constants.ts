@@ -45,48 +45,56 @@ export const initialGroupsState = [
     color: "#FFC0CB", // light pink
     properties: [2, 4],
     upgradePrice: 50,
+    isFullSet: false,
   },
   {
     groupId: 2,
     color: "#FFFFE0", // light yellow
     properties: [7, 9, 10],
     upgradePrice: 50,
+    isFullSet: false,
   },
   {
     groupId: 3,
     color: "#E0FFFF", // light cyan
     properties: [12, 14, 15],
     upgradePrice: 100,
+    isFullSet: false,
   },
   {
     groupId: 4,
     color: "#ADD8E6", // light blue
     properties: [17, 19, 20],
     upgradePrice: 100,
+    isFullSet: false,
   },
   {
     groupId: 5,
     color: "#FFDAB9", // light peach
     properties: [22, 24, 25],
     upgradePrice: 150,
+    isFullSet: false,
   },
   {
     groupId: 6,
     color: "#FFB6C1", // light coral
     properties: [27, 28, 30],
     upgradePrice: 150,
+    isFullSet: false,
   },
   {
     groupId: 7,
     color: "#DDA0DD", // plum
     properties: [32, 33, 35],
     upgradePrice: 200,
+    isFullSet: false,
   },
   {
     groupId: 8,
     color: "#F5DEB3", // wheat
     properties: [38, 40],
     upgradePrice: 200,
+    isFullSet: false,
   },
 ];
 

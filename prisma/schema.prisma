@@ -67,6 +67,7 @@ type Groups {
   color        String
   properties   Int[]
   upgradePrice Int?
+  isFullSet    Boolean @default(false)
 }
 
 type GameLogMsg {

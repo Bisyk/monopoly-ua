@@ -153,6 +153,7 @@ export default defineWebSocketHandler({
           currentTurnPlayer.balance - boughtProperty!.price!;
 
         changePlayerTurn();
+        checkIsFullSet(currentTurnPlayer, game.boardState);
 
         game.currentAction = "roll";
       }
@@ -250,3 +251,23 @@ async function syncGameState(roomId: string, peer, newGameState) {
   peer.send(JSON.stringify(updatedGame));
   peer.publish(roomId, JSON.stringify(updatedGame));
 }
+
+const checkIsFullSet = (player, boardState) => {
+  const playerProperties = player.properties;
+
+  for (const group of boardState[0].groups) {
+    const groupProperties = group.properties;
+
+    if (groupProperties.every(p => playerProperties.includes(p))) {
+      group.isFullSet = true;
+
+      boardState[0].tiles.forEach(t => {
+        if (groupProperties.includes(t.id)) {
+          t.rentLevels[0] = t.rentLevels[0] * 2;
+        }
+      });
+    } else {
+      group.isFullSet = false;
+    }
+  }
+};
