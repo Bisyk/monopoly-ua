@@ -37,6 +37,7 @@ const currentTilePlayerOn = computed(() => {
 })
 
 const fullSetsGroups = computed(() => {
+  if (!boardState.value[0]) return []
   return boardState.value[0].groups.filter(g => g.isFullSet).map(g => g.groupId)
 })
 
@@ -114,12 +115,13 @@ onClickOutside(tileInfo, event => {
 onMounted(async () => {
   const username = sessionStorage.getItem('username')
   const { body } = await $fetch(`/games/${route.params.roomId}`)
+  console.log(body);
   const { game } = JSON.parse(body)
 
   players.value = game.players
 
   if (!game.players.some(u => u.username === username)) {
-    router.push('/')
+    router.push({ path: '/' })
   }
 
   send(JSON.stringify({ action: 'JOIN_GAME', payload: { username } }))

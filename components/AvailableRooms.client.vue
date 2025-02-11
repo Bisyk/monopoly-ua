@@ -76,7 +76,7 @@ const startGame = async (game: CreatedGame) => {
   try {
     for (const player of game.players) {
       if (player === props.username) {
-        router.push(`/game/${game.id}`)
+        router.push({path: `/game/${game.id}`})
       }
     }
   } catch (error) {
