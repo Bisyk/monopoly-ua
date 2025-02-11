@@ -16,8 +16,6 @@ const props = defineProps({
   }
 })
 
-console.log(props.tileGroups);
-
 defineEmits(['showTileInfo'])
 
 const isCorner = computed(() => {

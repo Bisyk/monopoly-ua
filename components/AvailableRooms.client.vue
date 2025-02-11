@@ -32,9 +32,7 @@ const isConnectedToRoom = computed(() => {
 
 watch(allGames, () => {
   if (allGames.value.some(game => game.players.includes(props.username) && game.status === 'PENDING')) {
-    console.log('user to connect: ', props.username);
     const game = allGames.value.find(game => game.players.includes(props.username) && game.status === 'PENDING')
-    console.log('finded game for connect: ', game);
     if (game?.players.length === game?.maxPlayers) {
       startGame(game)
     }
@@ -61,7 +59,6 @@ const createRoom = async (maxPlayers: number) => {
 
 const connectRoom = async (roomId: number) => {
   if (roomConnections.value[roomId]) {
-    console.log(`Already connected to room ${roomId}`);
     return
   }
 
@@ -76,9 +73,7 @@ const connectRoom = async (roomId: number) => {
 }
 
 const startGame = async (game: CreatedGame) => {
-  console.log('startGame', game);
   try {
-    console.log(`Started game in room ${game.id}`);
     for (const player of game.players) {
       if (player === props.username) {
         router.push(`/game/${game.id}`)

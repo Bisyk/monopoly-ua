@@ -75,8 +75,6 @@ export default defineWebSocketHandler({
 
     const parsedMessage = JSON.parse(message.text());
 
-    console.log(parsedMessage);
-
     const game = await prisma.game.findUnique({
       where: {
         associatedRoomId: roomId,
@@ -140,23 +138,31 @@ export default defineWebSocketHandler({
     }
 
     if (parsedMessage.action === "BUY_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+
+      console.log(propertyId);
+
       const boughtProperty = game.boardState[0].tiles.find(
-        t => t.id === parsedMessage.payload.property.id
+        t => t.id === propertyId
       );
 
-      if (currentTurnPlayer.balance >= boughtProperty!.price!) {
-        boughtProperty!.owner = game.currentTurn;
+      console.log("boughtProperty", boughtProperty);
 
-        currentTurnPlayer.properties.push(boughtProperty!.id);
-
-        currentTurnPlayer.balance =
-          currentTurnPlayer.balance - boughtProperty!.price!;
-
-        changePlayerTurn();
-        checkIsFullSet(currentTurnPlayer, game.boardState);
-
-        game.currentAction = "roll";
+      if (currentTurnPlayer.balance <= boughtProperty!.price!) {
+        return;
       }
+
+      boughtProperty!.owner = game.currentTurn;
+
+      currentTurnPlayer.properties.push(boughtProperty!.id);
+
+      currentTurnPlayer.balance =
+        currentTurnPlayer.balance - boughtProperty!.price!;
+
+      checkIsFullSet(currentTurnPlayer, game.boardState);
+      changePlayerTurn();
+
+      game.currentAction = "roll";
     }
 
     if (parsedMessage.action === "PASS_PROPERTY") {
@@ -224,6 +230,28 @@ export default defineWebSocketHandler({
       currentTurnPlayer.balance -= propertyToBuyBack!.buybackPrice;
     }
 
+    if (parsedMessage.action === "UPGRADE_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+      const propertyGroup = game.boardState[0].groups.find(g => {
+        return g.properties.includes(propertyId);
+      });
+
+      const propertyToUpgrade = game.boardState[0].tiles.find(
+        t => t.id === propertyId
+      );
+
+      if (currentTurnPlayer.balance < propertyGroup!.upgradePrice) {
+        return;
+      }
+
+      if (propertyToUpgrade!.rentLevel === 5) {
+        return;
+      }
+
+      propertyToUpgrade!.rentLevel += 1;
+      currentTurnPlayer.balance -= propertyGroup!.upgradePrice;
+    }
+
     await syncGameState(roomId, peer, game);
   },
 });
@@ -259,13 +287,15 @@ const checkIsFullSet = (player, boardState) => {
     const groupProperties = group.properties;
 
     if (groupProperties.every(p => playerProperties.includes(p))) {
-      group.isFullSet = true;
+      if (!group.isFullSet) {
+        group.isFullSet = true;
 
-      boardState[0].tiles.forEach(t => {
-        if (groupProperties.includes(t.id)) {
-          t.rentLevels[0] = t.rentLevels[0] * 2;
-        }
-      });
+        boardState[0].tiles.forEach(t => {
+          if (groupProperties.includes(t.id)) {
+            t.rentLevels[0] = t.rentLevels[0] * 2;
+          }
+        });
+      }
     } else {
       group.isFullSet = false;
     }

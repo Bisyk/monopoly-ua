@@ -16,7 +16,6 @@ const tileInfo = ref(null)
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
 watch(gameState, (newState) => {
-  console.log(newState)
   if (Object.keys(newState).length > 0) {
     boardState.value = newState.boardState
   }
@@ -37,9 +36,11 @@ const currentTilePlayerOn = computed(() => {
   return tilesState.value[player.value.position - 1]
 })
 
+const fullSetsGroups = computed(() => {
+  return boardState.value[0].groups.filter(g => g.isFullSet).map(g => g.groupId)
+})
+
 handleMessage((message) => {
-  console.log('received message')
-  console.log(JSON.parse(message));
   gameState.value = JSON.parse(message)
 })
 
@@ -48,8 +49,8 @@ const handleUserTurn = () => {
   send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
 }
 
-const handleBuyProperty = () => {
-  send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, property: { ...currentTilePlayerOn.value } } }))
+const handleBuyProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handlePassProperty = () => {
@@ -68,6 +69,10 @@ const handleBuyBackProperty = (propertyId: number) => {
 
 const handlePayRent = (propertyId: number) => {
   send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+}
+
+const handleUpgradeProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'UPGRADE_PROPERTY', payload: { username, propertyId } }))
 }
 
 const showTileInfo = async (event, tile) => {
@@ -108,7 +113,6 @@ onClickOutside(tileInfo, event => {
 
 onMounted(async () => {
   const username = sessionStorage.getItem('username')
-  console.log('username: ', username);
   const { body } = await $fetch(`/games/${route.params.roomId}`)
   const { game } = JSON.parse(body)
 
@@ -139,6 +143,7 @@ definePageMeta({
 <template>
   <div style="position: fixed; top: 0; left: 0; z-index: 9999; height: 100vh; width: fit-content; overflow-y: scroll;">
     <pre>
+      {{ fullSetsGroups }}
       {{ gameState }}
     </pre>
   </div>
@@ -158,6 +163,16 @@ definePageMeta({
           v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && selectedTile.mortgaged"
           @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
           :disabled="player.balance < selectedTile.buybackPrice">BUY BACK
+        </BaseButton>
+
+        <!-- {{ player.properties }}
+        {{ selectedTile.id }}
+        {{ player.properties.includes(selectedTile.id) }}
+        {{ fullSetsGroups.includes(selectedTile.groupId) }} -->
+        <BaseButton
+          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && fullSetsGroups.includes(selectedTile.groupId)"
+          @click=" handleUpgradeProperty(selectedTile.id)">
+          UPGRADE
         </BaseButton>
       </div>
 
@@ -203,10 +218,12 @@ definePageMeta({
     <!-- BUY MODAL -->
     <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'buy'">
       <h1>Do you want to buy this property?</h1>
+
       <h3>Name: {{ currentTilePlayerOn.name }}</h3>
       <h3>Price: {{ currentTilePlayerOn.price }}</h3>
       <div style="display: flex; gap: 1rem;">
-        <BaseButton :disabled="player.balance < currentTilePlayerOn.price" @click="handleBuyProperty" bgColor="green">
+        <BaseButton :disabled="player.balance < currentTilePlayerOn.price"
+          @click="() => handleBuyProperty(currentTilePlayerOn.id)" bgColor="green">
           BUY
         </BaseButton>
         <BaseButton @click="handlePassProperty" bgColor="red">PASS
@@ -224,7 +241,6 @@ definePageMeta({
       </BaseButton>
       <p v-if="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">* you don't have enough
         money to pay rent, mortgage something</p>
-
     </GameModal>
 
     <!-- GAME BOARD -->

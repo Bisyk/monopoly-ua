@@ -4,7 +4,8 @@ import { onMounted } from 'vue';
 
 onMounted(() => {
   const audio = new Audio('/sound.wav');
-  audio.play();
+  
+  // audio.play();
 })
 </script>
 

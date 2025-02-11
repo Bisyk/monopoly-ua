@@ -12,8 +12,6 @@ export default defineEventHandler(async event => {
     },
   });
 
-  console.log("finded game", game);
-
   if (!game) {
     return { status: 404 };
   }
