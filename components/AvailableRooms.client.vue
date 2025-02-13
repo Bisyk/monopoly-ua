@@ -32,9 +32,7 @@ const isConnectedToRoom = computed(() => {
 
 watch(allGames, () => {
   if (allGames.value.some(game => game.players.includes(props.username) && game.status === 'PENDING')) {
-    console.log('user to connect: ', props.username);
     const game = allGames.value.find(game => game.players.includes(props.username) && game.status === 'PENDING')
-    console.log('finded game for connect: ', game);
     if (game?.players.length === game?.maxPlayers) {
       startGame(game)
     }
@@ -61,7 +59,6 @@ const createRoom = async (maxPlayers: number) => {
 
 const connectRoom = async (roomId: number) => {
   if (roomConnections.value[roomId]) {
-    console.log(`Already connected to room ${roomId}`);
     return
   }
 
@@ -76,12 +73,10 @@ const connectRoom = async (roomId: number) => {
 }
 
 const startGame = async (game: CreatedGame) => {
-  console.log('startGame', game);
   try {
-    console.log(`Started game in room ${game.id}`);
     for (const player of game.players) {
       if (player === props.username) {
-        router.push(`/game/${game.id}`)
+        router.push({path: `/game/${game.id}`})
       }
     }
   } catch (error) {
@@ -110,14 +105,18 @@ onMounted(() => {
         GAME</BaseButton>
     </div>
 
-    <AvailableRoomCard v-for="game in availableGames" :game-id="game.id" :max-players="game.maxPlayers"
-      :players="game.players" @joinGame="connectRoom" />
+    <AvailableRoomCard v-if="!!availableGames.length" v-for="game in availableGames" :game-id="game.id"
+      :max-players="game.maxPlayers" :players="game.players" @joinGame="connectRoom" />
 
+    <div v-else style="text-align: center; height: 70vh;">
+      <p>No available games. Create one!</p>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
 .container {
+  min-height: 70vh;
   margin: 2rem 2rem 0 2rem;
   background-color: white;
   padding: 0.5rem 2rem;

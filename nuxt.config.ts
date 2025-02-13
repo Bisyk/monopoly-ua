@@ -22,4 +22,7 @@ export default defineNuxtConfig({
       },
     },
   },
+  prisma: {
+    skipPrompts: true,
+  },
 });

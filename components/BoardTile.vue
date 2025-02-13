@@ -2,105 +2,126 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  type: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String,
+  tile: {
+    type: Object,
     required: true
   },
   players: {
     type: Array,
     required: true
   },
-  id: {
-    type: Number,
-    required: true
-  },
-  inTopRow: {
-    type: Boolean,
-    default: false
-  },
-  inRightRow: {
-    type: Boolean,
-    default: false
-  },
-  inBottomRow: {
-    type: Boolean,
-    default: false
-  },
-  inLeftRow: {
-    type: Boolean,
-    default: false
-  },
-  isHorizontal: {
-    type: Boolean,
-    default: false
-  },
-  isVertical: {
-    type: Boolean,
-    default: false
+  tileGroups: {
+    type: Array,
+    required: false
   }
 })
 
-const positionCss = computed(() => {
-  if (props.inTopRow) {
-    return 'transform: rotate(270deg)'
-  } else if (props.inRightRow) {
-    return 'right-row'
-  } else if (props.inBottomRow) {
-    return 'transform: rotate(270deg)'
-  } else if (props.inLeftRow) {
-    return 'left-row'
-  } else {
-    return ''
+defineEmits(['showTileInfo'])
+
+const isCorner = computed(() => {
+  return ['go', 'jail', 'parking', 'goToJail'].includes(props.tile.type)
+})
+
+const isHorizontalProperty = computed(() => {
+  const horizontalPropertyTypes = ['property', 'bonus-property'];
+  const horizontalPropertyIds = [2, 3, 4, 5, 6, 7, 8, 9, 10, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+  return horizontalPropertyTypes.includes(props.tile.type) && horizontalPropertyIds.includes(props.tile.id);
+});
+
+const isTopRow = computed(() => {
+  return props.tile.id >= 1 && props.tile.id <= 10;
+});
+
+const isRightRow = computed(() => {
+  return props.tile.id >= 11 && props.tile.id <= 20;
+});
+
+const isBottomRow = computed(() => {
+  return props.tile.id >= 21 && props.tile.id <= 30;
+});
+
+const isLeftRow = computed(() => {
+  return props.tile.id >= 31 && props.tile.id <= 40;
+})
+
+import type { CSSProperties } from 'vue';
+
+const tileGroup = computed(() => {
+  return props.tileGroups?.find(group => group.properties.includes(props.tile.id));
+})
+
+const priceStyle = computed<CSSProperties>(() => {
+  return {
+    fontSize: '1.8vmin',
+    width: '100%',
+    "max-width": '7vmin',
+    position: 'absolute',
+    textAlign: 'center',
+    top: isTopRow.value ? '-20%' : '',
+    bottom: isBottomRow.value ? '-20%' : '',
+    left: isLeftRow.value ? '-50%' : '',
+    right: isRightRow.value ? '-50%' : '',
+    transform: isLeftRow.value ? 'rotate(270deg) translate(-35%, 80%)' : isRightRow.value ? 'rotate(90deg) translate(35%, 80%)' : '',
+    'background-color': tileGroup.value?.color || 'darkgray',
+    'border-radius': '12px',
   }
 })
 
-const isCorner = (() => {
-  if (props.type === 'go' || props.type === 'jail' || props.type === 'parking' || props.type === 'goToJail') {
-    return true
+const upgradeStyle = computed((): CSSProperties => {
+  return {
+    position: 'absolute' as CSSProperties['position'],
+    zIndex: 5,
+    display: 'flex',
+    width: '100%',
+    height: '100%',
+    flexDirection: (isLeftRow.value || isRightRow.value ? 'column' : '') as CSSProperties['flexDirection'],
+    alignItems: isRightRow.value ? 'flex-start' : isLeftRow.value ? 'flex-end' : '',
+    justifyContent: 'center',
   }
-  return false
 })
 
-const heroImageClass = computed(() => {
-  if (props.isHorizontal) {
-    return "heroImage horizontal"
+const starStyle = computed(() => {
+  return {
+    display: 'flex',
+    alignItems: isTopRow.value ? 'flex-end' : 'flex-start',
   }
-  if (props.isVertical) {
-    return "heroImage vertical"
-  }
+})
+
+const tileBgColor = computed(() => {
+  return props.tile.owner ? props.players.find(player => player.username === props.tile.owner)?.color : 'white';
 })
 
 </script>
 
 <template>
-  <div :class="`space ${isCorner.value ? 'corner' : ''} ${props.type}`">
-    <div class=" container" :style="`width: 100%; ${props.type === 'property' || props.type === 'car' || props.type === 'bonus-property' ?
-      positionCss : ''}`">
-      <div class="heroSprite">
-        <img :class="heroImageClass"
-          v-if="props.type === 'property' || props.type === 'go' || props.type === 'bonus-property'"
-          :src="`/assets/${props.name}-sprite.webp`" alt="tile" />
-        <img :class="heroImageClass" v-if="props.type === 'chance'" src="/assets/chance-sprite.webp"
-          :style="`${inRightRow ? 'transform: rotate(90deg)' : ''}`" alt="chance" />
-        <img :class="heroImageClass" v-if="props.type === 'tax'" src="/assets/tax-sprite.webp" alt="tax" />
-        <img :class="heroImageClass" v-if="props.type === 'luxury-tax'" src="/assets/luxurytax-sprite.webp" alt="tax" />
-        <img :class="heroImageClass" v-if="props.type === 'car'" :src="`/assets/${props.name}-sprite.webp`" alt="car" />
-        <div v-if="props.type === 'jail'">
-          <img class="heroImage" src=" /assets/jail-sprite.webp" style="width: 50%; aspect-ratio: 1/1;" alt="jail" />
-          <img class="heroImage" src="/assets/doughnut-sprite.webp" style="width: 50%; aspect-ratio: 1/1;" alt="jail" />
-        </div>
-        <div v-if="props.type === 'parking'">
-          <img :class="heroImageClass" src="/assets/freeparking-sprite.webp" alt="parking" />
-        </div>
-        <div v-if="props.type === 'goToJail'">
-          <img :class="heroImageClass" src="/assets/goToJail-sprite.webp" alt="goToJail" />
-        </div>
+  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`"
+    @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
+    <div v-if="props.tile.mortgaged" class="mortgaged-container">
+      🔒
+    </div>
+    <div v-if="props.tile.price && !props.tile.owner" :style="priceStyle">
+      {{ props.tile.price }}
+    </div>
+    <div v-if="props.tile.type === 'property'" :style="upgradeStyle">
+      <p v-if="props.tile.rentLevel >= 1 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel >= 2 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel >= 3 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel >= 4 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel === 5" :style="starStyle"><span style="font-size: 2.5vmin">🌟</span></p>
+    </div>
+    <div v-if="props.tile.rentLevels.length && props.tile.owner" :style="priceStyle">
+      {{ props.tile.rentLevels[props.tile.rentLevel] }}
+    </div>
+    <div class="container">
+      <div class="heroContainer">
+        <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" class="heroImage"
+          :style="isHorizontalProperty ? { transform: 'rotate(270deg)' } : {}" />
         <div class="player-container">
-          <PlayerBase v-for="player in props.players" :key="player.id" :player="player" :tile-id="props.id" />
+          <PlayerBase v-for="player in props.players" :key="player.id" :player="player" :tile-id="props.tile.id" />
         </div>
       </div>
     </div>
@@ -109,13 +130,9 @@ const heroImageClass = computed(() => {
 
 
 <style lang="scss" scoped>
-$tile-size: 3.5vw;
-$corner-tile-size: calc(6vw + 4px);
-
 .space {
   background: white;
   text-align: center;
-  // border: 1px solid black;
   border-radius: 12px;
   filter: drop-shadow(0 0 0.15rem rgba(0, 0, 0, 0.5));
   width: 100%;
@@ -131,7 +148,7 @@ $corner-tile-size: calc(6vw + 4px);
     height: 100%;
     width: 100%;
 
-    .heroSprite {
+    .heroContainer {
       padding: 0;
       margin: 0;
       display: flex;
@@ -139,11 +156,14 @@ $corner-tile-size: calc(6vw + 4px);
       align-items: center;
       width: 100%;
       height: 100%;
+      overflow: hidden;
 
       .heroImage {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        width: auto;
+        height: auto;
       }
 
       .vertical {
@@ -236,5 +256,16 @@ $corner-tile-size: calc(6vw + 4px);
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
+}
+
+.mortgaged-container {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.6);
 }
 </style>
