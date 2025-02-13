@@ -46,6 +46,7 @@ export const initialGroupsState = [
     properties: [2, 4],
     upgradePrice: 50,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 2,
@@ -53,6 +54,7 @@ export const initialGroupsState = [
     properties: [7, 9, 10],
     upgradePrice: 50,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 3,
@@ -60,6 +62,7 @@ export const initialGroupsState = [
     properties: [12, 14, 15],
     upgradePrice: 100,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 4,
@@ -67,6 +70,7 @@ export const initialGroupsState = [
     properties: [17, 19, 20],
     upgradePrice: 100,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 5,
@@ -74,6 +78,7 @@ export const initialGroupsState = [
     properties: [22, 24, 25],
     upgradePrice: 150,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 6,
@@ -81,6 +86,7 @@ export const initialGroupsState = [
     properties: [27, 28, 30],
     upgradePrice: 150,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 7,
@@ -88,6 +94,7 @@ export const initialGroupsState = [
     properties: [32, 33, 35],
     upgradePrice: 200,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
   {
     groupId: 8,
@@ -95,6 +102,7 @@ export const initialGroupsState = [
     properties: [38, 40],
     upgradePrice: 200,
     isFullSet: false,
+    isUpgradeAvailable: true,
   },
 ];
 
@@ -105,7 +113,6 @@ export const initialPlayersState = {
   ownedPropertiesGroup: [],
   jailed: false,
   turnsInJail: 0,
-  isUpgradeAvailable: true,
 };
 
 export const initialTilesState = [

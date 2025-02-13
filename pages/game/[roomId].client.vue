@@ -28,6 +28,13 @@ const tilesState = computed(() => {
   return []
 })
 
+const groupsState = computed(() => {
+  if (boardState.value[0]) {
+    return boardState.value[0].groups
+  }
+  return []
+})
+
 const player = computed(() => {
   return gameState.value.players.find(p => p.username === username)
 })
@@ -188,7 +195,8 @@ definePageMeta({
           :disabled="player.balance < selectedTile.buybackPrice">BUY BACK
         </BaseButton>
 
-        <BaseButton v-if="player.isUpgradeAvailable &&
+        <BaseButton v-if="
+          groupsState.find(g => g.groupId === selectedTile.groupId).isUpgradeAvailable &&
           checkIfUpgradeable(selectedTile.id) &&
           gameState.currentTurn === username
           && player.properties.includes(selectedTile.id)

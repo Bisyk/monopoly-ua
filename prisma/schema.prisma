@@ -38,7 +38,6 @@ type Player {
   ownedPropertiesGroup Int[]
   jailed               Boolean
   turnsInJail          Int
-  isUpgradeAvailable   Boolean @default(true)
 }
 
 type gameState {
@@ -64,11 +63,12 @@ type Tile {
 }
 
 type Groups {
-  groupId      Int
-  color        String
-  properties   Int[]
-  upgradePrice Int?
-  isFullSet    Boolean @default(false)
+  groupId            Int
+  color              String
+  properties         Int[]
+  upgradePrice       Int?
+  isFullSet          Boolean @default(false)
+  isUpgradeAvailable Boolean @default(true)
 }
 
 type GameLogMsg {

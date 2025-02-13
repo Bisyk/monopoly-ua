@@ -92,12 +92,13 @@ export default defineWebSocketHandler({
     const currentTurnPlayerIdx = game.players.indexOf(currentTurnPlayer);
 
     const changePlayerTurn = () => {
+      game.boardState[0].groups.forEach(g => {
+        g.isUpgradeAvailable = true;
+      });
       if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
-        game.players[currentTurnPlayerIdx + 1].isUpgradeAvailable = true;
       } else {
         game.currentTurn = game.players[0].username;
-        game.players[0].isUpgradeAvailable = true;
       }
     };
 
@@ -248,7 +249,7 @@ export default defineWebSocketHandler({
 
       propertyToUpgrade!.rentLevel += 1;
       currentTurnPlayer.balance -= propertyGroup!.upgradePrice;
-      currentTurnPlayer.isUpgradeAvailable = false;
+      propertyGroup!.isUpgradeAvailable = false;
     }
 
     await syncGameState(roomId, peer, game);
