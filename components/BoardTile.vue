@@ -52,6 +52,7 @@ const tileGroup = computed(() => {
 
 const priceStyle = computed<CSSProperties>(() => {
   return {
+    fontSize: '1.8vmin',
     width: '100%',
     "max-width": '7vmin',
     position: 'absolute',

@@ -1,5 +1,5 @@
 <template>
-    <div v-if="isPlayerOnTile" class="player-token"></div>
+  <div v-if="isPlayerOnTile" class="player-token"></div>
 </template>
 
 <script setup lang="ts">
@@ -35,8 +35,8 @@ const borderColor = colorMap[props.player.color]
 
 <style scoped>
 .player-token {
-  width: 3.5vh;
-  height: 3.5vh;
+  width: 3vmin;
+  aspect-ratio: 1/1;
   background-color: v-bind(player.color);
   border: 0.5vh solid v-bind(borderColor);
   margin: 0.2vh;
