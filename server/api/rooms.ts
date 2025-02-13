@@ -9,7 +9,6 @@ export default defineWebSocketHandler({
     console.log(`Opened WS `);
     const availableRooms = await prisma.room.findMany();
     peer.send(JSON.stringify(availableRooms));
-    console.log(availableRooms);
     peers.push(peer);
   },
   close(peer) {

@@ -67,6 +67,26 @@ const priceStyle = computed<CSSProperties>(() => {
   }
 })
 
+const upgradeStyle = computed((): CSSProperties => {
+  return {
+    position: 'absolute' as CSSProperties['position'],
+    zIndex: 5,
+    display: 'flex',
+    width: '100%',
+    height: '100%',
+    flexDirection: (isLeftRow.value || isRightRow.value ? 'column' : '') as CSSProperties['flexDirection'],
+    alignItems: isRightRow.value ? 'flex-start' : isLeftRow.value ? 'flex-end' : '',
+    justifyContent: 'center',
+  }
+})
+
+const starStyle = computed(() => {
+  return {
+    display: 'flex',
+    alignItems: isTopRow.value ? 'flex-end' : 'flex-start',
+  }
+})
+
 const tileBgColor = computed(() => {
   return props.tile.owner ? props.players.find(player => player.username === props.tile.owner)?.color : 'white';
 })
@@ -81,6 +101,17 @@ const tileBgColor = computed(() => {
     </div>
     <div v-if="props.tile.price && !props.tile.owner" :style="priceStyle">
       {{ props.tile.price }}
+    </div>
+    <div v-if="props.tile.type === 'property'" :style="upgradeStyle">
+      <p v-if="props.tile.rentLevel >= 1 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel >= 2 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel >= 3 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel >= 4 && props.tile.rentLevel < 5" :style="starStyle"><span
+          style="font-size: 1.3vmin">⭐</span></p>
+      <p v-if="props.tile.rentLevel === 5" :style="starStyle"><span style="font-size: 2.5vmin">🌟</span></p>
     </div>
     <div v-if="props.tile.rentLevels.length && props.tile.owner" :style="priceStyle">
       {{ props.tile.rentLevels[props.tile.rentLevel] }}

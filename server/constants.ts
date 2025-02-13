@@ -105,6 +105,7 @@ export const initialPlayersState = {
   ownedPropertiesGroup: [],
   jailed: false,
   turnsInJail: 0,
+  isUpgradeAvailable: true,
 };
 
 export const initialTilesState = [

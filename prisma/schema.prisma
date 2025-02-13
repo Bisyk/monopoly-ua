@@ -38,6 +38,7 @@ type Player {
   ownedPropertiesGroup Int[]
   jailed               Boolean
   turnsInJail          Int
+  isUpgradeAvailable   Boolean @default(true)
 }
 
 type gameState {

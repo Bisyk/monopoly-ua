@@ -94,8 +94,10 @@ export default defineWebSocketHandler({
     const changePlayerTurn = () => {
       if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
+        game.players[currentTurnPlayerIdx + 1].isUpgradeAvailable = true;
       } else {
         game.currentTurn = game.players[0].username;
+        game.players[0].isUpgradeAvailable = true;
       }
     };
 
@@ -140,13 +142,9 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "BUY_PROPERTY") {
       const propertyId = parsedMessage.payload.propertyId;
 
-      console.log(propertyId);
-
       const boughtProperty = game.boardState[0].tiles.find(
         t => t.id === propertyId
       );
-
-      console.log("boughtProperty", boughtProperty);
 
       if (currentTurnPlayer.balance <= boughtProperty!.price!) {
         return;
@@ -250,6 +248,7 @@ export default defineWebSocketHandler({
 
       propertyToUpgrade!.rentLevel += 1;
       currentTurnPlayer.balance -= propertyGroup!.upgradePrice;
+      currentTurnPlayer.isUpgradeAvailable = false;
     }
 
     await syncGameState(roomId, peer, game);
@@ -280,24 +279,20 @@ async function syncGameState(roomId: string, peer, newGameState) {
   peer.publish(roomId, JSON.stringify(updatedGame));
 }
 
-const checkIsFullSet = (player, boardState) => {
+const checkIsFullSet = (player: any, boardState: any) => {
   const playerProperties = player.properties;
 
   for (const group of boardState[0].groups) {
     const groupProperties = group.properties;
 
-    if (groupProperties.every(p => playerProperties.includes(p))) {
-      if (!group.isFullSet) {
-        group.isFullSet = true;
+    if (groupProperties.every((p: any) => playerProperties.includes(p))) {
+      group.isFullSet = true;
 
-        boardState[0].tiles.forEach(t => {
-          if (groupProperties.includes(t.id)) {
-            t.rentLevels[0] = t.rentLevels[0] * 2;
-          }
-        });
-      }
-    } else {
-      group.isFullSet = false;
+      boardState[0].tiles.forEach((t: any) => {
+        if (groupProperties.includes(t.id)) {
+          t.rentLevels[0] = t.rentLevels[0] * 2;
+        }
+      });
     }
   }
 };

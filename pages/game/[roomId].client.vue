@@ -50,6 +50,26 @@ const handleUserTurn = () => {
   send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
 }
 
+const checkIfUpgradeable = (propertyId: number) => {
+  const property = tilesState.value[propertyId - 1]
+  if (property.type !== 'property') return false
+
+  const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
+  if (!group) return false
+
+  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
+
+  const allOwnedBySamePlayer = propertiesInGroup.every(p => p.owner === property.owner)
+  if (!allOwnedBySamePlayer) return false
+
+  const allAtMaxRentLevel = propertiesInGroup.every(p => p.rentLevel >= 5)
+  if (allAtMaxRentLevel) return false
+
+  const isLevelEvenlyUpgraded = propertiesInGroup.every(p => p.rentLevel >= property.rentLevel)
+
+  return isLevelEvenlyUpgraded
+}
+
 const handleBuyProperty = (propertyId: number) => {
   send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, propertyId } }))
 }
@@ -68,13 +88,15 @@ const handleBuyBackProperty = (propertyId: number) => {
   selectedTile.value = null
 }
 
+const handleUpgradeProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'UPGRADE_PROPERTY', payload: { username, propertyId } }))
+  selectedTile.value = null
+}
+
 const handlePayRent = (propertyId: number) => {
   send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
 }
 
-const handleUpgradeProperty = (propertyId: number) => {
-  send(JSON.stringify({ action: 'UPGRADE_PROPERTY', payload: { username, propertyId } }))
-}
 
 const showTileInfo = async (event, tile) => {
   const tileRect = event.target.getBoundingClientRect();
@@ -115,7 +137,6 @@ onClickOutside(tileInfo, event => {
 onMounted(async () => {
   const username = sessionStorage.getItem('username')
   const { body } = await $fetch(`/games/${route.params.roomId}`)
-  console.log(body);
   const { game } = JSON.parse(body)
 
   players.value = game.players
@@ -167,13 +188,11 @@ definePageMeta({
           :disabled="player.balance < selectedTile.buybackPrice">BUY BACK
         </BaseButton>
 
-        <!-- {{ player.properties }}
-        {{ selectedTile.id }}
-        {{ player.properties.includes(selectedTile.id) }}
-        {{ fullSetsGroups.includes(selectedTile.groupId) }} -->
-        <BaseButton
-          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && fullSetsGroups.includes(selectedTile.groupId)"
-          @click=" handleUpgradeProperty(selectedTile.id)">
+        <BaseButton v-if="player.isUpgradeAvailable &&
+          checkIfUpgradeable(selectedTile.id) &&
+          gameState.currentTurn === username
+          && player.properties.includes(selectedTile.id)
+          && fullSetsGroups.includes(selectedTile.groupId)" @click=" handleUpgradeProperty(selectedTile.id)">
           UPGRADE
         </BaseButton>
       </div>
