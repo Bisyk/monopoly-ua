@@ -38,5 +38,11 @@ const props = defineProps({
     transform: scale(1.1);
     transition: transform 0.3s ease;
   }
+
+  &:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+  }
 }
 </style>

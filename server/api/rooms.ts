@@ -1,13 +1,14 @@
-import { games } from "../routes/gamesList";
+import prisma from "~/lib/prisma";
 
 const rooms = "Rooms";
 const peers = [];
 
 export default defineWebSocketHandler({
-  open(peer) {
+  async open(peer) {
     peer.subscribe(rooms);
     console.log(`Opened WS `);
-    peer.send(JSON.stringify(games.value));
+    const availableRooms = await prisma.room.findMany();
+    peer.send(JSON.stringify(availableRooms));
     peers.push(peer);
   },
   close(peer) {
@@ -16,7 +17,8 @@ export default defineWebSocketHandler({
   error(peer, error) {
     console.log("error on ws", peer, error);
   },
-  message(peer, message) {
-    peer.send(JSON.stringify(games.value));
+  async message(peer, message) {
+    const availableRooms = await prisma.room.findMany();
+    peer.send(JSON.stringify(availableRooms));
   },
 });
