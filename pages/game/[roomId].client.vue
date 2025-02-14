@@ -72,9 +72,77 @@ const checkIfUpgradeable = (propertyId: number) => {
   const allAtMaxRentLevel = propertiesInGroup.every(p => p.rentLevel >= 5)
   if (allAtMaxRentLevel) return false
 
+  const isAnyMortgaged = propertiesInGroup.some(p => p.mortgaged)
+  if (isAnyMortgaged) return false
+
+  const isOwner = player.value.properties.includes(propertyId)
+  if (!isOwner) return false
+
+  const isUpgradable = groupsState.value.find(g => g.groupId === property.groupId).isUpgradeAvailable
+  if (!isUpgradable) return false
+
+  const isFullSet = fullSetsGroups.value.includes(property.groupId)
+  if (!isFullSet) return false
+
   const isLevelEvenlyUpgraded = propertiesInGroup.every(p => p.rentLevel >= property.rentLevel)
 
   return isLevelEvenlyUpgraded
+}
+
+const checkIfMortgageable = (propertyId: number) => {
+  const property = tilesState.value[propertyId - 1]
+  if (property.type !== 'property') return false
+
+  const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
+  if (!group) return false
+
+
+  const isOwner = player.value.properties.includes(propertyId)
+  if (!isOwner) return false
+
+  const isMortgaged = property.mortgaged
+  if (isMortgaged) return false
+
+  const isRentLevelZero = property.rentLevel === 0
+  if (!isRentLevelZero) return false
+
+  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
+
+  const isAnyPropertyUpgraded = propertiesInGroup.some(p => p.rentLevel > 0)
+
+  return !isAnyPropertyUpgraded
+}
+
+const checkIfBuybackAble = (propertyId: number) => {
+  const property = tilesState.value[propertyId - 1]
+  if (property.type !== 'property') return false
+
+  const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
+  if (!group) return false
+
+  const isOwner = player.value.properties.includes(propertyId)
+  if (!isOwner) return false
+
+  const isMortgaged = property.mortgaged
+  if (!isMortgaged) return false
+
+  return true
+}
+
+const checkIfSellable = (propertyId: number) => {
+  const property = tilesState.value[propertyId - 1]
+  if (property.type !== 'property') return false
+
+  if (property.rentLevel < 1) return false
+
+  const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
+  if (!group) return false
+
+  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
+
+  const notLowerThanAnyOtherProperty = propertiesInGroup.every(p => p.rentLevel <= property.rentLevel)
+
+  return notLowerThanAnyOtherProperty
 }
 
 const handleBuyProperty = (propertyId: number) => {
@@ -100,10 +168,14 @@ const handleUpgradeProperty = (propertyId: number) => {
   selectedTile.value = null
 }
 
+const handleSellProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'SELL_PROPERTY', payload: { username, propertyId } }))
+  selectedTile.value = null
+}
+
 const handlePayRent = (propertyId: number) => {
   send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
 }
-
 
 const showTileInfo = async (event, tile) => {
   const tileRect = event.target.getBoundingClientRect();
@@ -184,23 +256,25 @@ definePageMeta({
     <div v-if="selectedTile" class="tileInfo" ref="tileInfo">
       <h3>{{ selectedTile.name }}</h3>
       <div style="display: flex; width: 100%; justify-content: center; gap: 1rem;">
-        <BaseButton
-          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && !selectedTile.mortgaged"
-          @click="handleMortgageProperty(selectedTile.id)" bgColor="red">SELL
+        <BaseButton v-if="checkIfMortgageable(selectedTile.id) &&
+          gameState.currentTurn === username" @click="handleMortgageProperty(selectedTile.id)" bgColor="red">
+          MORTGAGE
         </BaseButton>
 
-        <BaseButton
-          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && selectedTile.mortgaged"
-          @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
-          :disabled="player.balance < selectedTile.buybackPrice">BUY BACK
+        <BaseButton v-if="checkIfBuybackAble(selectedTile.id) &&
+          gameState.currentTurn === username" @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
+          :disabled="player.balance < selectedTile.buybackPrice">
+          BUY BACK
+        </BaseButton>
+
+        <BaseButton v-if="checkIfSellable(selectedTile.id) &&
+          gameState.currentTurn === username" @click="handleSellProperty(selectedTile.id)" bgColor="red">
+          SELL
         </BaseButton>
 
         <BaseButton v-if="
-          groupsState.find(g => g.groupId === selectedTile.groupId).isUpgradeAvailable &&
           checkIfUpgradeable(selectedTile.id) &&
-          gameState.currentTurn === username
-          && player.properties.includes(selectedTile.id)
-          && fullSetsGroups.includes(selectedTile.groupId)" @click=" handleUpgradeProperty(selectedTile.id)">
+          gameState.currentTurn === username" @click="handleUpgradeProperty(selectedTile.id)">
           UPGRADE
         </BaseButton>
       </div>
@@ -225,7 +299,7 @@ definePageMeta({
             <div>{{ selectedTile.rentLevels[4] }}</div>
           </div>
           <div style="display: flex; justify-content: space-between;">
-            <div>⭐⭐⭐⭐⭐ </div>
+            <div>🌟 </div>
             <div>{{ selectedTile.rentLevels[5] }}</div>
           </div>
         </div>
