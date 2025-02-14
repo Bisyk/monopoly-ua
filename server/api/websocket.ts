@@ -252,6 +252,26 @@ export default defineWebSocketHandler({
       propertyGroup!.isUpgradeAvailable = false;
     }
 
+    if (parsedMessage.action === "SELL_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+
+      const propertyToSell = game.boardState[0].tiles.find(
+        t => t.id === propertyId
+      );
+
+      const propertyGroup = game.boardState[0].groups.find(g => {
+        return g.properties.includes(propertyId);
+      });
+
+      if (propertyToSell!.rentLeven < 1) {
+        return;
+      }
+
+      currentTurnPlayer.balance +=
+        propertyToSell.rentLevels[propertyToSell.rentLevel] / 2;
+      propertyToSell!.rentLevel -= 1;
+    }
+
     await syncGameState(roomId, peer, game);
   },
 });
