@@ -149,8 +149,8 @@ const handleBuyProperty = (propertyId: number) => {
   send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, propertyId } }))
 }
 
-const handlePassProperty = () => {
-  send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username } }))
+const handlePassProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handleMortgageProperty = (propertyId: number) => {
@@ -175,6 +175,14 @@ const handleSellProperty = (propertyId: number) => {
 
 const handlePayRent = (propertyId: number) => {
   send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+}
+
+const handlePassAuctionProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'PASS_AUCTION_PROPERTY', payload: { username, propertyId } }))
+}
+
+const handleBidAuctionProperty = (propertyId: number) => {
+  send(JSON.stringify({ action: 'BID_AUCTION_PROPERTY', payload: { username, propertyId } }))
 }
 
 const showTileInfo = async (event, tile) => {
@@ -329,9 +337,22 @@ definePageMeta({
           @click="() => handleBuyProperty(currentTilePlayerOn.id)" bgColor="green">
           BUY
         </BaseButton>
-        <BaseButton @click="handlePassProperty" bgColor="red">PASS
+        <BaseButton @click="handlePassProperty(currentTilePlayerOn.id)" bgColor="red">PASS
         </BaseButton>
       </div>
+    </GameModal>
+
+    <!-- AUCTION MODAL -->
+    <GameModal v-if="gameState.currentAction === 'auction' && gameState.currentAuctionParticipant === username">
+      <h1>Auction</h1>
+      <h3>Do you want buy <span style="text-decoration: underline;">{{ tilesState.filter(t => t.id ===
+        gameState.tileOnAuction)[0].name }}</span> for
+        <span style="text-decoration: underline;">{{ gameState.currentAuctionBid + 10 }}</span>?
+      </h3>
+      <BaseButton @click="handleBidAuctionProperty(gameState.tileOnAuction)" bgColor="green"
+        :disabled="player.balance < gameState.currentAuctionBid + 10">BID</BaseButton>
+      <BaseButton @click="handlePassAuctionProperty(gameState.tileOnAuction)" bgColor="red">PASS</BaseButton>
+
     </GameModal>
 
     <!-- PAY RENT MODAL -->
@@ -345,6 +366,7 @@ definePageMeta({
       <p v-if="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">* you don't have enough
         money to pay rent, mortgage something</p>
     </GameModal>
+
 
     <!-- GAME BOARD -->
     <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" />

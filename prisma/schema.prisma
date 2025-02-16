@@ -20,13 +20,17 @@ model Room {
 }
 
 model Game {
-  id               String       @id @default(auto()) @map("_id") @db.ObjectId
-  associatedRoomId String       @unique
-  players          Player[]
-  currentTurn      String
-  gameLog          GameLogMsg[]
-  boardState       gameState[]
-  currentAction    String
+  id                        String       @id @default(auto()) @map("_id") @db.ObjectId
+  associatedRoomId          String       @unique
+  players                   Player[]
+  currentTurn               String
+  gameLog                   GameLogMsg[]
+  boardState                gameState[]
+  currentAction             String
+  auctionParticipants       String[]
+  currentAuctionParticipant String?
+  currentAuctionBid         Int?
+  tileOnAuction             Int?
 }
 
 type Player {

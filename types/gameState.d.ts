@@ -8,6 +8,10 @@ declare interface GameState {
   players: Array<string>;
   currentTurn: string | null;
   currentAction: string | null;
+  auctionParticipants: string[] | null;
+  currentAuctionParticipant: string | null;
+  currentAuctionBid: number | null;
+  tileOnAuction: Tile | null;
   boardState: Array<object>;
   gameLog: Array<gameLogEntry>;
 }

@@ -44,6 +44,10 @@ export default defineWebSocketHandler({
           })),
           currentTurn: room!.players[0],
           currentAction: "roll",
+          auctionParticipants: [],
+          currentAuctionParticipant: "",
+          currentAuctionBid: 0,
+          tileOnAuction: null,
           gameLog: [],
           boardState: {
             tiles: initialTilesState,
@@ -95,7 +99,7 @@ export default defineWebSocketHandler({
       game.boardState[0].groups.forEach(g => {
         g.isUpgradeAvailable = true;
       });
-      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
+      if (currentTurnPlayerIdx < MAX_PLAYERS) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
       } else {
         game.currentTurn = game.players[0].username;
@@ -165,9 +169,88 @@ export default defineWebSocketHandler({
     }
 
     if (parsedMessage.action === "PASS_PROPERTY") {
-      changePlayerTurn();
+      const propertyId = parsedMessage.payload.propertyId;
+      const playerToPassUsername = parsedMessage.payload.username;
 
-      game.currentAction = "roll";
+      const passedProperty = game.boardState[0].tiles.find(
+        t => t.id === propertyId
+      );
+
+      const players = game.players;
+
+      const auctionParticipants = players
+        .filter(p => p.username !== playerToPassUsername)
+        .filter(p => p.balance >= passedProperty!.price!);
+
+      if (!auctionParticipants.length) {
+        game.currentAction = "roll";
+        changePlayerTurn();
+        return;
+      }
+
+      game.currentAction = "auction";
+      game.auctionParticipants = auctionParticipants.map(p => p.username);
+      game.currentAuctionParticipant = game.auctionParticipants[0];
+      game.currentAuctionBid = passedProperty!.price!;
+      game.tileOnAuction = propertyId;
+    }
+
+    if (parsedMessage.action === "PASS_AUCTION_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+      const playerToPassUsername = parsedMessage.payload.username;
+
+      const remainingParticipants = game.auctionParticipants.filter(
+        p => p !== playerToPassUsername
+      );
+
+      if (!remainingParticipants.length) {
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      if (remainingParticipants.length === 1) {
+        const winner = game.players.find(
+          p => p.username === remainingParticipants[0]
+        );
+        const propertyToBuy = game.boardState[0].tiles.find(
+          t => t.id === propertyId
+        );
+        winner!.balance -= game.currentAuctionBid!;
+        winner!.properties.push(propertyId);
+        propertyToBuy!.owner = winner!.username;
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      game.auctionParticipants = remainingParticipants;
+      game.currentAuctionParticipant = game.auctionParticipants[0];
+    }
+
+    if (parsedMessage.action === "BID_AUCTION_PROPERTY") {
+      const propertyId = parsedMessage.payload.propertyId;
+
+      const playerToBidUsername = parsedMessage.payload.username;
+
+      const playerToBidIdxInAuction = game.auctionParticipants.findIndex(
+        p => p === playerToBidUsername
+      );
+
+      const playerToBid = game.players.find(
+        p => p.username === playerToBidUsername
+      );
+
+      if (playerToBid!.balance <= game.currentAuctionBid! + 10) {
+        return;
+      }
+
+      game.currentAuctionBid! += 10;
+
+      if (playerToBidIdxInAuction === game.auctionParticipants.length - 1) {
+        game.currentAuctionParticipant = game.auctionParticipants[0];
+      } else {
+        game.currentAuctionParticipant =
+          game.auctionParticipants[playerToBidIdxInAuction + 1];
+      }
     }
 
     if (parsedMessage.action === "PAY_RENT") {
@@ -293,6 +376,10 @@ async function syncGameState(roomId: string, peer, newGameState) {
       gameLog: newGameState.gameLog,
       boardState: newGameState.boardState,
       currentAction: newGameState.currentAction,
+      auctionParticipants: newGameState.auctionParticipants,
+      currentAuctionParticipant: newGameState.currentAuctionParticipant,
+      currentAuctionBid: newGameState.currentAuctionBid,
+      tileOnAuction: newGameState.tileOnAuction,
     },
   });
 
