@@ -10,7 +10,7 @@ class PropertyTile {
   public mortgaged: boolean;
   public position: number;
   public rentLevel: number;
-  public rentLevels: number;
+  public rentLevels: number[];
   public mortgagePrice: number;
   public buybackPrice: number;
 
