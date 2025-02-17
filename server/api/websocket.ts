@@ -99,7 +99,7 @@ export default defineWebSocketHandler({
       game.boardState[0].groups.forEach(g => {
         g.isUpgradeAvailable = true;
       });
-      if (currentTurnPlayerIdx < MAX_PLAYERS) {
+      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
       } else {
         game.currentTurn = game.players[0].username;
@@ -244,6 +244,21 @@ export default defineWebSocketHandler({
       }
 
       game.currentAuctionBid! += 10;
+
+      if (game.auctionParticipants.length === 1) {
+        console.log("winner");
+        const winner = game.players.find(
+          p => p.username === playerToBidUsername
+        );
+        const propertyToBuy = game.boardState[0].tiles.find(
+          t => t.id === propertyId
+        );
+        winner!.balance -= game.currentAuctionBid!;
+        winner!.properties.push(propertyId);
+        propertyToBuy!.owner = winner!.username;
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
 
       if (playerToBidIdxInAuction === game.auctionParticipants.length - 1) {
         game.currentAuctionParticipant = game.auctionParticipants[0];
