@@ -282,7 +282,9 @@ definePageMeta({
 
         <BaseButton v-if="
           checkIfUpgradeable(selectedTile.id) &&
-          gameState.currentTurn === username" @click="handleUpgradeProperty(selectedTile.id)">
+          gameState.currentTurn === username" @click="handleUpgradeProperty(selectedTile.id)"
+          :disabled="player.balance < groupsState.find(g => g.groupId === selectedTile.groupId).upgradePrice"
+          bgColor="green">
           UPGRADE
         </BaseButton>
       </div>
@@ -345,8 +347,8 @@ definePageMeta({
     <!-- AUCTION MODAL -->
     <GameModal v-if="gameState.currentAction === 'auction' && gameState.currentAuctionParticipant === username">
       <h1>Auction</h1>
-      <h3>Do you want buy <span style="text-decoration: underline;">{{ tilesState.filter(t => t.id ===
-        gameState.tileOnAuction)[0].name }}</span> for
+      <h3>Do you want buy <span style="text-decoration: underline;">{{tilesState.filter(t => t.id ===
+        gameState.tileOnAuction)[0].name}}</span> for
         <span style="text-decoration: underline;">{{ gameState.currentAuctionBid + 10 }}</span>?
       </h3>
       <BaseButton @click="handleBidAuctionProperty(gameState.tileOnAuction)" bgColor="green"
@@ -367,6 +369,15 @@ definePageMeta({
         money to pay rent, mortgage something</p>
     </GameModal>
 
+    <!-- PAY CHANCE MODAL -->
+    <GameModal
+      v-if="gameState.currentTurn === username && gameState.currentAction === 'chance' && gameState.activeChance[0].type === 'minusBalance'">
+      <h1>Pay Chance</h1>
+      <h3>{{ gameState.activeChance[0].text }}</h3>
+      <BaseButton
+        @click="() => send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.activeChance[0].amount } }))"
+        bgColor="red" :disabled="player.balance < gameState.activeChance[0].amount">PAY</BaseButton>
+    </GameModal>
 
     <!-- GAME BOARD -->
     <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" />

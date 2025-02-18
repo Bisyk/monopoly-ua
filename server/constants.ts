@@ -391,6 +391,29 @@ export const initialTilesState = [
   ),
 ];
 
+export const chances = [
+  {
+    type: "plusBalance",
+    amount: 100,
+    text: "You won a lottery! And get 100",
+  },
+  {
+    type: "minusBalance",
+    amount: 100,
+    text: "You lost a lottery! And lost 100",
+  },
+  // {
+  //   type: "goToTile",
+  //   tileId: 11,
+  //   text: "Go to Jail!",
+  // },
+  {
+    type: "plusBalance",
+    amount: 50,
+    text: "You won a beauty competition! And get 50",
+  },
+];
+
 export const colors = [
   "#9999FF", // blue
   "#99CC99", // green

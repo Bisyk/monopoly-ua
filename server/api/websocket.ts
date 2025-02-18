@@ -1,6 +1,7 @@
 import { parse } from "url";
 import prisma from "~/lib/prisma";
 import {
+  chances,
   colors,
   initialGroupsState,
   initialPlayersState,
@@ -52,6 +53,9 @@ export default defineWebSocketHandler({
           boardState: {
             tiles: initialTilesState,
             groups: initialGroupsState,
+          },
+          activeChance: {
+            type: "",
           },
         },
       });
@@ -134,6 +138,30 @@ export default defineWebSocketHandler({
         game.currentAction = "buy";
       }
 
+      if (tilePlayerOn.type === "chance") {
+        game.currentAction = "chance";
+
+        const yourChance = chances[Math.floor(Math.random() * chances.length)];
+
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: yourChance.text,
+        });
+
+        if (yourChance.type === "minusBalance") {
+          // currentTurnPlayer.balance -= yourChance.amount;
+          // game.currentAction = "roll";
+          // changePlayerTurn();
+          game.activeChance = yourChance;
+        }
+
+        if (yourChance.type === "plusBalance") {
+          currentTurnPlayer.balance += yourChance.amount;
+          game.currentAction = "roll";
+          changePlayerTurn();
+        }
+      }
+
       if (
         ["property"].includes(tilePlayerOn.type) &&
         tilePlayerOn.owner &&
@@ -185,14 +213,15 @@ export default defineWebSocketHandler({
       if (!auctionParticipants.length) {
         game.currentAction = "roll";
         changePlayerTurn();
-        return;
       }
 
-      game.currentAction = "auction";
-      game.auctionParticipants = auctionParticipants.map(p => p.username);
-      game.currentAuctionParticipant = game.auctionParticipants[0];
-      game.currentAuctionBid = passedProperty!.price!;
-      game.tileOnAuction = propertyId;
+      if (auctionParticipants.length) {
+        game.currentAction = "auction";
+        game.auctionParticipants = auctionParticipants.map(p => p.username);
+        game.currentAuctionParticipant = game.auctionParticipants[0];
+        game.currentAuctionBid = passedProperty!.price!;
+        game.tileOnAuction = propertyId;
+      }
     }
 
     if (parsedMessage.action === "PASS_AUCTION_PROPERTY") {
@@ -370,6 +399,19 @@ export default defineWebSocketHandler({
       propertyToSell!.rentLevel -= 1;
     }
 
+    if (parsedMessage.action === "PAY_CHANCE") {
+      const amount = parsedMessage.payload.amount;
+
+      if (currentTurnPlayer.balance < amount) {
+        return;
+      }
+
+      currentTurnPlayer.balance -= amount;
+      game.currentAction = "roll";
+      game.activeChance = { type: "" };
+      changePlayerTurn();
+    }
+
     await syncGameState(roomId, peer, game);
   },
 });
@@ -395,6 +437,7 @@ async function syncGameState(roomId: string, peer, newGameState) {
       currentAuctionParticipant: newGameState.currentAuctionParticipant,
       currentAuctionBid: newGameState.currentAuctionBid,
       tileOnAuction: newGameState.tileOnAuction,
+      activeChance: newGameState.activeChance,
     },
   });
 

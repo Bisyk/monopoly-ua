@@ -25,12 +25,13 @@ model Game {
   players                   Player[]
   currentTurn               String
   gameLog                   GameLogMsg[]
-  boardState                gameState[]
+  boardState                GameState[]
   currentAction             String
   auctionParticipants       String[]
   currentAuctionParticipant String?
   currentAuctionBid         Int?
   tileOnAuction             Int?
+  activeChance              Chance[]
 }
 
 type Player {
@@ -44,7 +45,7 @@ type Player {
   turnsInJail          Int
 }
 
-type gameState {
+type GameState {
   tiles  Tile[]
   groups Groups[]
 }
@@ -78,6 +79,12 @@ type Groups {
 type GameLogMsg {
   username String
   msg      String
+}
+
+type Chance {
+  type   String
+  amount Int?
+  text   String?
 }
 
 // model User {
