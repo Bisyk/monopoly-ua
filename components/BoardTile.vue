@@ -130,6 +130,12 @@ const tileBgColor = computed(() => {
 
 
 <style lang="scss" scoped>
+.player-container{
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+}
 .space {
   background: white;
   text-align: center;

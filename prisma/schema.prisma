@@ -43,6 +43,8 @@ type Player {
   ownedPropertiesGroup Int[]
   jailed               Boolean
   turnsInJail          Int
+  doublesInRow         Int
+  bonusRoll            Boolean
 }
 
 type GameState {

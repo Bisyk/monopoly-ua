@@ -113,6 +113,8 @@ export const initialPlayersState = {
   ownedPropertiesGroup: [],
   jailed: false,
   turnsInJail: 0,
+  doublesInRow: 0,
+  bonusRoll: false,
 };
 
 export const initialTilesState = [
@@ -402,11 +404,11 @@ export const chances = [
     amount: 100,
     text: "You lost a lottery! And lost 100",
   },
-  // {
-  //   type: "goToTile",
-  //   tileId: 11,
-  //   text: "Go to Jail!",
-  // },
+  {
+    type: "goToJail",
+    tileId: 11,
+    text: "Go to Jail for corruption!",
+  },
   {
     type: "plusBalance",
     amount: 50,

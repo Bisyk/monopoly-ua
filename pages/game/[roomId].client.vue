@@ -185,6 +185,10 @@ const handleBidAuctionProperty = (propertyId: number) => {
   send(JSON.stringify({ action: 'BID_AUCTION_PROPERTY', payload: { username, propertyId } }))
 }
 
+const handleJailPay = () => {
+  send(JSON.stringify({ action: 'JAIL_PAY', payload: { username } }))
+}
+
 const showTileInfo = async (event, tile) => {
   const tileRect = event.target.getBoundingClientRect();
   const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
@@ -320,12 +324,27 @@ definePageMeta({
     </div>
 
     <!-- ROLL MODAL -->
-    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll'">
+    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll' && !player.jailed">
       <div>
         <h1>It's your turn!</h1>
         <h3 style="margin-bottom: 1rem;">Roll the dice to move your piece.</h3>
       </div>
       <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
+    </GameModal>
+
+    <!-- Jail Modal -->
+    <GameModal v-if="gameState.currentTurn === username && player.jailed">
+      <h1>You are in JAIL!</h1>
+      <p>You have the following options:</p>
+      <ul>
+        <li>Pay $50 to get out of jail immediately.</li>
+        <li>Roll doubles on your next turn to get out of jail for free.</li>
+        <li>Wait for three turns, after which you will be released automatically.</li>
+      </ul>
+      <div>
+        <BaseButton @click="handleUserTurn">ROLL DICE</BaseButton>
+        <BaseButton @click="handleJailPay" :disabled="player.balance < 50" bgColor="green">PAY</BaseButton>
+      </div>
     </GameModal>
 
     <!-- BUY MODAL -->

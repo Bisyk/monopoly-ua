@@ -70,6 +70,11 @@ defineProps({
 $tile-size: 7vmin; 
 $corner-tile-size: 14vmin; 
 
+.gameLog{
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
 
 .table {
   display: flex;
