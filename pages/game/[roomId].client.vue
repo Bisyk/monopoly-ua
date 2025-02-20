@@ -185,6 +185,10 @@ const handleBidAuctionProperty = (propertyId: number) => {
   send(JSON.stringify({ action: 'BID_AUCTION_PROPERTY', payload: { username, propertyId } }))
 }
 
+const handleJailPay = () => {
+  send(JSON.stringify({ action: 'JAIL_PAY', payload: { username } }))
+}
+
 const showTileInfo = async (event, tile) => {
   const tileRect = event.target.getBoundingClientRect();
   const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
@@ -282,7 +286,9 @@ definePageMeta({
 
         <BaseButton v-if="
           checkIfUpgradeable(selectedTile.id) &&
-          gameState.currentTurn === username" @click="handleUpgradeProperty(selectedTile.id)">
+          gameState.currentTurn === username" @click="handleUpgradeProperty(selectedTile.id)"
+          :disabled="player.balance < groupsState.find(g => g.groupId === selectedTile.groupId).upgradePrice"
+          bgColor="green">
           UPGRADE
         </BaseButton>
       </div>
@@ -318,12 +324,27 @@ definePageMeta({
     </div>
 
     <!-- ROLL MODAL -->
-    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll'">
+    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll' && !player.jailed">
       <div>
         <h1>It's your turn!</h1>
         <h3 style="margin-bottom: 1rem;">Roll the dice to move your piece.</h3>
       </div>
       <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
+    </GameModal>
+
+    <!-- Jail Modal -->
+    <GameModal v-if="gameState.currentTurn === username && player.jailed">
+      <h1>You are in JAIL!</h1>
+      <p>You have the following options:</p>
+      <ul>
+        <li>Pay $50 to get out of jail immediately.</li>
+        <li>Roll doubles on your next turn to get out of jail for free.</li>
+        <li>Wait for three turns, after which you will be released automatically.</li>
+      </ul>
+      <div>
+        <BaseButton @click="handleUserTurn">ROLL DICE</BaseButton>
+        <BaseButton @click="handleJailPay" :disabled="player.balance < 50" bgColor="green">PAY</BaseButton>
+      </div>
     </GameModal>
 
     <!-- BUY MODAL -->
@@ -345,8 +366,8 @@ definePageMeta({
     <!-- AUCTION MODAL -->
     <GameModal v-if="gameState.currentAction === 'auction' && gameState.currentAuctionParticipant === username">
       <h1>Auction</h1>
-      <h3>Do you want buy <span style="text-decoration: underline;">{{ tilesState.filter(t => t.id ===
-        gameState.tileOnAuction)[0].name }}</span> for
+      <h3>Do you want buy <span style="text-decoration: underline;">{{tilesState.filter(t => t.id ===
+        gameState.tileOnAuction)[0].name}}</span> for
         <span style="text-decoration: underline;">{{ gameState.currentAuctionBid + 10 }}</span>?
       </h3>
       <BaseButton @click="handleBidAuctionProperty(gameState.tileOnAuction)" bgColor="green"
@@ -367,6 +388,15 @@ definePageMeta({
         money to pay rent, mortgage something</p>
     </GameModal>
 
+    <!-- PAY CHANCE MODAL -->
+    <GameModal
+      v-if="gameState.currentTurn === username && gameState.currentAction === 'chance' && gameState.activeChance[0].type === 'minusBalance'">
+      <h1>Pay Chance</h1>
+      <h3>{{ gameState.activeChance[0].text }}</h3>
+      <BaseButton
+        @click="() => send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.activeChance[0].amount } }))"
+        bgColor="red" :disabled="player.balance < gameState.activeChance[0].amount">PAY</BaseButton>
+    </GameModal>
 
     <!-- GAME BOARD -->
     <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" />

@@ -1,6 +1,7 @@
 import { parse } from "url";
 import prisma from "~/lib/prisma";
 import {
+  chances,
   colors,
   initialGroupsState,
   initialPlayersState,
@@ -53,6 +54,9 @@ export default defineWebSocketHandler({
             tiles: initialTilesState,
             groups: initialGroupsState,
           },
+          activeChance: {
+            type: "",
+          },
         },
       });
     }
@@ -99,7 +103,12 @@ export default defineWebSocketHandler({
       game.boardState[0].groups.forEach(g => {
         g.isUpgradeAvailable = true;
       });
-      if (currentTurnPlayerIdx < MAX_PLAYERS) {
+
+      if (currentTurnPlayer.bonusRoll) {
+        return;
+      }
+
+      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
       } else {
         game.currentTurn = game.players[0].username;
@@ -109,6 +118,7 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "ROLL_DICE") {
       console.log("ROLL_DICE");
 
+      const boardSize = 40;
       const { left, right } = parsedMessage.payload.turnResult;
 
       game.gameLog.push({
@@ -116,7 +126,57 @@ export default defineWebSocketHandler({
         msg: `got ${left} and ${right}`,
       });
 
-      const boardSize = 40;
+      if (left === right) {
+        currentTurnPlayer.doublesInRow += 1;
+        currentTurnPlayer.bonusRoll = true;
+      } else {
+        currentTurnPlayer.doublesInRow = 0;
+        currentTurnPlayer.bonusRoll = false;
+      }
+
+      if (currentTurnPlayer.doublesInRow === 3) {
+        currentTurnPlayer.jailed = true;
+        currentTurnPlayer.turnsInJail = 3;
+        currentTurnPlayer.position = 10;
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      if (currentTurnPlayer.jailed) {
+        console.log("jailed");
+        currentTurnPlayer.turnsInJail -= 1;
+
+        if (!(left === right) && currentTurnPlayer.turnsInJail > 0) {
+          if (currentTurnPlayer.turnsInJail === 0) {
+            currentTurnPlayer.jailed = false;
+          }
+
+          game.gameLog.push({
+            username: game.currentTurn,
+            msg: `You failed to roll doubles and stay in jail. Turns left: ${currentTurnPlayer.turnsInJail}`,
+          });
+          changePlayerTurn();
+          syncGameState(roomId, peer, game);
+          return;
+        }
+
+        if (left === right) {
+          currentTurnPlayer.jailed = false;
+          currentTurnPlayer.turnsInJail = 0;
+          game.gameLog.push({
+            username: game.currentTurn,
+            msg: "You rolled doubles and got out of jail",
+          });
+        }
+
+        if (currentTurnPlayer.turnsInJail === 0) {
+          currentTurnPlayer.jailed = false;
+          game.gameLog.push({
+            username: game.currentTurn,
+            msg: "You got out of jail",
+          });
+        }
+      }
 
       const newPlayerPosition =
         (currentTurnPlayer.position + left + right) % boardSize;
@@ -124,14 +184,45 @@ export default defineWebSocketHandler({
         currentTurnPlayer.position = boardSize;
       }
 
-      currentTurnPlayer.position = newPlayerPosition + 1;
-      const tilePlayerOn = game.boardState[0].tiles[newPlayerPosition];
+      currentTurnPlayer.position = newPlayerPosition;
+      const tilePlayerOn = game.boardState[0].tiles[newPlayerPosition - 1];
+
+      console.log(tilePlayerOn);
 
       if (
         ["property", "car", "bonus-property"].includes(tilePlayerOn.type) &&
         !tilePlayerOn.owner
       ) {
         game.currentAction = "buy";
+      }
+
+      if (tilePlayerOn.type === "chance") {
+        game.currentAction = "chance";
+
+        const yourChance = chances[Math.floor(Math.random() * chances.length)];
+
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: yourChance.text,
+        });
+
+        if (yourChance.type === "goToJail") {
+          currentTurnPlayer.position = yourChance.tileId;
+          currentTurnPlayer.jailed = true;
+          currentTurnPlayer.turnsInJail = 3;
+          game.currentAction = "roll";
+          changePlayerTurn();
+        }
+
+        if (yourChance.type === "minusBalance") {
+          game.activeChance = yourChance;
+        }
+
+        if (yourChance.type === "plusBalance") {
+          currentTurnPlayer.balance += yourChance.amount;
+          game.currentAction = "roll";
+          changePlayerTurn();
+        }
       }
 
       if (
@@ -141,6 +232,19 @@ export default defineWebSocketHandler({
         !tilePlayerOn.mortgaged
       ) {
         game.currentAction = "payRent";
+      }
+
+      if (tilePlayerOn.type === "jail") {
+        console.log("jail");
+        currentTurnPlayer.jailed = true;
+        currentTurnPlayer.turnsInJail = 3;
+        currentTurnPlayer.position = 10;
+        game.currentAction = "roll";
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You are going in jail",
+        });
+        changePlayerTurn();
       }
     }
 
@@ -163,6 +267,7 @@ export default defineWebSocketHandler({
         currentTurnPlayer.balance - boughtProperty!.price!;
 
       checkIsFullSet(currentTurnPlayer, game.boardState);
+
       changePlayerTurn();
 
       game.currentAction = "roll";
@@ -185,14 +290,15 @@ export default defineWebSocketHandler({
       if (!auctionParticipants.length) {
         game.currentAction = "roll";
         changePlayerTurn();
-        return;
       }
 
-      game.currentAction = "auction";
-      game.auctionParticipants = auctionParticipants.map(p => p.username);
-      game.currentAuctionParticipant = game.auctionParticipants[0];
-      game.currentAuctionBid = passedProperty!.price!;
-      game.tileOnAuction = propertyId;
+      if (auctionParticipants.length) {
+        game.currentAction = "auction";
+        game.auctionParticipants = auctionParticipants.map(p => p.username);
+        game.currentAuctionParticipant = game.auctionParticipants[0];
+        game.currentAuctionBid = passedProperty!.price!;
+        game.tileOnAuction = propertyId;
+      }
     }
 
     if (parsedMessage.action === "PASS_AUCTION_PROPERTY") {
@@ -244,6 +350,21 @@ export default defineWebSocketHandler({
       }
 
       game.currentAuctionBid! += 10;
+
+      if (game.auctionParticipants.length === 1) {
+        console.log("winner");
+        const winner = game.players.find(
+          p => p.username === playerToBidUsername
+        );
+        const propertyToBuy = game.boardState[0].tiles.find(
+          t => t.id === propertyId
+        );
+        winner!.balance -= game.currentAuctionBid!;
+        winner!.properties.push(propertyId);
+        propertyToBuy!.owner = winner!.username;
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
 
       if (playerToBidIdxInAuction === game.auctionParticipants.length - 1) {
         game.currentAuctionParticipant = game.auctionParticipants[0];
@@ -355,6 +476,30 @@ export default defineWebSocketHandler({
       propertyToSell!.rentLevel -= 1;
     }
 
+    if (parsedMessage.action === "PAY_CHANCE") {
+      const amount = parsedMessage.payload.amount;
+
+      if (currentTurnPlayer.balance < amount) {
+        return;
+      }
+
+      currentTurnPlayer.balance -= amount;
+      game.currentAction = "roll";
+      game.activeChance = { type: "" };
+      changePlayerTurn();
+    }
+
+    if (parsedMessage.action === "JAIL_PAY") {
+      if (currentTurnPlayer.balance < 50) {
+        return;
+      }
+
+      currentTurnPlayer.balance -= 50;
+      currentTurnPlayer.jailed = false;
+      currentTurnPlayer.turnsInJail = 0;
+      game.currentAction = "roll";
+    }
+
     await syncGameState(roomId, peer, game);
   },
 });
@@ -380,6 +525,7 @@ async function syncGameState(roomId: string, peer, newGameState) {
       currentAuctionParticipant: newGameState.currentAuctionParticipant,
       currentAuctionBid: newGameState.currentAuctionBid,
       tileOnAuction: newGameState.tileOnAuction,
+      activeChance: newGameState.activeChance,
     },
   });
 
