@@ -150,6 +150,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "Mercedes-Benz",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   new PropertyTile(7, 2, "staff", "Staff", 100, [6, 30, 90, 270, 400, 550]),
   {
@@ -219,6 +221,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "Porsche",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   new PropertyTile(
     17,
@@ -291,6 +295,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "BMW",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   new PropertyTile(27, 6, "okko", "OKKO", 260, [22, 110, 330, 800, 975, 1150]),
   new PropertyTile(28, 6, "wog", "WOG", 260, [22, 110, 330, 800, 975, 1150]),
@@ -360,6 +366,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "Toyota",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   {
     id: 37,
