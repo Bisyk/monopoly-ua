@@ -234,11 +234,11 @@ export default defineWebSocketHandler({
         game.currentAction = "payRent";
       }
 
-      if (tilePlayerOn.type === "jail") {
+      if (tilePlayerOn.type === "goToJail") {
         console.log("jail");
         currentTurnPlayer.jailed = true;
         currentTurnPlayer.turnsInJail = 3;
-        currentTurnPlayer.position = 10;
+        currentTurnPlayer.position = 11;
         game.currentAction = "roll";
         game.gameLog.push({
           username: game.currentTurn,
@@ -259,14 +259,30 @@ export default defineWebSocketHandler({
         return;
       }
 
-      boughtProperty!.owner = game.currentTurn;
+      if (boughtProperty!.type === "property") {
+        boughtProperty!.owner = game.currentTurn;
 
-      currentTurnPlayer.properties.push(boughtProperty!.id);
+        currentTurnPlayer.properties.push(boughtProperty!.id);
 
-      currentTurnPlayer.balance =
-        currentTurnPlayer.balance - boughtProperty!.price!;
+        currentTurnPlayer.balance =
+          currentTurnPlayer.balance - boughtProperty!.price!;
 
-      checkIsFullSet(currentTurnPlayer, game.boardState);
+        checkIsFullSet(currentTurnPlayer, game.boardState);
+      }
+
+      if (boughtProperty!.type === "car") {
+        currentTurnPlayer.balance -= boughtProperty!.price!;
+        currentTurnPlayer.properties.push(boughtProperty!.id);
+        boughtProperty!.owner = currentTurnPlayer.username;
+
+        const boughtCars = game.boardState[0].tiles.filter(
+          t => t.type === "car" && t.owner === currentTurnPlayer.username
+        );
+
+        boughtCars.forEach(c => {
+          c.rentLevel = boughtCars.length - 1;
+        });
+      }
 
       changePlayerTurn();
 
@@ -359,9 +375,26 @@ export default defineWebSocketHandler({
         const propertyToBuy = game.boardState[0].tiles.find(
           t => t.id === propertyId
         );
-        winner!.balance -= game.currentAuctionBid!;
-        winner!.properties.push(propertyId);
-        propertyToBuy!.owner = winner!.username;
+        if (propertyToBuy!.type === "property") {
+          winner!.balance -= game.currentAuctionBid!;
+          winner!.properties.push(propertyId);
+          propertyToBuy!.owner = winner!.username;
+        }
+
+        if (propertyToBuy!.type === "car") {
+          winner!.balance -= game.currentAuctionBid!;
+          winner!.properties.push(propertyId);
+          propertyToBuy!.owner = winner!.username;
+
+          const boughtCars = game.boardState[0].tiles.filter(
+            t => t.type === "car" && t.owner === winner!.username
+          );
+
+          boughtCars.forEach(c => {
+            c.rentLevel = boughtCars.length - 1;
+          });
+        }
+
         game.currentAction = "roll";
         changePlayerTurn();
       }
