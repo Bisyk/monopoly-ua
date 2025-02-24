@@ -49,14 +49,14 @@ export default defineWebSocketHandler({
           currentAuctionParticipant: "",
           currentAuctionBid: 0,
           tileOnAuction: null,
-          gameLog: [],
+          activeChance: {
+            type: "",
+          },
           boardState: {
             tiles: initialTilesState,
             groups: initialGroupsState,
           },
-          activeChance: {
-            type: "",
-          },
+          gameLog: [],
         },
       });
     }
@@ -121,15 +121,18 @@ export default defineWebSocketHandler({
       const boardSize = 40;
       const { left, right } = parsedMessage.payload.turnResult;
 
-      game.gameLog.push({
-        username: game.currentTurn,
-        msg: `got ${left} and ${right}`,
-      });
-
       if (left === right) {
         currentTurnPlayer.doublesInRow += 1;
         currentTurnPlayer.bonusRoll = true;
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: `rolled ${left} and ${right} and got bonus roll`,
+        });
       } else {
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: `rolled ${left} and ${right}`,
+        });
         currentTurnPlayer.doublesInRow = 0;
         currentTurnPlayer.bonusRoll = false;
       }
@@ -179,24 +182,43 @@ export default defineWebSocketHandler({
       }
 
       const newPlayerPosition =
-        (currentTurnPlayer.position + left + right) % boardSize;
-      if (currentTurnPlayer.position === 0) {
-        currentTurnPlayer.position = boardSize;
-      }
+        ((currentTurnPlayer.position + left + right - 1) % boardSize) + 1;
 
       currentTurnPlayer.position = newPlayerPosition;
-      const tilePlayerOn = game.boardState[0].tiles[newPlayerPosition - 1];
-
-      console.log(tilePlayerOn);
+      const tilePlayerOn = game.boardState[0].tiles.find(
+        t => t.id === newPlayerPosition
+      );
 
       if (
-        ["property", "car", "bonus-property"].includes(tilePlayerOn.type) &&
-        !tilePlayerOn.owner
+        ["property", "car", "bonus-property"].includes(tilePlayerOn!.type) &&
+        !tilePlayerOn!.owner
       ) {
         game.currentAction = "buy";
       }
 
-      if (tilePlayerOn.type === "chance") {
+      if (
+        ["property", "car", "bonus-property"].includes(tilePlayerOn!.type) &&
+        tilePlayerOn!.owner &&
+        tilePlayerOn!.owner !== currentTurnPlayer.username &&
+        !tilePlayerOn!.mortgaged
+      ) {
+        game.currentAction = "payRent";
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: `You have to pay rent to ${tilePlayerOn!.owner}`,
+        });
+      }
+
+      if (tilePlayerOn!.owner === currentTurnPlayer.username) {
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You landed on your property",
+        });
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      if (tilePlayerOn!.type === "chance") {
         game.currentAction = "chance";
 
         const yourChance = chances[Math.floor(Math.random() * chances.length)];
@@ -207,7 +229,7 @@ export default defineWebSocketHandler({
         });
 
         if (yourChance.type === "goToJail") {
-          currentTurnPlayer.position = yourChance.tileId;
+          currentTurnPlayer.position = yourChance.tileId!;
           currentTurnPlayer.jailed = true;
           currentTurnPlayer.turnsInJail = 3;
           game.currentAction = "roll";
@@ -219,22 +241,57 @@ export default defineWebSocketHandler({
         }
 
         if (yourChance.type === "plusBalance") {
-          currentTurnPlayer.balance += yourChance.amount;
+          currentTurnPlayer.balance += yourChance.amount!;
           game.currentAction = "roll";
           changePlayerTurn();
         }
       }
 
-      if (
-        ["property"].includes(tilePlayerOn.type) &&
-        tilePlayerOn.owner &&
-        tilePlayerOn.owner !== currentTurnPlayer.username &&
-        !tilePlayerOn.mortgaged
-      ) {
-        game.currentAction = "payRent";
+      if (tilePlayerOn!.type === "tax") {
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You need to pay 100$ tax",
+        });
+        game.currentAction = "payTax";
       }
 
-      if (tilePlayerOn.type === "goToJail") {
+      if (tilePlayerOn!.type === "luxury-tax") {
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You need to pay 75$ luxury tax",
+        });
+        game.currentAction = "payTax";
+      }
+
+      if (tilePlayerOn.type === "go") {
+        currentTurnPlayer.balance += 200;
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You got 200$ for landing on go",
+        });
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      if (tilePlayerOn!.type === "jail") {
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You are in jail with excursion",
+        });
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      if (tilePlayerOn.type === "parking") {
+        game.gameLog.push({
+          username: game.currentTurn,
+          msg: "You landed on parking",
+        });
+        game.currentAction = "roll";
+        changePlayerTurn();
+      }
+
+      if (tilePlayerOn!.type === "goToJail") {
         console.log("jail");
         currentTurnPlayer.jailed = true;
         currentTurnPlayer.turnsInJail = 3;
@@ -255,7 +312,7 @@ export default defineWebSocketHandler({
         t => t.id === propertyId
       );
 
-      if (currentTurnPlayer.balance <= boughtProperty!.price!) {
+      if (currentTurnPlayer.balance < boughtProperty!.price!) {
         return;
       }
 
@@ -281,6 +338,22 @@ export default defineWebSocketHandler({
 
         boughtCars.forEach(c => {
           c.rentLevel = boughtCars.length - 1;
+        });
+      }
+
+      if (boughtProperty!.type === "bonus-property") {
+        currentTurnPlayer.balance -= boughtProperty!.price!;
+        currentTurnPlayer.properties.push(boughtProperty!.id);
+        boughtProperty!.owner = currentTurnPlayer.username;
+
+        const propertiesOwned = game.boardState[0].tiles.filter(
+          t =>
+            t.type === "bonus-property" &&
+            t.owner === currentTurnPlayer.username
+        );
+
+        propertiesOwned.forEach(p => {
+          p.rentLevel = propertiesOwned.length - 1;
         });
       }
 
@@ -361,7 +434,7 @@ export default defineWebSocketHandler({
         p => p.username === playerToBidUsername
       );
 
-      if (playerToBid!.balance <= game.currentAuctionBid! + 10) {
+      if (playerToBid!.balance < game.currentAuctionBid! + 10) {
         return;
       }
 
@@ -395,6 +468,20 @@ export default defineWebSocketHandler({
           });
         }
 
+        if (propertyToBuy!.type === "bonus-property") {
+          winner!.balance -= game.currentAuctionBid!;
+          winner!.properties.push(propertyId);
+          propertyToBuy!.owner = winner!.username;
+
+          const propertiesOwned = game.boardState[0].tiles.filter(
+            t => t.type === "bonus-property" && t.owner === winner!.username
+          );
+
+          propertiesOwned.forEach(p => {
+            p.rentLevel = propertiesOwned.length - 1;
+          });
+        }
+
         game.currentAction = "roll";
         changePlayerTurn();
       }
@@ -418,10 +505,21 @@ export default defineWebSocketHandler({
         p => p.username === propertyToPayRent!.owner
       );
 
-      const rentToPay =
-        propertyToPayRent!.rentLevels[propertyToPayRent!.rentLevel];
+      let rentToPay = 0;
 
-      if (currentTurnPlayer.balance <= rentToPay) {
+      if (
+        propertyToPayRent!.type === "bonus-property" &&
+        parsedMessage.payload.turnResult
+      ) {
+        rentToPay =
+          propertyToPayRent!.rentLevels[propertyToPayRent!.rentLevel] *
+          (parsedMessage.payload.turnResult.left +
+            parsedMessage.payload.turnResult.right);
+      } else {
+        rentToPay = propertyToPayRent!.rentLevels[propertyToPayRent!.rentLevel];
+      }
+
+      if (currentTurnPlayer.balance < rentToPay) {
         return;
       }
 
@@ -530,6 +628,17 @@ export default defineWebSocketHandler({
       currentTurnPlayer.balance -= 50;
       currentTurnPlayer.jailed = false;
       currentTurnPlayer.turnsInJail = 0;
+      game.currentAction = "roll";
+    }
+
+    if (parsedMessage.action === "PAY_TAX") {
+      const tax = parsedMessage.payload.tax;
+
+      if (currentTurnPlayer.balance < tax) {
+        return;
+      }
+
+      currentTurnPlayer.balance -= tax;
       game.currentAction = "roll";
     }
 

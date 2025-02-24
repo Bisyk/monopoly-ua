@@ -114,7 +114,8 @@ const tileBgColor = computed(() => {
       <p v-if="props.tile.rentLevel === 5" :style="starStyle"><span style="font-size: 2.5vmin">🌟</span></p>
     </div>
     <div v-if="props.tile.rentLevels.length && props.tile.owner" :style="priceStyle">
-      {{ props.tile.rentLevels[props.tile.rentLevel] }}
+      {{ props.tile.type === 'bonus-property' ? `${props.tile.rentLevels[props.tile.rentLevel]}x` : 
+      props.tile.rentLevels[props.tile.rentLevel] }}
     </div>
     <div class="container">
       <div class="heroContainer">
