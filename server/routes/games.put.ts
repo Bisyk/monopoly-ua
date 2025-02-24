@@ -5,8 +5,6 @@ export default defineEventHandler(async event => {
 
   const { action, payload } = await readBody(event);
 
-  console.log(action, payload);
-
   if (action.type === "JOIN_ROOM") {
     console.log("PUT /games JOIN_ROOM");
     const game = await prisma.room.findUnique({

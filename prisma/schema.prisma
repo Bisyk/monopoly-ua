@@ -67,6 +67,7 @@ type Tile {
   rentLevels    Int[]    @default([])
   mortgagePrice Int?
   buybackPrice  Int?
+  taxAmount     Int?
 }
 
 type Groups {

@@ -12,6 +12,8 @@ const username = sessionStorage.getItem('username')
 const boardState = ref<BoardState[]>([] as BoardState)
 const selectedTile = ref<BoardTile>(null)
 const tileInfo = ref(null)
+const isSending = ref(false)
+const turnResult = ref({ left: 0, right: 0 })
 
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
@@ -40,7 +42,7 @@ const player = computed(() => {
 })
 
 const currentTilePlayerOn = computed(() => {
-  return tilesState.value[player.value.position - 1]
+  return tilesState.value.find(t => t.id === player.value.position)
 })
 
 const fullSetsGroups = computed(() => {
@@ -49,16 +51,18 @@ const fullSetsGroups = computed(() => {
 })
 
 handleMessage((message) => {
+  isSending.value = false
   gameState.value = JSON.parse(message)
 })
 
 const handleUserTurn = () => {
-  const turnResult = rollDice()
-  send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
+  isSending.value = true
+  turnResult.value = rollDice()
+  send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult: turnResult.value } }))
 }
 
 const checkIfUpgradeable = (propertyId: number) => {
-  const property = tilesState.value[propertyId - 1]
+  const property = tilesState.value.find(t => t.id === propertyId)
   if (property.type !== 'property') return false
 
   const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
@@ -90,7 +94,7 @@ const checkIfUpgradeable = (propertyId: number) => {
 }
 
 const checkIfMortgageable = (propertyId: number) => {
-  const property = tilesState.value[propertyId - 1]
+  const property = tilesState.value.find(t => t.id === propertyId)
   if (property.type !== 'property') return false
 
   const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
@@ -114,7 +118,7 @@ const checkIfMortgageable = (propertyId: number) => {
 }
 
 const checkIfBuybackAble = (propertyId: number) => {
-  const property = tilesState.value[propertyId - 1]
+  const property = tilesState.value.find(t => t.id === propertyId)
   if (property.type !== 'property') return false
 
   const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
@@ -130,7 +134,7 @@ const checkIfBuybackAble = (propertyId: number) => {
 }
 
 const checkIfSellable = (propertyId: number) => {
-  const property = tilesState.value[propertyId - 1]
+  const property = tilesState.value.find(t => t.id === propertyId)
   if (property.type !== 'property') return false
 
   if (property.rentLevel < 1) return false
@@ -146,46 +150,60 @@ const checkIfSellable = (propertyId: number) => {
 }
 
 const handleBuyProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handlePassProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handleMortgageProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'MORTGAGE_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
 const handleBuyBackProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'BUY_BACK_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
 const handleUpgradeProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'UPGRADE_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
 const handleSellProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'SELL_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
 const handlePayRent = (propertyId: number) => {
-  send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+  isSending.value = true
+  if (currentTilePlayerOn.value.type === "bonus-property") {
+    send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId, turnResult: turnResult.value } }))
+  } else {
+    send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+  }
 }
 
 const handlePassAuctionProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'PASS_AUCTION_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handleBidAuctionProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'BID_AUCTION_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handleJailPay = () => {
+  isSending.value = true
   send(JSON.stringify({ action: 'JAIL_PAY', payload: { username } }))
 }
 
@@ -269,25 +287,27 @@ definePageMeta({
       <h3>{{ selectedTile.name }}</h3>
       <div style="display: flex; width: 100%; justify-content: center; gap: 1rem;">
         <BaseButton v-if="checkIfMortgageable(selectedTile.id) &&
-          gameState.currentTurn === username" @click="handleMortgageProperty(selectedTile.id)" bgColor="red">
+          gameState.currentTurn === username" @click="handleMortgageProperty(selectedTile.id)" bgColor="red"
+          :disabled="isSending">
           MORTGAGE
         </BaseButton>
 
         <BaseButton v-if="checkIfBuybackAble(selectedTile.id) &&
           gameState.currentTurn === username" @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
-          :disabled="player.balance < selectedTile.buybackPrice">
+          :disabled="player.balance < selectedTile.buybackPrice || isSending">
           BUY BACK
         </BaseButton>
 
         <BaseButton v-if="checkIfSellable(selectedTile.id) &&
-          gameState.currentTurn === username" @click="handleSellProperty(selectedTile.id)" bgColor="red">
+          gameState.currentTurn === username" @click="handleSellProperty(selectedTile.id)" bgColor="red"
+          :disabled="isSending">
           SELL
         </BaseButton>
 
         <BaseButton v-if="
           checkIfUpgradeable(selectedTile.id) &&
           gameState.currentTurn === username" @click="handleUpgradeProperty(selectedTile.id)"
-          :disabled="player.balance < groupsState.find(g => g.groupId === selectedTile.groupId).upgradePrice"
+          :disabled="player.balance < groupsState.find(g => g.groupId === selectedTile.groupId).upgradePrice || isSending"
           bgColor="green">
           UPGRADE
         </BaseButton>
@@ -329,7 +349,8 @@ definePageMeta({
         <h1>It's your turn!</h1>
         <h3 style="margin-bottom: 1rem;">Roll the dice to move your piece.</h3>
       </div>
-      <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
+      <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;" :disabled="isSending">ROLL DICE
+      </BaseButton>
     </GameModal>
 
     <!-- Jail Modal -->
@@ -342,8 +363,8 @@ definePageMeta({
         <li>Wait for three turns, after which you will be released automatically.</li>
       </ul>
       <div>
-        <BaseButton @click="handleUserTurn">ROLL DICE</BaseButton>
-        <BaseButton @click="handleJailPay" :disabled="player.balance < 50" bgColor="green">PAY</BaseButton>
+        <BaseButton @click="handleUserTurn" :disabled="isSending">ROLL DICE</BaseButton>
+        <BaseButton @click="handleJailPay" :disabled="player.balance < 50 || isSending" bgColor="green">PAY</BaseButton>
       </div>
     </GameModal>
 
@@ -354,11 +375,11 @@ definePageMeta({
       <h3>Name: {{ currentTilePlayerOn.name }}</h3>
       <h3>Price: {{ currentTilePlayerOn.price }}</h3>
       <div style="display: flex; gap: 1rem;">
-        <BaseButton :disabled="player.balance < currentTilePlayerOn.price"
+        <BaseButton :disabled="player.balance < currentTilePlayerOn.price || isSending"
           @click="() => handleBuyProperty(currentTilePlayerOn.id)" bgColor="green">
           BUY
         </BaseButton>
-        <BaseButton @click="handlePassProperty(currentTilePlayerOn.id)" bgColor="red">PASS
+        <BaseButton @click="handlePassProperty(currentTilePlayerOn.id)" bgColor="red" :disabled="isSending">PASS
         </BaseButton>
       </div>
     </GameModal>
@@ -371,8 +392,9 @@ definePageMeta({
         <span style="text-decoration: underline;">{{ gameState.currentAuctionBid + 10 }}</span>?
       </h3>
       <BaseButton @click="handleBidAuctionProperty(gameState.tileOnAuction)" bgColor="green"
-        :disabled="player.balance < gameState.currentAuctionBid + 10">BID</BaseButton>
-      <BaseButton @click="handlePassAuctionProperty(gameState.tileOnAuction)" bgColor="red">PASS</BaseButton>
+        :disabled="player.balance < gameState.currentAuctionBid + 10 || isSending">BID</BaseButton>
+      <BaseButton @click="handlePassAuctionProperty(gameState.tileOnAuction)" bgColor="red" :disabled="isSending">PASS
+      </BaseButton>
 
     </GameModal>
 
@@ -380,9 +402,13 @@ definePageMeta({
     <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'payRent'">
       <h1>Pay Rent</h1>
       <h3>Owner: {{ currentTilePlayerOn.owner }}</h3>
-      <h3>Rent: {{ currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] }}</h3>
+      <h3 v-if="currentTilePlayerOn.type === 'bonus-property'">
+        {{ `${turnResult.left} + ${turnResult.right} x ${currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]}
+        = ${turnResult.left + turnResult.right *
+          currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]}` }}</h3>
+      <h3 v-else>Rent: {{ currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] }}</h3>
       <BaseButton @click="() => handlePayRent(currentTilePlayerOn.id)" bgColor="red"
-        :disabled="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">PAY
+        :disabled="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] || isSending">PAY
       </BaseButton>
       <p v-if="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">* you don't have enough
         money to pay rent, mortgage something</p>
@@ -395,7 +421,16 @@ definePageMeta({
       <h3>{{ gameState.activeChance[0].text }}</h3>
       <BaseButton
         @click="() => send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.activeChance[0].amount } }))"
-        bgColor="red" :disabled="player.balance < gameState.activeChance[0].amount">PAY</BaseButton>
+        bgColor="red" :disabled="player.balance < gameState.activeChance[0].amount || isSending">PAY</BaseButton>
+    </GameModal>
+
+    <!-- PAY TAX MODAL -->
+    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'payTax'">
+      <h1>Pay Tax</h1>
+      <h3>You need to pay ${{ currentTilePlayerOn.taxAmount }} tax</h3>
+      <BaseButton
+        @click="() => send(JSON.stringify({ action: 'PAY_TAX', payload: { username, tax: currentTilePlayerOn.taxAmount } }))"
+        bgColor="red" :disabled="player.balance < currentTilePlayerOn.taxAmount || isSending">PAY</BaseButton>
     </GameModal>
 
     <!-- GAME BOARD -->

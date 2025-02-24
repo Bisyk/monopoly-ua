@@ -137,6 +137,7 @@ export const initialTilesState = [
   {
     id: 5,
     type: "tax",
+    taxAmount: 100,
     spriteName: "tax",
     position: 5,
     name: "Tax",
@@ -195,6 +196,8 @@ export const initialTilesState = [
     price: 150,
     mortgaged: false,
     name: "Ukrnafta",
+    rentLevel: 0,
+    rentLevels: [4, 10],
   },
   new PropertyTile(
     14,
@@ -310,6 +313,8 @@ export const initialTilesState = [
     price: 150,
     mortgaged: false,
     name: "Naftogaz",
+    rentLevel: 0,
+    rentLevels: [4, 10],
   },
   new PropertyTile(
     30,
@@ -372,6 +377,7 @@ export const initialTilesState = [
   {
     id: 37,
     type: "luxury-tax",
+    taxAmount: 75,
     spriteName: "luxurytax",
     position: 37,
     name: "Luxury Tax",
