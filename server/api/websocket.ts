@@ -146,7 +146,6 @@ export default defineWebSocketHandler({
       }
 
       if (currentTurnPlayer.jailed) {
-        console.log("jailed");
         currentTurnPlayer.turnsInJail -= 1;
 
         if (!(left === right) && currentTurnPlayer.turnsInJail > 0) {
@@ -292,7 +291,6 @@ export default defineWebSocketHandler({
       }
 
       if (tilePlayerOn!.type === "goToJail") {
-        console.log("jail");
         currentTurnPlayer.jailed = true;
         currentTurnPlayer.turnsInJail = 3;
         currentTurnPlayer.position = 11;
@@ -441,7 +439,6 @@ export default defineWebSocketHandler({
       game.currentAuctionBid! += 10;
 
       if (game.auctionParticipants.length === 1) {
-        console.log("winner");
         const winner = game.players.find(
           p => p.username === playerToBidUsername
         );

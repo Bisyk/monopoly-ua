@@ -119,7 +119,6 @@ const checkIfMortgageable = (propertyId: number) => {
 
 const checkIfBuybackAble = (propertyId: number) => {
   const property = tilesState.value.find(t => t.id === propertyId)
-  console.log(property);
   if (property.type !== 'property') return false
 
   const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
