@@ -719,7 +719,6 @@ const checkIsFullSet = (player: any, boardState: any) => {
       groupProperties.some((p: any) => playerProperties.includes(p)) &&
       group.isFullSet
     ) {
-      console.log("not full set anymore", group.groupId);
       group.isFullSet = false;
 
       boardState.tiles.forEach((t: any) => {
@@ -730,15 +729,7 @@ const checkIsFullSet = (player: any, boardState: any) => {
     }
 
     if (groupProperties.every((p: any) => playerProperties.includes(p))) {
-      console.log(
-        "full set for: ",
-        group.groupId,
-        "and player: ",
-        player.username
-      );
-      console.log("group before", group);
       group.isFullSet = true;
-      console.log("group after", group);
 
       boardState.tiles.forEach((t: any) => {
         if (groupProperties.includes(t.id)) {
@@ -746,7 +737,5 @@ const checkIsFullSet = (player: any, boardState: any) => {
         }
       });
     }
-
-    console.log("groups at the end", boardState.groups);
   }
 };
