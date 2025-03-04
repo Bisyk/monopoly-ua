@@ -33,6 +33,14 @@ const props = defineProps({
   activeTrade: {
     type: Object,
     required: false
+  },
+  yourTradableProperties: {
+    type: Array,
+    required: true
+  },
+  playerTradableProperties: {
+    type: Array,
+    required: true
   }
 })
 
@@ -80,7 +88,7 @@ const isTradeValid = computed(() => {
             <input type="number" v-model="tradeTiles.givenMoney" placeholder="0" />
           </p>
           <p>Your Properties:</p>
-          <div v-for="property in player.properties.sort((a, b) => a - b)">
+          <div v-for="property in yourTradableProperties.sort((a, b) => a - b)">
             <div @click="() => toggleGivenProperty(property)" class="tradeProperty"
               :style="{ backgroundColor: tradeTiles.given.has(property) ? players.find(p => p.username === tradePlayerUsername).color : 'white' }">
               <img :src="`/assets/sprites/ua/${boardState.tiles.find(t => t.id === property).spriteName}.webp`" alt="">
@@ -93,8 +101,7 @@ const isTradeValid = computed(() => {
             <input type="number" v-model="tradeTiles.receivedMoney" placeholder="0" />
           </p>
           <p>{{ tradePlayerUsername }} properties:</p>
-          <div
-            v-for="property in players.find(p => p.username === tradePlayerUsername).properties.sort((a, b) => a - b)">
+          <div v-for="property in playerTradableProperties.sort((a, b) => a - b)">
             <div @click="() => toggleReceivedProperty(property)" class="tradeProperty"
               :style="{ backgroundColor: tradeTiles.received.has(property) ? player.color : 'white' }">
               <img :src="`/assets/sprites/ua/${boardState.tiles.find(t => t.id === property).spriteName}.webp`" alt="">

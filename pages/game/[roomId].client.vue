@@ -54,6 +54,39 @@ const fullSetsGroups = computed(() => {
   return groupsState.value?.filter(g => g.isFullSet).map(g => g.groupId) ?? []
 })
 
+const getYourTradableProperties = () => {
+  const ownedAndNotMortgaged = tilesState.value.filter(t => t.owner === username && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
+  const tradeable = ownedAndNotMortgaged.filter(t => {
+    const isFullSet = fullSetsGroups.value.includes(t.groupId)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some(tile => tile.groupId === t.groupId && tile.rentLevel > 0)
+
+    if (isFullSet && isAnyTileInFullSetUpgraded) {
+      return false
+    }
+
+    return true
+  })
+
+  return tradeable.map(t => t.id)
+}
+
+const getPlayerTradableProperties = () => {
+  const ownedAndNotMortgaged = tilesState.value.filter(t => t.owner === tradePlayerUsername.value && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
+  console.log(ownedAndNotMortgaged);
+  const tradeable = ownedAndNotMortgaged.filter(t => {
+    const isFullSet = fullSetsGroups.value.includes(t.groupId)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some(tile => tile.groupId === t.groupId && tile.rentLevel > 0)
+
+    if (isFullSet && isAnyTileInFullSetUpgraded) {
+      return false
+    }
+
+    return true
+  })
+
+  return tradeable.map(t => t.id)
+}
+
 handleMessage((message) => {
   isSending.value = false
   gameState.value = JSON.parse(message)
@@ -288,16 +321,12 @@ onClickOutside(tileInfo, event => {
 })
 
 onMounted(async () => {
-  console.log('before mount');
   const username = sessionStorage.getItem('username')
   const { body } = await $fetch(`/games/${route.params.roomId}`)
-  console.log('body: ', body);
   const { game } = JSON.parse(body)
 
-  console.log('game: ', game);
   gameState.value = game
   players.value = game.players
-  console.log(players.value);
 
   if (!game.players.some(p => p.username === username)) {
     router.push({ path: '/' })
@@ -320,14 +349,15 @@ definePageMeta({
 </script>
 
 <template>
-  <!-- <div style="position: fixed; top: 0; right: 0; z-index: 9999; height: 100vh; width: fit-content; overflow-y: scroll;">
+  <div
+    style="position: fixed; top: 0; right: 0; z-index: 9999; height: 100vh; width: fit-content; overflow-y: scroll; max-width: 40vmin;">
     <pre>
       {{ tradePlayerUsername }}
       {{ tradeTiles }}
       {{ fullSetsGroups }}
       {{ gameState }}
     </pre>
-  </div> -->
+  </div>
 
   <div class="gameContainer" v-if="gameState">
     <!-- Tile Info -->
@@ -542,6 +572,7 @@ definePageMeta({
     <!--SEND TRADE MODAL -->
     <TradeModal v-if="tradePlayerUsername" :tradePlayerUsername="tradePlayerUsername" :tradeTiles="tradeTiles"
       :player="player" :players="gameState.players" :boardState="boardState"
+      :yourTradableProperties="getYourTradableProperties()" :playerTradableProperties="getPlayerTradableProperties()"
       @setTradePlayerUsername="(username) => setTradePlayerUsername(username)" @sendTrade="sendTrade" send />
 
 
