@@ -28,8 +28,6 @@ export default defineWebSocketHandler({
     }
 
     console.log("game not found in websocket");
-
-    
   },
   close(peer) {
     const roomId = getRoomIdFromPeer(peer!.request!.url!);
@@ -319,6 +317,8 @@ export default defineWebSocketHandler({
       changePlayerTurn();
 
       game.currentAction = "roll";
+      syncGameState(roomId, peer, game);
+      return;
     }
 
     if (parsedMessage.action === "PASS_PROPERTY") {
@@ -640,6 +640,9 @@ export default defineWebSocketHandler({
         game.boardState.tiles.find(t => t.id === r)!.owner = from;
       });
 
+      checkIsFullSet(playerFrom, game.boardState);
+      checkIsFullSet(playerTo, game.boardState);
+
       playerFrom!.balance -= givenMoney;
       playerTo!.balance += givenMoney;
 
@@ -656,6 +659,8 @@ export default defineWebSocketHandler({
       };
 
       game.currentAction = "roll";
+      syncGameState(roomId, peer, game);
+      return;
     }
 
     if (parsedMessage.action === "DECLINE_TRADE") {
@@ -710,8 +715,30 @@ const checkIsFullSet = (player: any, boardState: any) => {
   for (const group of boardState.groups) {
     const groupProperties = group.properties;
 
+    if (
+      groupProperties.some((p: any) => playerProperties.includes(p)) &&
+      group.isFullSet
+    ) {
+      console.log("not full set anymore", group.groupId);
+      group.isFullSet = false;
+
+      boardState.tiles.forEach((t: any) => {
+        if (groupProperties.includes(t.id)) {
+          t.rentLevels[0] = t.rentLevels[0] / 2;
+        }
+      });
+    }
+
     if (groupProperties.every((p: any) => playerProperties.includes(p))) {
+      console.log(
+        "full set for: ",
+        group.groupId,
+        "and player: ",
+        player.username
+      );
+      console.log("group before", group);
       group.isFullSet = true;
+      console.log("group after", group);
 
       boardState.tiles.forEach((t: any) => {
         if (groupProperties.includes(t.id)) {
@@ -719,5 +746,7 @@ const checkIsFullSet = (player: any, boardState: any) => {
         }
       });
     }
+
+    console.log("groups at the end", boardState.groups);
   }
 };
