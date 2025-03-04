@@ -12,78 +12,119 @@ defineProps({
     type: Function,
     required: true,
   },
+  players: {
+    type: Array,
+    required: true,
+  },
+  player: {
+    type: Object,
+    required: true,
+  },
 })
+
+defineEmits(['activateTrade'])
 </script>
 
 <template>
-  <div class="table">
-    <div v-if="tilesState && tilesState.length" class="board">
-      <div class="center">
-        <div>
-          <div v-if="gameState.gameLog && gameState?.gameLog.length" class="gameLog">
-            <p v-for="entry in gameState?.gameLog">{{ entry.username }}: {{ entry.msg }}</p>
+  <div class="main-container">
+    <div class="table">
+      <div class="players-container">
+        <PlayerContainer v-for="playerFromPlayers in gameState.players" :key="playerFromPlayers.username"
+          :player="player" :playerFromPlayers="playerFromPlayers"
+          @activateTrade="$emit('activateTrade', playerFromPlayers.username)" />
+      </div>
+
+      <div v-if="tilesState && tilesState.length" class="board">
+        <div class="center">
+          <div>
+            <div v-if="gameState.gameLog && gameState?.gameLog.length" class="gameLog">
+              <p v-for="entry in gameState?.gameLog">{{ entry.username }}: {{ entry.msg }}</p>
+            </div>
           </div>
         </div>
+        <!-- Go Tile -->
+        <BoardTile :tile="tilesState[0]" :players="gameState.players" />
+        <!-- Top Row -->
+        <div class="row horizontal-row top-row ">
+          <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"
+            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            :tileGroups="[gameState.boardState.groups[0], gameState.boardState.groups[1]]" />
+        </div>
+        <!-- Jail Tile -->
+        <BoardTile :tile="tilesState[10]" :type="tilesState[10].type" :players="gameState.players" />
+        <!-- Right Row -->
+        <div class="row vertical-row right-row">
+          <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :players="gameState.players"
+            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            :tileGroups="[gameState.boardState.groups[2], gameState.boardState.groups[3]]" />
+        </div>
+        <!-- Free Parking Tile -->
+        <BoardTile :tile="tilesState[20]" :players="gameState.players" />
+        <!-- Bottom Row -->
+        <div class="row horizontal-row bottom-row">
+          <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players"
+            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            :tileGroups="[gameState.boardState.groups[4], gameState.boardState.groups[5]]" />
+        </div>
+        <!-- Go to Jail Tile -->
+        <BoardTile :tile="tilesState[30]" :players="gameState.players" />
+        <!-- Left Row -->
+        <div class="row vertical-row left-row">
+          <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players"
+            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            :tileGroups="[gameState.boardState.groups[6], gameState.boardState.groups[7]]" />
+        </div>
       </div>
-
-      <!-- Go Tile -->
-      <BoardTile :tile="tilesState[0]" :players="gameState.players" />
-
-      <!-- Top Row -->
-      <div class="row horizontal-row top-row ">
-        <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[0],gameState.boardState[0].groups[1]]"/>
-      </div>
-
-      <!-- Jail Tile -->
-      <BoardTile :tile="tilesState[10]" :type="tilesState[10].type" :players="gameState.players" />
-
-      <!-- Right Row -->
-      <div class="row vertical-row right-row">
-        <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[2],gameState.boardState[0].groups[3]]"/>
-      </div>
-
-      <!-- Free Parking Tile -->
-      <BoardTile :tile="tilesState[20]" :players="gameState.players" />
-
-      <!-- Bottom Row -->
-      <div class="row horizontal-row bottom-row">
-        <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[4],gameState.boardState[0].groups[5]]"/>
-      </div>
-
-      <!-- Go to Jail Tile -->
-      <BoardTile :tile="tilesState[30]" :players="gameState.players" />
-
-      <!-- Left Row -->
-      <div class="row vertical-row left-row">
-        <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players"
-          @show-tile-info="(e, tile) => showTileInfo(e, tile)" :tileGroups="[gameState.boardState[0].groups[6],gameState.boardState[0].groups[7]]"/>
-      </div>
-
     </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-$tile-size: 7vmin; 
-$corner-tile-size: 14vmin; 
+$tile-size: 7vmin;
+$corner-tile-size: 14vmin;
 
-.gameLog{
+$tile-size-l: 6vmin;
+$corner-tile-size-l: 12vmin;
+
+.gameLog {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
 }
 
-.table {
+.main-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 100vh;
+  width: 100vw;
   overflow: hidden;
+  aspect-ratio: 4/3;
+}
+
+.table {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  place-items: center;
+  height: 100vh;
   position: relative;
+  width: 100%;
+  gap: 4vmin;
+  width: 100%;
+  justify-content: center;
+
+  .players-container {
+    padding: 3.5vmin 0 3.5vmin 0;
+    display: flex;
+    flex-direction: column;
+    width: 15vmin;
+    height: 100%;
+    gap: 2vmin;
+    justify-content: center;
+  }
+
 }
 
 .board {
@@ -91,9 +132,8 @@ $corner-tile-size: 14vmin;
   grid-template-columns: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for columns
   grid-template-rows: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for rows
   grid-gap: 2px;
-  margin: 0 auto;
-  max-width: 95vmin; 
   max-height: 95vmin;
+  width: fit-content;
 }
 
 .center {
@@ -106,7 +146,6 @@ $corner-tile-size: 14vmin;
   justify-items: center;
   align-items: center;
 }
-
 
 // =================
 // Rows and Spaces
@@ -180,5 +219,35 @@ $corner-tile-size: 14vmin;
   scrollbar-width: thin;
   scrollbar-color: #ccc transparent;
   border-radius: 2rem;
+}
+
+@media (max-width: 890px) {
+  .board {
+    display: grid;
+    grid-template-columns: $corner-tile-size-l repeat(9, $tile-size-l) $corner-tile-size-l; // Use viewport width units for columns
+    grid-template-rows: $corner-tile-size-l repeat(9, $tile-size-l) $corner-tile-size-l; // Use viewport width units for rows
+    grid-gap: 2px;
+    max-height: 95vmin;
+    width: fit-content;
+  }
+
+  .horizontal-row {
+    grid-template-columns: repeat(9, $tile-size-l); // Adjust column size based on viewport width
+    grid-template-rows: calc($corner-tile-size-l);
+  }
+
+  .vertical-row {
+    grid-template-columns: $corner-tile-size-l;
+    grid-template-rows: repeat(9, $tile-size-l); // Adjust row size based on viewport width
+
+    .container {
+      top: 50%;
+      left: 50%;
+    }
+  }
+
+  .players-container {
+    width: 10vmin;
+  }
 }
 </style>

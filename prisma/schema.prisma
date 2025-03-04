@@ -25,13 +25,14 @@ model Game {
   players                   Player[]
   currentTurn               String
   gameLog                   GameLogMsg[]
-  boardState                GameState[]
+  boardState                BoardState
   currentAction             String
   auctionParticipants       String[]
   currentAuctionParticipant String?
   currentAuctionBid         Int?
   tileOnAuction             Int?
   activeChance              Chance[]
+  activeTrade               Json
 }
 
 type Player {
@@ -47,7 +48,7 @@ type Player {
   bonusRoll            Boolean
 }
 
-type GameState {
+type BoardState {
   tiles  Tile[]
   groups Groups[]
 }
@@ -90,18 +91,3 @@ type Chance {
   text   String?
 }
 
-// model User {
-//   id    Int     @id @default(autoincrement())
-//   email String  @unique
-//   name  String?
-//   posts Post[]
-// }
-
-// model Post {
-//   id        Int     @id @default(autoincrement())
-//   title     String
-//   content   String?
-//   published Boolean @default(false)
-//   author    User    @relation(fields: [authorId], references: [id])
-//   authorId  Int
-// }
