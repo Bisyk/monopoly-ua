@@ -8,18 +8,10 @@ import {
   initialTilesState,
 } from "../constants";
 
-// todo: replace with actual game state
-const MAX_PLAYERS = 2;
-
 export default defineWebSocketHandler({
   async open(peer) {
     const roomId = getRoomIdFromPeer(peer!.request!.url!);
     peer.subscribe(roomId);
-    const room = await prisma.room.findUnique({
-      where: {
-        id: roomId,
-      },
-    });
 
     const game = await prisma.game.findUnique({
       where: {
@@ -28,47 +20,58 @@ export default defineWebSocketHandler({
     });
 
     if (game) {
+      console.log("game in websocket found", game);
       peer.send(JSON.stringify(game));
       peer.publish(roomId, JSON.stringify(game));
 
       return;
     }
 
-    if (!game) {
-      const game = await prisma.game.create({
-        data: {
-          associatedRoomId: roomId,
-          players: room!.players.map((player, idx) => ({
-            username: player,
-            color: colors[idx],
-            ...initialPlayersState,
-          })),
-          currentTurn: room!.players[0],
-          currentAction: "roll",
-          auctionParticipants: [],
-          currentAuctionParticipant: "",
-          currentAuctionBid: 0,
-          tileOnAuction: null,
-          activeChance: {
-            type: "",
-          },
-          boardState: {
-            tiles: initialTilesState,
-            groups: initialGroupsState,
-          },
-          gameLog: [],
-        },
-      });
-    }
+    console.log("game not found in websocket");
 
-    const createdGame = await prisma.game.findUnique({
-      where: {
-        associatedRoomId: roomId,
-      },
-    });
+    // if (!game) {
+    //   const game = await prisma.game.create({
+    //     data: {
+    //       associatedRoomId: roomId,
+    //       players: room!.players.map((player, idx) => ({
+    //         username: player,
+    //         color: colors[idx],
+    //         ...initialPlayersState,
+    //       })),
+    //       currentTurn: room!.players[0],
+    //       currentAction: "roll",
+    //       auctionParticipants: [],
+    //       currentAuctionParticipant: "",
+    //       currentAuctionBid: 0,
+    //       tileOnAuction: null,
+    //       activeChance: {
+    //         type: "",
+    //       },
+    //       activeTrade: {
+    //         from: "",
+    //         to: "",
+    //         tilesGiven: [],
+    //         tilesReceived: [],
+    //         moneyGiven: 0,
+    //         moneyReceived: 0,
+    //       },
+    //       boardState: {
+    //         tiles: initialTilesState,
+    //         groups: initialGroupsState,
+    //       },
+    //       gameLog: [],
+    //     },
+    //   });
+    // }
 
-    peer.send(JSON.stringify(createdGame));
-    peer.publish(roomId, JSON.stringify(createdGame));
+    // const createdGame = await prisma.game.findUnique({
+    //   where: {
+    //     associatedRoomId: roomId,
+    //   },
+    // });
+
+    // peer.send(JSON.stringify(createdGame));
+    // peer.publish(roomId, JSON.stringify(createdGame));
   },
   close(peer) {
     const roomId = getRoomIdFromPeer(peer!.request!.url!);
@@ -100,7 +103,7 @@ export default defineWebSocketHandler({
     const currentTurnPlayerIdx = game.players.indexOf(currentTurnPlayer);
 
     const changePlayerTurn = () => {
-      game.boardState[0].groups.forEach(g => {
+      game.boardState.groups.forEach(g => {
         g.isUpgradeAvailable = true;
       });
 
@@ -108,7 +111,7 @@ export default defineWebSocketHandler({
         return;
       }
 
-      if (currentTurnPlayerIdx < MAX_PLAYERS - 1) {
+      if (currentTurnPlayerIdx < game.players.length - 1) {
         game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
       } else {
         game.currentTurn = game.players[0].username;
@@ -184,7 +187,7 @@ export default defineWebSocketHandler({
         ((currentTurnPlayer.position + left + right - 1) % boardSize) + 1;
 
       currentTurnPlayer.position = newPlayerPosition;
-      const tilePlayerOn = game.boardState[0].tiles.find(
+      const tilePlayerOn = game.boardState.tiles.find(
         t => t.id === newPlayerPosition
       );
 
@@ -306,7 +309,7 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "BUY_PROPERTY") {
       const propertyId = parsedMessage.payload.propertyId;
 
-      const boughtProperty = game.boardState[0].tiles.find(
+      const boughtProperty = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
@@ -330,7 +333,7 @@ export default defineWebSocketHandler({
         currentTurnPlayer.properties.push(boughtProperty!.id);
         boughtProperty!.owner = currentTurnPlayer.username;
 
-        const boughtCars = game.boardState[0].tiles.filter(
+        const boughtCars = game.boardState.tiles.filter(
           t => t.type === "car" && t.owner === currentTurnPlayer.username
         );
 
@@ -344,7 +347,7 @@ export default defineWebSocketHandler({
         currentTurnPlayer.properties.push(boughtProperty!.id);
         boughtProperty!.owner = currentTurnPlayer.username;
 
-        const propertiesOwned = game.boardState[0].tiles.filter(
+        const propertiesOwned = game.boardState.tiles.filter(
           t =>
             t.type === "bonus-property" &&
             t.owner === currentTurnPlayer.username
@@ -364,7 +367,7 @@ export default defineWebSocketHandler({
       const propertyId = parsedMessage.payload.propertyId;
       const playerToPassUsername = parsedMessage.payload.username;
 
-      const passedProperty = game.boardState[0].tiles.find(
+      const passedProperty = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
@@ -405,7 +408,7 @@ export default defineWebSocketHandler({
         const winner = game.players.find(
           p => p.username === remainingParticipants[0]
         );
-        const propertyToBuy = game.boardState[0].tiles.find(
+        const propertyToBuy = game.boardState.tiles.find(
           t => t.id === propertyId
         );
         winner!.balance -= game.currentAuctionBid!;
@@ -442,7 +445,7 @@ export default defineWebSocketHandler({
         const winner = game.players.find(
           p => p.username === playerToBidUsername
         );
-        const propertyToBuy = game.boardState[0].tiles.find(
+        const propertyToBuy = game.boardState.tiles.find(
           t => t.id === propertyId
         );
         if (propertyToBuy!.type === "property") {
@@ -456,7 +459,7 @@ export default defineWebSocketHandler({
           winner!.properties.push(propertyId);
           propertyToBuy!.owner = winner!.username;
 
-          const boughtCars = game.boardState[0].tiles.filter(
+          const boughtCars = game.boardState.tiles.filter(
             t => t.type === "car" && t.owner === winner!.username
           );
 
@@ -470,7 +473,7 @@ export default defineWebSocketHandler({
           winner!.properties.push(propertyId);
           propertyToBuy!.owner = winner!.username;
 
-          const propertiesOwned = game.boardState[0].tiles.filter(
+          const propertiesOwned = game.boardState.tiles.filter(
             t => t.type === "bonus-property" && t.owner === winner!.username
           );
 
@@ -494,7 +497,7 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "PAY_RENT") {
       const propertyId = parsedMessage.payload.propertyId;
 
-      const propertyToPayRent = game.boardState[0].tiles.find(
+      const propertyToPayRent = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
@@ -530,7 +533,7 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "MORTGAGE_PROPERTY") {
       const propertyId = parsedMessage.payload.propertyId;
 
-      const propertyToMortgage = game.boardState[0].tiles.find(
+      const propertyToMortgage = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
@@ -545,7 +548,7 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "BUY_BACK_PROPERTY") {
       const propertyId = parsedMessage.payload.propertyId;
 
-      const propertyToBuyBack = game.boardState[0].tiles.find(
+      const propertyToBuyBack = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
@@ -563,11 +566,11 @@ export default defineWebSocketHandler({
 
     if (parsedMessage.action === "UPGRADE_PROPERTY") {
       const propertyId = parsedMessage.payload.propertyId;
-      const propertyGroup = game.boardState[0].groups.find(g => {
+      const propertyGroup = game.boardState.groups.find(g => {
         return g.properties.includes(propertyId);
       });
 
-      const propertyToUpgrade = game.boardState[0].tiles.find(
+      const propertyToUpgrade = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
@@ -587,11 +590,11 @@ export default defineWebSocketHandler({
     if (parsedMessage.action === "SELL_PROPERTY") {
       const propertyId = parsedMessage.payload.propertyId;
 
-      const propertyToSell = game.boardState[0].tiles.find(
+      const propertyToSell = game.boardState.tiles.find(
         t => t.id === propertyId
       );
 
-      const propertyGroup = game.boardState[0].groups.find(g => {
+      const propertyGroup = game.boardState.groups.find(g => {
         return g.properties.includes(propertyId);
       });
 
@@ -639,6 +642,76 @@ export default defineWebSocketHandler({
       game.currentAction = "roll";
     }
 
+    if (parsedMessage.action === "TRADE") {
+      const { username, tradePlayerUsername, tradeTiles } =
+        parsedMessage.payload;
+
+      const { given, received, givenMoney, receivedMoney } = tradeTiles;
+
+      console.log(username);
+      console.log(tradePlayerUsername);
+      console.log(tradeTiles);
+
+      game.currentAction = "trade";
+      game.activeTrade = {
+        from: username,
+        to: tradePlayerUsername,
+        given,
+        received,
+        givenMoney,
+        receivedMoney,
+      };
+    }
+
+    if (parsedMessage.action === "ACCEPT_TRADE") {
+      const { from, to, given, received, givenMoney, receivedMoney } =
+        game.activeTrade;
+
+      const playerFrom = game.players.find(p => p.username === from);
+      const playerTo = game.players.find(p => p.username === to);
+
+      given.forEach(g => {
+        playerFrom!.properties = playerFrom!.properties.filter(p => p !== g);
+        playerTo!.properties.push(g);
+        game.boardState.tiles.find(t => t.id === g)!.owner = to;
+      });
+
+      received.forEach(r => {
+        playerTo!.properties = playerTo!.properties.filter(p => p !== r);
+        playerFrom!.properties.push(r);
+        game.boardState.tiles.find(t => t.id === r)!.owner = from;
+      });
+
+      playerFrom!.balance -= givenMoney;
+      playerTo!.balance += givenMoney;
+
+      playerFrom!.balance += receivedMoney;
+      playerTo!.balance -= receivedMoney;
+
+      game.activeTrade = {
+        from: "",
+        to: "",
+        given: [],
+        received: [],
+        givenMoney: 0,
+        receivedMoney: 0,
+      };
+
+      game.currentAction = "roll";
+    }
+
+    if (parsedMessage.action === "DECLINE_TRADE") {
+      game.activeTrade = {
+        from: "",
+        to: "",
+        given: [],
+        received: [],
+        givenMoney: 0,
+        receivedMoney: 0,
+      };
+      game.currentAction = "roll";
+    }
+
     await syncGameState(roomId, peer, game);
   },
 });
@@ -665,6 +738,7 @@ async function syncGameState(roomId: string, peer, newGameState) {
       currentAuctionBid: newGameState.currentAuctionBid,
       tileOnAuction: newGameState.tileOnAuction,
       activeChance: newGameState.activeChance,
+      activeTrade: newGameState.activeTrade,
     },
   });
 
@@ -675,13 +749,13 @@ async function syncGameState(roomId: string, peer, newGameState) {
 const checkIsFullSet = (player: any, boardState: any) => {
   const playerProperties = player.properties;
 
-  for (const group of boardState[0].groups) {
+  for (const group of boardState.groups) {
     const groupProperties = group.properties;
 
     if (groupProperties.every((p: any) => playerProperties.includes(p))) {
       group.isFullSet = true;
 
-      boardState[0].tiles.forEach((t: any) => {
+      boardState.tiles.forEach((t: any) => {
         if (groupProperties.includes(t.id)) {
           t.rentLevels[0] = t.rentLevels[0] * 2;
         }

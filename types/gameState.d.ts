@@ -12,7 +12,7 @@ declare interface GameState {
   currentAuctionParticipant: string | null;
   currentAuctionBid: number | null;
   tileOnAuction: Tile | null;
-  boardState: Array<object>;
+  boardState: Object;
   gameLog: Array<gameLogEntry>;
 }
 

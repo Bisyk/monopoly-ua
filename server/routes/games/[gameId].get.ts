@@ -13,8 +13,11 @@ export default defineEventHandler(async event => {
   });
 
   if (!game) {
+    console.log("game not found");
     return { status: 404 };
   }
+
+  console.log("game found");
 
   return { body: JSON.stringify({ game }) };
 });

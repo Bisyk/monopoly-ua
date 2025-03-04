@@ -72,7 +72,7 @@ const upgradeStyle = computed((): CSSProperties => {
     position: 'absolute' as CSSProperties['position'],
     zIndex: 5,
     display: 'flex',
-    width: '100%',
+    width: '80%',
     height: '100%',
     flexDirection: (isLeftRow.value || isRightRow.value ? 'column' : '') as CSSProperties['flexDirection'],
     alignItems: isRightRow.value ? 'flex-start' : isLeftRow.value ? 'flex-end' : '',
