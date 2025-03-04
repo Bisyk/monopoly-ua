@@ -29,49 +29,7 @@ export default defineWebSocketHandler({
 
     console.log("game not found in websocket");
 
-    // if (!game) {
-    //   const game = await prisma.game.create({
-    //     data: {
-    //       associatedRoomId: roomId,
-    //       players: room!.players.map((player, idx) => ({
-    //         username: player,
-    //         color: colors[idx],
-    //         ...initialPlayersState,
-    //       })),
-    //       currentTurn: room!.players[0],
-    //       currentAction: "roll",
-    //       auctionParticipants: [],
-    //       currentAuctionParticipant: "",
-    //       currentAuctionBid: 0,
-    //       tileOnAuction: null,
-    //       activeChance: {
-    //         type: "",
-    //       },
-    //       activeTrade: {
-    //         from: "",
-    //         to: "",
-    //         tilesGiven: [],
-    //         tilesReceived: [],
-    //         moneyGiven: 0,
-    //         moneyReceived: 0,
-    //       },
-    //       boardState: {
-    //         tiles: initialTilesState,
-    //         groups: initialGroupsState,
-    //       },
-    //       gameLog: [],
-    //     },
-    //   });
-    // }
-
-    // const createdGame = await prisma.game.findUnique({
-    //   where: {
-    //     associatedRoomId: roomId,
-    //   },
-    // });
-
-    // peer.send(JSON.stringify(createdGame));
-    // peer.publish(roomId, JSON.stringify(createdGame));
+    
   },
   close(peer) {
     const roomId = getRoomIdFromPeer(peer!.request!.url!);
