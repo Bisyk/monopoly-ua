@@ -240,6 +240,7 @@ onClickOutside(tileInfo, event => {
 
 onMounted(async () => {
   const username = sessionStorage.getItem('username')
+  // @ts-ignore
   const { body } = await $fetch(`/games/${route.params.roomId}`)
   const { game } = JSON.parse(body)
 
