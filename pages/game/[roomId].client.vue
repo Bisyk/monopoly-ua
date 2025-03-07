@@ -3,14 +3,17 @@ import { onMounted, ref, watch, computed, useTemplateRef, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getTilePosition } from '../../utils/board'
 import { onClickOutside } from '@vueuse/core'
+import { type Group, type Player, type Tile } from '../../types'
+import { rollDice } from '../../utils/gameFunctions'
 
 const route = useRoute()
 const router = useRouter()
-const players = ref<any>([])
+const players = ref<Player[]>([])
 const gameState = ref<any>({} as any)
 const username = sessionStorage.getItem('username')
 const selectedTile = ref<any>(null)
 const tileInfo = ref(null)
+const tileInfoStyle = ref({ top: 0, left: 0 })
 const isSending = ref(false)
 const turnResult = ref({ left: 0, right: 0 })
 const tradePlayerUsername = ref('')
@@ -21,6 +24,7 @@ const tradeTiles = ref({
   receivedMoney: 0
 })
 
+// @ts-ignore
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
 watch(gameState, (newState) => {
@@ -43,22 +47,22 @@ const groupsState = computed(() => {
 
 const player = computed(() => {
   if (!gameState.value.players) return {}
-  return gameState.value.players.find(p => p.username === username)
+  return gameState.value.players.find((p: Player) => p.username === username)
 })
 
 const currentTilePlayerOn = computed(() => {
-  return tilesState.value?.find(t => t.id === player.value.position) ?? {}
+  return tilesState.value?.find((t: Tile) => t.id === player.value.position) ?? {}
 })
 
 const fullSetsGroups = computed(() => {
-  return groupsState.value?.filter(g => g.isFullSet).map(g => g.groupId) ?? []
+  return groupsState.value?.filter((g: Group) => g.isFullSet).map((g: Group) => g.groupId) ?? []
 })
 
 const getYourTradableProperties = () => {
-  const ownedAndNotMortgaged = tilesState.value.filter(t => t.owner === username && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
-  const tradeable = ownedAndNotMortgaged.filter(t => {
+  const ownedAndNotMortgaged = tilesState.value.filter((t: Tile) => t.owner === username && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
+  const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
     const isFullSet = fullSetsGroups.value.includes(t.groupId)
-    const isAnyTileInFullSetUpgraded = tilesState.value.some(tile => tile.groupId === t.groupId && tile.rentLevel > 0)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel > 0)
 
     if (isFullSet && isAnyTileInFullSetUpgraded) {
       return false
@@ -67,15 +71,15 @@ const getYourTradableProperties = () => {
     return true
   })
 
-  return tradeable.map(t => t.id)
+  return tradeable.map((t: Tile) => t.id)
 }
 
 const getPlayerTradableProperties = () => {
-  const ownedAndNotMortgaged = tilesState.value.filter(t => t.owner === tradePlayerUsername.value && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
+  const ownedAndNotMortgaged = tilesState.value.filter((t: Tile) => t.owner === tradePlayerUsername.value && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
   console.log(ownedAndNotMortgaged);
-  const tradeable = ownedAndNotMortgaged.filter(t => {
+  const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
     const isFullSet = fullSetsGroups.value.includes(t.groupId)
-    const isAnyTileInFullSetUpgraded = tilesState.value.some(tile => tile.groupId === t.groupId && tile.rentLevel > 0)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel > 0)
 
     if (isFullSet && isAnyTileInFullSetUpgraded) {
       return false
@@ -84,10 +88,10 @@ const getPlayerTradableProperties = () => {
     return true
   })
 
-  return tradeable.map(t => t.id)
+  return tradeable.map((t: Tile) => t.id)
 }
 
-handleMessage((message) => {
+handleMessage((message: string) => {
   isSending.value = false
   gameState.value = JSON.parse(message)
 })
@@ -98,93 +102,7 @@ const handleUserTurn = () => {
   send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult: turnResult.value } }))
 }
 
-const checkIfUpgradeable = (propertyId: number) => {
-  const property = tilesState.value.find(t => t.id === propertyId)
-  if (property.type !== 'property') return false
 
-  const group = boardState.value.groups.find(g => g.groupId === property.groupId)
-  if (!group) return false
-
-  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
-
-  const allOwnedBySamePlayer = propertiesInGroup.every(p => p.owner === property.owner)
-  if (!allOwnedBySamePlayer) return false
-
-  const allAtMaxRentLevel = propertiesInGroup.every(p => p.rentLevel >= 5)
-  if (allAtMaxRentLevel) return false
-
-  const isAnyMortgaged = propertiesInGroup.some(p => p.mortgaged)
-  if (isAnyMortgaged) return false
-
-  const isOwner = player.value.properties.includes(propertyId)
-  if (!isOwner) return false
-
-  const isUpgradable = groupsState.value.find(g => g.groupId === property.groupId).isUpgradeAvailable
-  if (!isUpgradable) return false
-
-  const isFullSet = fullSetsGroups.value.includes(property.groupId)
-  if (!isFullSet) return false
-
-  const isLevelEvenlyUpgraded = propertiesInGroup.every(p => p.rentLevel >= property.rentLevel)
-
-  return isLevelEvenlyUpgraded
-}
-
-const checkIfMortgageable = (propertyId: number) => {
-  const property = tilesState.value.find(t => t.id === propertyId)
-  if (property.type !== 'property') return false
-
-  const group = boardState.value.groups.find(g => g.groupId === property.groupId)
-  if (!group) return false
-
-
-  const isOwner = player.value.properties.includes(propertyId)
-  if (!isOwner) return false
-
-  const isMortgaged = property.mortgaged
-  if (isMortgaged) return false
-
-  const isRentLevelZero = property.rentLevel === 0
-  if (!isRentLevelZero) return false
-
-  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
-
-  const isAnyPropertyUpgraded = propertiesInGroup.some(p => p.rentLevel > 0)
-
-  return !isAnyPropertyUpgraded
-}
-
-const checkIfBuybackAble = (propertyId: number) => {
-  const property = tilesState.value.find(t => t.id === propertyId)
-  if (property.type !== 'property') return false
-
-  const group = boardState.value.groups.find(g => g.groupId === property.groupId)
-  if (!group) return false
-
-  const isOwner = player.value.properties.includes(propertyId)
-  if (!isOwner) return false
-
-  const isMortgaged = property.mortgaged
-  if (!isMortgaged) return false
-
-  return true
-}
-
-const checkIfSellable = (propertyId: number) => {
-  const property = tilesState.value.find(t => t.id === propertyId)
-  if (property.type !== 'property') return false
-
-  if (property.rentLevel < 1) return false
-
-  const group = boardState.value.groups.find(g => g.groupId === property.groupId)
-  if (!group) return false
-
-  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
-
-  const notLowerThanAnyOtherProperty = propertiesInGroup.every(p => p.rentLevel <= property.rentLevel)
-
-  return notLowerThanAnyOtherProperty
-}
 
 const handleBuyProperty = (propertyId: number) => {
   isSending.value = true
@@ -275,7 +193,7 @@ const declineTrade = () => {
   send(JSON.stringify({ action: 'DECLINE_TRADE', payload: { username } }))
 }
 
-const showTileInfo = async (event, tile) => {
+const showTileInfo = async (event: any, tile: Tile) => {
   const tileRect = event.target.getBoundingClientRect();
   const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
   selectedTile.value = tile;
@@ -291,28 +209,28 @@ const showTileInfo = async (event, tile) => {
 
   if (position === 'right') {
     left -= tileRect.width
+    top -= tileRect.height * 1.8
   }
 
   if (position === 'bottom') {
-    top -= tileRect.height / 2
+    top -= tileRect.height * 2.3
   }
 
   if (position === 'left') {
     left += tileRect.width
+    top -= tileRect.height * 1.8
   }
 
-  if (tileInfo.value) {
-    tileInfo.value.style.top = `${top}px`;
-    tileInfo.value.style.left = `${left}px`;
-  }
+  tileInfoStyle.value.top = top;
+  tileInfoStyle.value.left = left;;
 }
 
-const activateTrade = (username) => {
+const activateTrade = (username: string) => {
   if (gameState.value.currentTurn !== player.value.username) return
   tradePlayerUsername.value = username
 }
 
-const setTradePlayerUsername = (username) => {
+const setTradePlayerUsername = (username: string) => {
   tradePlayerUsername.value = username
 }
 
@@ -328,12 +246,12 @@ onMounted(async () => {
   gameState.value = game
   players.value = game.players
 
-  if (!game.players.some(p => p.username === username)) {
+  if (!game.players.some((p: Player) => p.username === username)) {
     router.push({ path: '/' })
   }
 })
 
-
+// @ts-ignore
 definePageMeta({
   title: 'Monopoly UA | Game',
   layout: 'empty',
@@ -360,72 +278,11 @@ definePageMeta({
   </div>
 
   <div class="gameContainer" v-if="gameState">
-    <!-- Tile Info -->
-    <div v-if="selectedTile" class="tileInfo" ref="tileInfo">
-      <h3>{{ selectedTile.name }}</h3>
-      <div style="display: flex; width: 100%; justify-content: center; gap: 1rem">
-        <BaseButton v-if="
-          checkIfMortgageable(selectedTile.id) &&
-          gameState.currentTurn === username
-        " @click="handleMortgageProperty(selectedTile.id)" bgColor="red" :disabled="isSending">
-          MORTGAGE
-        </BaseButton>
-
-        <BaseButton v-if="
-          checkIfBuybackAble(selectedTile.id) &&
-          gameState.currentTurn === username
-        " @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
-          :disabled="player.balance < selectedTile.buybackPrice || isSending">
-          BUY BACK
-        </BaseButton>
-
-        <BaseButton v-if="
-          checkIfSellable(selectedTile.id) &&
-          gameState.currentTurn === username
-        " @click="handleSellProperty(selectedTile.id)" bgColor="red" :disabled="isSending">
-          SELL
-        </BaseButton>
-
-        <BaseButton v-if="
-          checkIfUpgradeable(selectedTile.id) &&
-          gameState.currentTurn === username
-        " @click="handleUpgradeProperty(selectedTile.id)" :disabled="player.balance <
-          groupsState.find((g) => g.groupId === selectedTile.groupId)
-            .upgradePrice || isSending
-          " bgColor="green">
-          UPGRADE
-        </BaseButton>
-      </div>
-
-      <div v-if="selectedTile.type === 'property'">
-        <p>💰 Base Rent: {{ selectedTile.rentLevels[0] }}</p>
-        <div style="display: flex; flex-direction: column; gap: 1rem">
-          <div style="display: flex; justify-content: space-between">
-            <div>⭐</div>
-            <div>{{ selectedTile.rentLevels[1] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between">
-            <div>⭐⭐</div>
-            <div>{{ selectedTile.rentLevels[2] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between">
-            <div>⭐⭐⭐</div>
-            <div>{{ selectedTile.rentLevels[3] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between">
-            <div>⭐⭐⭐⭐</div>
-            <div>{{ selectedTile.rentLevels[4] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between">
-            <div>🌟</div>
-            <div>{{ selectedTile.rentLevels[5] }}</div>
-          </div>
-        </div>
-      </div>
-      <p>💰 Buy Price: {{ selectedTile.price }}</p>
-      <p>💰 Mortgage Price: {{ selectedTile.mortgagePrice }}</p>
-      <p>💰 Buyback Price: {{ selectedTile.buybackPrice }}</p>
-    </div>
+    <TileInfoCard v-if="selectedTile" ref="tileInfo" @mortgageProperty="handleMortgageProperty"
+      @buyBackProperty="handleBuyBackProperty" @sellProperty="handleSellProperty"
+      @upgradeProperty="handleUpgradeProperty" :selectedTile="selectedTile" :currentTurn="gameState.currentTurn"
+      :username="username" :player="player" :tilesState="tilesState" :boardState="boardState" :groupsState="groupsState"
+      :fullSetsGroups="fullSetsGroups" :tileInfoStyle="tileInfoStyle" :isSending="isSending" />
 
     <!-- ROLL MODAL -->
     <GameModal v-if="
@@ -485,7 +342,7 @@ definePageMeta({
       <h3>
         Do you want buy
         <span style="text-decoration: underline">{{
-          tilesState.filter((t) => t.id === gameState.tileOnAuction)[0].name
+          tilesState.filter((t: Tile) => t.id === gameState.tileOnAuction)[0].name
         }}</span>
         for
         <span style="text-decoration: underline">{{
@@ -573,7 +430,7 @@ definePageMeta({
     <TradeModal v-if="tradePlayerUsername" :tradePlayerUsername="tradePlayerUsername" :tradeTiles="tradeTiles"
       :player="player" :players="gameState.players" :boardState="boardState"
       :yourTradableProperties="getYourTradableProperties()" :playerTradableProperties="getPlayerTradableProperties()"
-      @setTradePlayerUsername="(username) => setTradePlayerUsername(username)" @sendTrade="sendTrade" send />
+      @setTradePlayerUsername="(username: string) => setTradePlayerUsername(username)" @sendTrade="sendTrade" send />
 
 
 
@@ -586,7 +443,7 @@ definePageMeta({
 
     <!-- GAME BOARD -->
     <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" :players="players"
-      :player="player" @activateTrade="(username) => activateTrade(username)" />
+      :player="player" @activateTrade="(username: string) => activateTrade(username)" />
   </div>
 
   <div v-else>
@@ -603,15 +460,7 @@ definePageMeta({
   display: grid;
   grid-template-columns: 1fr 4fr;
 
-  .tileInfo {
-    position: absolute;
-    z-index: 11;
-    background-color: white;
-    padding: 1rem;
-    border-radius: 12px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    min-width: 10vw;
-  }
+
 
   .playersContainer {
     display: flex;
