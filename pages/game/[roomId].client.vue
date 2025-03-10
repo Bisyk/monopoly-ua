@@ -285,19 +285,10 @@ definePageMeta({
       :username="username" :player="player" :tilesState="tilesState" :boardState="boardState" :groupsState="groupsState"
       :fullSetsGroups="fullSetsGroups" :tileInfoStyle="tileInfoStyle" :isSending="isSending" />
 
-    <!-- ROLL MODAL -->
-    <GameModal v-if="
+    <ModalRoll v-if="
       gameState.currentTurn === username &&
       gameState.currentAction === 'roll' &&
-      !player.jailed
-    ">
-      <div>
-        <h1>It's your turn!</h1>
-        <h3 style="margin-bottom: 1rem">Roll the dice to move your piece.</h3>
-      </div>
-      <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111" :disabled="isSending">ROLL DICE
-      </BaseButton>
-    </GameModal>
+      !player.jailed" @handleUserTurn="handleUserTurn"/>
 
     <!-- Jail Modal -->
     <GameModal v-if="gameState.currentTurn === username && player.jailed">
