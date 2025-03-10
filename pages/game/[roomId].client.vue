@@ -288,38 +288,28 @@ definePageMeta({
     <ModalRoll v-if="
       gameState.currentTurn === username &&
       gameState.currentAction === 'roll' &&
-      !player.jailed" @handleUserTurn="handleUserTurn" />
+      !player.jailed" @handleUserTurn="handleUserTurn
+      " />
 
-    <ModalJail v-if="gameState.currentTurn === username && player.jailed" :playerBalance="player.balance"
-      :isSending="isSending" @handleUserTurn="handleUserTurn" @handleJailPay="handleJailPay" />
+    <ModalJail v-if="gameState.currentTurn === username &&
+      player.jailed
+    " :playerBalance="player.balance" :isSending="isSending" @handleUserTurn="handleUserTurn"
+      @handleJailPay="handleJailPay" />
 
     <ModalBuy v-if="
-      gameState.currentTurn === username && gameState.currentAction === 'buy'" :tileName="currentTilePlayerOn.name"
-      :tilePrice="currentTilePlayerOn.price" :playerBalance="player.balance" :isSending="isSending"
-      @handleBuyProperty="handleBuyProperty(currentTilePlayerOn.id)"
+      gameState.currentTurn === username &&
+      gameState.currentAction === 'buy'
+    " :tileName="currentTilePlayerOn.name" :tilePrice="currentTilePlayerOn.price" :playerBalance="player.balance"
+      :isSending="isSending" @handleBuyProperty="handleBuyProperty(currentTilePlayerOn.id)"
       @handlePassProperty="handlePassProperty(currentTilePlayerOn.id)" />
 
-    <!-- AUCTION MODAL -->
-    <GameModal v-if="
+    <ModalAuction v-if="
       gameState.currentAction === 'auction' &&
       gameState.currentAuctionParticipant === username
-    ">
-      <h1>Auction</h1>
-      <h3>
-        Do you want buy
-        <span style="text-decoration: underline">{{
-          tilesState.filter((t: Tile) => t.id === gameState.tileOnAuction)[0].name
-        }}</span>
-        for
-        <span style="text-decoration: underline">{{
-          gameState.currentAuctionBid + 10
-        }}</span>?
-      </h3>
-      <BaseButton @click="handleBidAuctionProperty(gameState.tileOnAuction)" bgColor="green" :disabled="player.balance < gameState.currentAuctionBid + 10 || isSending
-        ">BID</BaseButton>
-      <BaseButton @click="handlePassAuctionProperty(gameState.tileOnAuction)" bgColor="red" :disabled="isSending">PASS
-      </BaseButton>
-    </GameModal>
+    " :tileOnAuctionName="tilesState.filter((t: Tile) => t.id === gameState.tileOnAuction)[0].name"
+      :tileOnAuctionPrice="gameState.currentAuctionBid + 10" :playerBalance="player.balance"
+      @handleBidAuctionProperty="handleBidAuctionProperty(gameState.tileOnAuction)"
+      @handlePassAuctionProperty="handlePassAuctionProperty(gameState.tileOnAuction)" />
 
     <!-- PAY RENT MODAL -->
     <GameModal v-if="
