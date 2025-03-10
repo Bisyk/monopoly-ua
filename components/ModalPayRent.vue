@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps({
   tilePlayerOn: {
-    type: Object as PropType<Tile>,
+    type: Object,
     required: true
   },
   turnResult: {
