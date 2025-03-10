@@ -290,22 +290,6 @@ definePageMeta({
       gameState.currentAction === 'roll' &&
       !player.jailed" @handleUserTurn="handleUserTurn" />
 
-    <!-- Jail Modal -->
-    <!-- <GameModal v-if="gameState.currentTurn === username && player.jailed">
-      <h1>You are in JAIL!</h1>
-      <p>You have the following options:</p>
-      <ul>
-        <li>Pay $50 to get out of jail immediately.</li>
-        <li>Roll doubles on your next turn to get out of jail for free.</li>
-        <li>
-          Wait for three turns, after which you will be released automatically.
-        </li>
-      </ul>
-      <div>
-        <BaseButton @click="handleUserTurn" :disabled="isSending">ROLL DICE</BaseButton>
-        <BaseButton @click="handleJailPay" :disabled="player.balance < 50 || isSending" bgColor="green">PAY</BaseButton>
-      </div>
-    </GameModal> -->
     <ModalJail v-if="gameState.currentTurn === username && player.jailed" :playerBalance="player.balance" :isSending="isSending" @handleUserTurn="handleUserTurn"
       @handleJailPay="handleJailPay" />
 
