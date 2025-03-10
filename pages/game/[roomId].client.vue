@@ -290,26 +290,14 @@ definePageMeta({
       gameState.currentAction === 'roll' &&
       !player.jailed" @handleUserTurn="handleUserTurn" />
 
-    <ModalJail v-if="gameState.currentTurn === username && player.jailed" :playerBalance="player.balance" :isSending="isSending" @handleUserTurn="handleUserTurn"
-      @handleJailPay="handleJailPay" />
+    <ModalJail v-if="gameState.currentTurn === username && player.jailed" :playerBalance="player.balance"
+      :isSending="isSending" @handleUserTurn="handleUserTurn" @handleJailPay="handleJailPay" />
 
-    <!-- BUY MODAL -->
-    <GameModal v-if="
-      gameState.currentTurn === username && gameState.currentAction === 'buy'
-    ">
-      <h1>Do you want to buy this property?</h1>
-
-      <h3>Name: {{ currentTilePlayerOn.name }}</h3>
-      <h3>Price: {{ currentTilePlayerOn.price }}</h3>
-      <div style="display: flex; gap: 1rem">
-        <BaseButton :disabled="player.balance < currentTilePlayerOn.price || isSending"
-          @click="() => handleBuyProperty(currentTilePlayerOn.id)" bgColor="green">
-          BUY
-        </BaseButton>
-        <BaseButton @click="handlePassProperty(currentTilePlayerOn.id)" bgColor="red" :disabled="isSending">PASS
-        </BaseButton>
-      </div>
-    </GameModal>
+    <ModalBuy v-if="
+      gameState.currentTurn === username && gameState.currentAction === 'buy'" :tileName="currentTilePlayerOn.name"
+      :tilePrice="currentTilePlayerOn.price" :playerBalance="player.balance" :isSending="isSending"
+      @handleBuyProperty="handleBuyProperty(currentTilePlayerOn.id)"
+      @handlePassProperty="handlePassProperty(currentTilePlayerOn.id)" />
 
     <!-- AUCTION MODAL -->
     <GameModal v-if="
