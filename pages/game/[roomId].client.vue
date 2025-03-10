@@ -162,6 +162,17 @@ const handleJailPay = () => {
   send(JSON.stringify({ action: 'JAIL_PAY', payload: { username } }))
 }
 
+const handlePayChance = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.value.activeChance[0].amount } }))
+}
+
+const handlePayTax = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'PAY_TAX', payload: { username, tax: currentTilePlayerOn.value.taxAmount } }))
+}
+
+
 const sendTrade = () => {
   isSending.value = true
   send(JSON.stringify({
@@ -289,7 +300,7 @@ definePageMeta({
       gameState.currentTurn === username &&
       gameState.currentAction === 'roll' &&
       !player.jailed" @handleUserTurn="handleUserTurn
-      " />
+      " :isSending="isSending" />
 
     <ModalJail v-if="gameState.currentTurn === username &&
       player.jailed
@@ -307,88 +318,33 @@ definePageMeta({
       gameState.currentAction === 'auction' &&
       gameState.currentAuctionParticipant === username
     " :tileOnAuctionName="tilesState.filter((t: Tile) => t.id === gameState.tileOnAuction)[0].name"
-      :tileOnAuctionPrice="gameState.currentAuctionBid + 10" :playerBalance="player.balance"
+      :tileOnAuctionPrice="gameState.currentAuctionBid + 10" :playerBalance="player.balance" :isSending="isSending"
       @handleBidAuctionProperty="handleBidAuctionProperty(gameState.tileOnAuction)"
       @handlePassAuctionProperty="handlePassAuctionProperty(gameState.tileOnAuction)" />
 
-    <!-- PAY RENT MODAL -->
-    <GameModal v-if="
+    <ModalPayRent v-if="
       gameState.currentTurn === username &&
       gameState.currentAction === 'payRent'
-    ">
-      <h1>Pay Rent</h1>
-      <h3>Owner: {{ currentTilePlayerOn.owner }}</h3>
-      <h3 v-if="currentTilePlayerOn.type === 'bonus-property'">
-        {{
-          `${turnResult.left} + ${turnResult.right} x ${currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]}
-        = ${turnResult.left +
-          turnResult.right *
-          currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]
-          }`
-        }}
-      </h3>
-      <h3 v-else>
-        Rent:
-        {{ currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] }}
-      </h3>
-      <BaseButton @click="() => handlePayRent(currentTilePlayerOn.id)" bgColor="red" :disabled="player.balance <
-        currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] ||
-        isSending
-        ">PAY
-      </BaseButton>
-      <p v-if="
-        player.balance <
-        currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]
-      ">
-        * you don't have enough money to pay rent, mortgage something
-      </p>
-    </GameModal>
+    " :tilePlayerOn="currentTilePlayerOn" :turnResult="turnResult" :playerBalance="player.balance"
+      :isSending="isSending" @handlePayRent="handlePayRent(currentTilePlayerOn.id)" />
 
-    <!-- PAY CHANCE MODAL -->
-    <GameModal v-if="
+    <ModalPayChance v-if="
       gameState.currentTurn === username &&
       gameState.currentAction === 'chance' &&
       gameState.activeChance[0].type === 'minusBalance'
-    ">
-      <h1>Pay Chance</h1>
-      <h3>{{ gameState.activeChance[0].text }}</h3>
-      <BaseButton @click="
-        () =>
-          send(
-            JSON.stringify({
-              action: 'PAY_CHANCE',
-              payload: { username, amount: gameState.activeChance[0].amount },
-            }),
-          )
-      " bgColor="red" :disabled="player.balance < gameState.activeChance[0].amount || isSending
-        ">PAY</BaseButton>
-    </GameModal>
+    " :chanceText="gameState.activeChance[0].text" :playerBalance="player.balance"
+      :chanceAmount="gameState.activeChance[0].amount" :isSending="isSending" @handlePayChance="handlePayChance" />
 
-    <!-- PAY TAX MODAL -->
-    <GameModal v-if="
+    <ModalPayTax v-if="
       gameState.currentTurn === username &&
       gameState.currentAction === 'payTax'
-    ">
-      <h1>Pay Tax</h1>
-      <h3>You need to pay ${{ currentTilePlayerOn.taxAmount }} tax</h3>
-      <BaseButton @click="
-        () =>
-          send(
-            JSON.stringify({
-              action: 'PAY_TAX',
-              payload: { username, tax: currentTilePlayerOn.taxAmount },
-            }),
-          )
-      " bgColor="red" :disabled="player.balance < currentTilePlayerOn.taxAmount || isSending">PAY</BaseButton>
-    </GameModal>
+    " :taxAmount="currentTilePlayerOn.taxAmount" :playerBalance="player.balance" @handlePayTax="handlePayTax" />
 
     <!--SEND TRADE MODAL -->
     <TradeModal v-if="tradePlayerUsername" :tradePlayerUsername="tradePlayerUsername" :tradeTiles="tradeTiles"
       :player="player" :players="gameState.players" :boardState="boardState"
       :yourTradableProperties="getYourTradableProperties()" :playerTradableProperties="getPlayerTradableProperties()"
       @setTradePlayerUsername="(username: string) => setTradePlayerUsername(username)" @sendTrade="sendTrade" send />
-
-
 
     <!-- RECEIVE TRADE MODAL -->
     <TradeModal v-if="
