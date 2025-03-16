@@ -25,7 +25,8 @@ const tradeTiles = ref({
 })
 
 // @ts-ignore
-const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
+const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
+const { status, send, open, close, handleMessage } = useWebsocketManager(`${protocol}://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
 watch(gameState, (newState) => {
   if (Object.keys(newState).length > 0) {
