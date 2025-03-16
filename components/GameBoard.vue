@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import type { PropType } from 'vue';
+import type { Tile } from '~/types';
+
 defineProps({
   tilesState: {
-    type: Array,
+    type: Array as PropType<Tile[]>,
     required: true,
   },
   gameState: {
@@ -47,7 +50,7 @@ defineEmits(['activateTrade'])
         <!-- Top Row -->
         <div class="row horizontal-row top-row ">
           <BoardTile v-for="tile in tilesState.slice(1, 10)" :tile="tile" :players="gameState.players"
-            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[gameState.boardState.groups[0], gameState.boardState.groups[1]]" />
         </div>
         <!-- Jail Tile -->
@@ -55,7 +58,7 @@ defineEmits(['activateTrade'])
         <!-- Right Row -->
         <div class="row vertical-row right-row">
           <BoardTile v-for="tile in tilesState.slice(11, 20)" :tile="tile" :players="gameState.players"
-            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[gameState.boardState.groups[2], gameState.boardState.groups[3]]" />
         </div>
         <!-- Free Parking Tile -->
@@ -63,7 +66,7 @@ defineEmits(['activateTrade'])
         <!-- Bottom Row -->
         <div class="row horizontal-row bottom-row">
           <BoardTile v-for="tile in tilesState.slice(21, 30).reverse()" :tile="tile" :players="gameState.players"
-            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[gameState.boardState.groups[4], gameState.boardState.groups[5]]" />
         </div>
         <!-- Go to Jail Tile -->
@@ -71,7 +74,7 @@ defineEmits(['activateTrade'])
         <!-- Left Row -->
         <div class="row vertical-row left-row">
           <BoardTile v-for="tile in tilesState.slice(31, 40).reverse()" :tile="tile" :players="gameState.players"
-            @show-tile-info="(e, tile) => showTileInfo(e, tile)"
+            @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[gameState.boardState.groups[6], gameState.boardState.groups[7]]" />
         </div>
       </div>

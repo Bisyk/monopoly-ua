@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue';
+
 const selectedOption = ref(2)
-const modalContainer = ref<HTMLElement>(null);
+const modalContainer = ref<HTMLElement>({} as HTMLElement);
 
 defineEmits(['createGame', 'closeModal'])
 

@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { Group, Player, Tile } from '~/types'
 
 const props = defineProps({
   tile: {
-    type: Object,
+    type: Object as PropType<Tile>,
     required: true
   },
   players: {
-    type: Array,
+    type: Array as PropType<Player[]>,
     required: true
   },
   tileGroups: {
-    type: Array,
+    type: Array as PropType<Group[]>,
     required: false
   }
-})
+});
 
 defineEmits(['showTileInfo'])
 
@@ -44,10 +45,10 @@ const isLeftRow = computed(() => {
   return props.tile.id >= 31 && props.tile.id <= 40;
 })
 
-import type { CSSProperties } from 'vue';
+import type { CSSProperties, PropType } from 'vue';
 
 const tileGroup = computed(() => {
-  return props.tileGroups?.find(group => group.properties.includes(props.tile.id));
+  return props.tileGroups?.find((group: Group) => group.properties.includes(props.tile.id));
 })
 
 const priceStyle = computed<CSSProperties>(() => {
@@ -88,7 +89,7 @@ const starStyle = computed(() => {
 })
 
 const tileBgColor = computed(() => {
-  return props.tile.owner ? props.players.find(player => player.username === props.tile.owner)?.color : 'white';
+  return props.tile.owner ? (props.players as Player[]).find(player => player.username === props.tile.owner)?.color : 'white';
 })
 
 </script>
@@ -114,15 +115,16 @@ const tileBgColor = computed(() => {
       <p v-if="props.tile.rentLevel === 5" :style="starStyle"><span style="font-size: 2.5vmin">🌟</span></p>
     </div>
     <div v-if="props.tile.rentLevels.length && props.tile.owner" :style="priceStyle">
-      {{ props.tile.type === 'bonus-property' ? `${props.tile.rentLevels[props.tile.rentLevel]}x` : 
-      props.tile.rentLevels[props.tile.rentLevel] }}
+      {{ props.tile.type === 'bonus-property' ? `${props.tile.rentLevels[props.tile.rentLevel]}x` :
+        props.tile.rentLevels[props.tile.rentLevel] }}
     </div>
     <div class="container">
       <div class="heroContainer">
         <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" class="heroImage"
           :style="isHorizontalProperty ? { transform: 'rotate(270deg)' } : {}" />
         <div class="player-container">
-          <PlayerBase v-for="player in props.players" :key="player.id" :player="player" :tile-id="props.tile.id" />
+          <PlayerBase v-for="player in props.players" :key="player.username" :player="player"
+            :tile-id="props.tile.id" />
         </div>
       </div>
     </div>
@@ -131,12 +133,13 @@ const tileBgColor = computed(() => {
 
 
 <style lang="scss" scoped>
-.player-container{
+.player-container {
   position: absolute;
   z-index: 5;
   top: 0;
   left: 0;
 }
+
 .space {
   background: white;
   text-align: center;
