@@ -113,6 +113,9 @@ const checkIfBuybackAble = (propertyId: number) => {
 }
 
 const checkIfSellable = (propertyId: number) => {
+  const isOwner = props.player.properties.includes(propertyId)
+  if (!isOwner) return false
+
   const property = props.tilesState.find(t => t.id === propertyId)
   if (property!.type !== 'property') return false
 
