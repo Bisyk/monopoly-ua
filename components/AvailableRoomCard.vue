@@ -9,7 +9,7 @@ defineProps({
     required: true
   },
   gameId: {
-    type: Number,
+    type: String,
     required: true
   }
 })

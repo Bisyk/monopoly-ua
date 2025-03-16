@@ -3,109 +3,208 @@ import { onMounted, ref, watch, computed, useTemplateRef, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getTilePosition } from '../../utils/board'
 import { onClickOutside } from '@vueuse/core'
+import { type Group, type Player, type Tile } from '../../types'
+import { rollDice } from '../../utils/gameFunctions'
 
 const route = useRoute()
 const router = useRouter()
-const players = ref<string[]>([])
-const gameState = ref<GameState>({} as GameState)
+const players = ref<Player[]>([])
+const gameState = ref<any>({} as any)
 const username = sessionStorage.getItem('username')
-const boardState = ref<BoardState[]>([] as BoardState)
-const selectedTile = ref<BoardTile>(null)
+const selectedTile = ref<any>(null)
 const tileInfo = ref(null)
+const tileInfoStyle = ref({ top: 0, left: 0 })
+const isSending = ref(false)
+const turnResult = ref({ left: 0, right: 0 })
+const tradePlayerUsername = ref('')
+const tradeTiles = ref({
+  given: new Set(),
+  received: new Set(),
+  givenMoney: 0,
+  receivedMoney: 0
+})
 
+// @ts-ignore
 const { status, send, open, close, handleMessage } = useWebsocketManager(`ws://${location.host}/api/websocket?roomId=${route.params.roomId}`)
 
 watch(gameState, (newState) => {
   if (Object.keys(newState).length > 0) {
-    boardState.value = newState.boardState
+    gameState.value = newState
   }
+})
+
+const boardState = computed(() => {
+  return gameState.value?.boardState ?? []
 })
 
 const tilesState = computed(() => {
-  if (boardState.value[0]) {
-    return boardState.value[0].tiles
-  }
-  return []
+  return gameState.value.boardState?.tiles ?? []
 })
 
 const groupsState = computed(() => {
-  if (boardState.value[0]) {
-    return boardState.value[0].groups
-  }
-  return []
+  return gameState.value.boardState?.groups ?? []
 })
 
 const player = computed(() => {
-  return gameState.value.players.find(p => p.username === username)
+  if (!gameState.value.players) return {}
+  return gameState.value.players.find((p: Player) => p.username === username)
 })
 
 const currentTilePlayerOn = computed(() => {
-  return tilesState.value[player.value.position - 1]
+  return tilesState.value?.find((t: Tile) => t.id === player.value.position) ?? {}
 })
 
 const fullSetsGroups = computed(() => {
-  if (!boardState.value[0]) return []
-  return boardState.value[0].groups.filter(g => g.isFullSet).map(g => g.groupId)
+  return groupsState.value?.filter((g: Group) => g.isFullSet).map((g: Group) => g.groupId) ?? []
 })
 
-handleMessage((message) => {
+const getYourTradableProperties = () => {
+  const ownedAndNotMortgaged = tilesState.value.filter((t: Tile) => t.owner === username && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
+  const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
+    const isFullSet = fullSetsGroups.value.includes(t.groupId)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel > 0)
+
+    if (isFullSet && isAnyTileInFullSetUpgraded) {
+      return false
+    }
+
+    return true
+  })
+
+  return tradeable.map((t: Tile) => t.id)
+}
+
+const getPlayerTradableProperties = () => {
+  const ownedAndNotMortgaged = tilesState.value.filter((t: Tile) => t.owner === tradePlayerUsername.value && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
+  console.log(ownedAndNotMortgaged);
+  const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
+    const isFullSet = fullSetsGroups.value.includes(t.groupId)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel > 0)
+
+    if (isFullSet && isAnyTileInFullSetUpgraded) {
+      return false
+    }
+
+    return true
+  })
+
+  return tradeable.map((t: Tile) => t.id)
+}
+
+handleMessage((message: string) => {
+  isSending.value = false
   gameState.value = JSON.parse(message)
 })
 
 const handleUserTurn = () => {
-  const turnResult = rollDice()
-  send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult } }))
+  isSending.value = true
+  turnResult.value = rollDice()
+  send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult: turnResult.value } }))
 }
 
-const checkIfUpgradeable = (propertyId: number) => {
-  const property = tilesState.value[propertyId - 1]
-  if (property.type !== 'property') return false
 
-  const group = boardState.value[0].groups.find(g => g.groupId === property.groupId)
-  if (!group) return false
-
-  const propertiesInGroup = tilesState.value.filter(t => t.groupId === property.groupId)
-
-  const allOwnedBySamePlayer = propertiesInGroup.every(p => p.owner === property.owner)
-  if (!allOwnedBySamePlayer) return false
-
-  const allAtMaxRentLevel = propertiesInGroup.every(p => p.rentLevel >= 5)
-  if (allAtMaxRentLevel) return false
-
-  const isLevelEvenlyUpgraded = propertiesInGroup.every(p => p.rentLevel >= property.rentLevel)
-
-  return isLevelEvenlyUpgraded
-}
 
 const handleBuyProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'BUY_PROPERTY', payload: { username, propertyId } }))
 }
 
-const handlePassProperty = () => {
-  send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username } }))
+const handlePassProperty = (propertyId: number) => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'PASS_PROPERTY', payload: { username, propertyId } }))
 }
 
 const handleMortgageProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'MORTGAGE_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
 const handleBuyBackProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'BUY_BACK_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
 const handleUpgradeProperty = (propertyId: number) => {
+  isSending.value = true
   send(JSON.stringify({ action: 'UPGRADE_PROPERTY', payload: { username, propertyId } }))
   selectedTile.value = null
 }
 
+const handleSellProperty = (propertyId: number) => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'SELL_PROPERTY', payload: { username, propertyId } }))
+  selectedTile.value = null
+}
+
 const handlePayRent = (propertyId: number) => {
-  send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+  isSending.value = true
+  if (currentTilePlayerOn.value.type === "bonus-property") {
+    send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId, turnResult: turnResult.value } }))
+  } else {
+    send(JSON.stringify({ action: 'PAY_RENT', payload: { username, propertyId } }))
+  }
+}
+
+const handlePassAuctionProperty = (propertyId: number) => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'PASS_AUCTION_PROPERTY', payload: { username, propertyId } }))
+}
+
+const handleBidAuctionProperty = (propertyId: number) => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'BID_AUCTION_PROPERTY', payload: { username, propertyId } }))
+}
+
+const handleJailPay = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'JAIL_PAY', payload: { username } }))
+}
+
+const handlePayChance = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.value.activeChance[0].amount } }))
+}
+
+const handlePayTax = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'PAY_TAX', payload: { username, tax: currentTilePlayerOn.value.taxAmount } }))
 }
 
 
-const showTileInfo = async (event, tile) => {
+const sendTrade = () => {
+  isSending.value = true
+  send(JSON.stringify({
+    action: 'TRADE', payload: {
+      username, tradePlayerUsername: tradePlayerUsername.value, tradeTiles: {
+        given: Array.from(tradeTiles.value.given),
+        received: Array.from(tradeTiles.value.received),
+        givenMoney: tradeTiles.value.givenMoney,
+        receivedMoney: tradeTiles.value.receivedMoney
+      }
+    }
+  }))
+  tradePlayerUsername.value = ''
+  tradeTiles.value = {
+    given: new Set(),
+    received: new Set(),
+    givenMoney: 0,
+    receivedMoney: 0
+  }
+}
+
+const acceptTrade = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'ACCEPT_TRADE', payload: { username } }))
+}
+
+const declineTrade = () => {
+  isSending.value = true
+  send(JSON.stringify({ action: 'DECLINE_TRADE', payload: { username } }))
+}
+
+const showTileInfo = async (event: any, tile: Tile) => {
   const tileRect = event.target.getBoundingClientRect();
   const containerRect = document.querySelector('.gameContainer')!.getBoundingClientRect();
   selectedTile.value = tile;
@@ -121,20 +220,29 @@ const showTileInfo = async (event, tile) => {
 
   if (position === 'right') {
     left -= tileRect.width
+    top -= tileRect.height * 1.8
   }
 
   if (position === 'bottom') {
-    top -= tileRect.height / 2
+    top -= tileRect.height * 2.3
   }
 
   if (position === 'left') {
     left += tileRect.width
+    top -= tileRect.height * 1.8
   }
 
-  if (tileInfo.value) {
-    tileInfo.value.style.top = `${top}px`;
-    tileInfo.value.style.left = `${left}px`;
-  }
+  tileInfoStyle.value.top = top;
+  tileInfoStyle.value.left = left;;
+}
+
+const activateTrade = (username: string) => {
+  if (gameState.value.currentTurn !== player.value.username) return
+  tradePlayerUsername.value = username
+}
+
+const setTradePlayerUsername = (username: string) => {
+  tradePlayerUsername.value = username
 }
 
 onClickOutside(tileInfo, event => {
@@ -143,19 +251,19 @@ onClickOutside(tileInfo, event => {
 
 onMounted(async () => {
   const username = sessionStorage.getItem('username')
+  // @ts-ignore
   const { body } = await $fetch(`/games/${route.params.roomId}`)
   const { game } = JSON.parse(body)
 
+  gameState.value = game
   players.value = game.players
 
-  if (!game.players.some(u => u.username === username)) {
+  if (!game.players.some((p: Player) => p.username === username)) {
     router.push({ path: '/' })
   }
-
-  send(JSON.stringify({ action: 'JOIN_GAME', payload: { username } }))
 })
 
-
+// @ts-ignore
 definePageMeta({
   title: 'Monopoly UA | Game',
   layout: 'empty',
@@ -171,131 +279,110 @@ definePageMeta({
 </script>
 
 <template>
-  <div style="position: fixed; top: 0; left: 0; z-index: 9999; height: 100vh; width: fit-content; overflow-y: scroll;">
+  <div
+    style="position: fixed; top: 0; right: 0; z-index: 9999; height: 100vh; width: fit-content; overflow-y: scroll; max-width: 40vmin;">
     <pre>
+      {{ tradePlayerUsername }}
+      {{ tradeTiles }}
       {{ fullSetsGroups }}
       {{ gameState }}
     </pre>
   </div>
 
-  <div class="gameContainer">
+  <div class="gameContainer" v-if="gameState">
+    <TileInfoCard v-if="selectedTile" ref="tileInfo" @mortgageProperty="handleMortgageProperty"
+      @buyBackProperty="handleBuyBackProperty" @sellProperty="handleSellProperty"
+      @upgradeProperty="handleUpgradeProperty" :selectedTile="selectedTile" :currentTurn="gameState.currentTurn"
+      :username="username" :player="player" :tilesState="tilesState" :boardState="boardState" :groupsState="groupsState"
+      :fullSetsGroups="fullSetsGroups" :tileInfoStyle="tileInfoStyle" :isSending="isSending" />
 
-    <!-- Tile Info -->
-    <div v-if="selectedTile" class="tileInfo" ref="tileInfo">
-      <h3>{{ selectedTile.name }}</h3>
-      <div style="display: flex; width: 100%; justify-content: center; gap: 1rem;">
-        <BaseButton
-          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && !selectedTile.mortgaged"
-          @click="handleMortgageProperty(selectedTile.id)" bgColor="red">SELL
-        </BaseButton>
+    <ModalRoll v-if="
+      gameState.currentTurn === username &&
+      gameState.currentAction === 'roll' &&
+      !player.jailed" @handleUserTurn="handleUserTurn
+      " :isSending="isSending" />
 
-        <BaseButton
-          v-if="gameState.currentTurn === username && player.properties.includes(selectedTile.id) && selectedTile.mortgaged"
-          @click="handleBuyBackProperty(selectedTile.id)" bgColor="green"
-          :disabled="player.balance < selectedTile.buybackPrice">BUY BACK
-        </BaseButton>
+    <ModalJail v-if="gameState.currentTurn === username &&
+      player.jailed
+    " :playerBalance="player.balance" :isSending="isSending" @handleUserTurn="handleUserTurn"
+      @handleJailPay="handleJailPay" />
 
-        <BaseButton v-if="
-          groupsState.find(g => g.groupId === selectedTile.groupId).isUpgradeAvailable &&
-          checkIfUpgradeable(selectedTile.id) &&
-          gameState.currentTurn === username
-          && player.properties.includes(selectedTile.id)
-          && fullSetsGroups.includes(selectedTile.groupId)" @click=" handleUpgradeProperty(selectedTile.id)">
-          UPGRADE
-        </BaseButton>
-      </div>
+    <ModalBuy v-if="
+      gameState.currentTurn === username &&
+      gameState.currentAction === 'buy'
+    " :tileName="currentTilePlayerOn.name" :tilePrice="currentTilePlayerOn.price" :playerBalance="player.balance"
+      :isSending="isSending" @handleBuyProperty="handleBuyProperty(currentTilePlayerOn.id)"
+      @handlePassProperty="handlePassProperty(currentTilePlayerOn.id)" />
 
-      <div v-if="selectedTile.type === 'property'">
-        <p>💰 Base Rent: {{ selectedTile.rentLevels[0] }}</p>
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-          <div style="display: flex; justify-content: space-between;">
-            <div>⭐ </div>
-            <div>{{ selectedTile.rentLevels[1] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between;">
-            <div>⭐⭐ </div>
-            <div>{{ selectedTile.rentLevels[2] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between;">
-            <div>⭐⭐⭐ </div>
-            <div>{{ selectedTile.rentLevels[3] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between;">
-            <div>⭐⭐⭐⭐ </div>
-            <div>{{ selectedTile.rentLevels[4] }}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between;">
-            <div>⭐⭐⭐⭐⭐ </div>
-            <div>{{ selectedTile.rentLevels[5] }}</div>
-          </div>
-        </div>
-      </div>
-      <p>💰 Buy Price: {{ selectedTile.price }}</p>
-      <p>💰 Mortgage Price: {{ selectedTile.mortgagePrice }}</p>
-      <p>💰 Buyback Price: {{ selectedTile.buybackPrice }}</p>
-    </div>
+    <ModalAuction v-if="
+      gameState.currentAction === 'auction' &&
+      gameState.currentAuctionParticipant === username
+    " :tileOnAuctionName="tilesState.filter((t: Tile) => t.id === gameState.tileOnAuction)[0].name"
+      :tileOnAuctionPrice="gameState.currentAuctionBid + 10" :playerBalance="player.balance" :isSending="isSending"
+      @handleBidAuctionProperty="handleBidAuctionProperty(gameState.tileOnAuction)"
+      @handlePassAuctionProperty="handlePassAuctionProperty(gameState.tileOnAuction)" />
 
-    <!-- ROLL MODAL -->
-    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'roll'">
-      <div>
-        <h1>It's your turn!</h1>
-        <h3 style="margin-bottom: 1rem;">Roll the dice to move your piece.</h3>
-      </div>
-      <BaseButton @click="handleUserTurn" style="position: absolute; z-index: 11111;">ROLL DICE</BaseButton>
-    </GameModal>
+    <ModalPayRent v-if="
+      gameState.currentTurn === username &&
+      gameState.currentAction === 'payRent'
+    " :tilePlayerOn="currentTilePlayerOn" :turnResult="turnResult" :playerBalance="player.balance"
+      :isSending="isSending" @handlePayRent="handlePayRent(currentTilePlayerOn.id)" />
 
-    <!-- BUY MODAL -->
-    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'buy'">
-      <h1>Do you want to buy this property?</h1>
+    <ModalPayChance v-if="
+      gameState.currentTurn === username &&
+      gameState.currentAction === 'chance' &&
+      gameState.activeChance[0].type === 'minusBalance'
+    " :chanceText="gameState.activeChance[0].text" :playerBalance="player.balance"
+      :chanceAmount="gameState.activeChance[0].amount" :isSending="isSending" @handlePayChance="handlePayChance" />
 
-      <h3>Name: {{ currentTilePlayerOn.name }}</h3>
-      <h3>Price: {{ currentTilePlayerOn.price }}</h3>
-      <div style="display: flex; gap: 1rem;">
-        <BaseButton :disabled="player.balance < currentTilePlayerOn.price"
-          @click="() => handleBuyProperty(currentTilePlayerOn.id)" bgColor="green">
-          BUY
-        </BaseButton>
-        <BaseButton @click="handlePassProperty" bgColor="red">PASS
-        </BaseButton>
-      </div>
-    </GameModal>
+    <ModalPayTax v-if="
+      gameState.currentTurn === username &&
+      gameState.currentAction === 'payTax'
+    " :taxAmount="currentTilePlayerOn.taxAmount" :playerBalance="player.balance" @handlePayTax="handlePayTax" />
 
-    <!-- PAY RENT MODAL -->
-    <GameModal v-if="gameState.currentTurn === username && gameState.currentAction === 'payRent'">
-      <h1>Pay Rent</h1>
-      <h3>Owner: {{ currentTilePlayerOn.owner }}</h3>
-      <h3>Rent: {{ currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel] }}</h3>
-      <BaseButton @click="() => handlePayRent(currentTilePlayerOn.id)" bgColor="red"
-        :disabled="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">PAY
-      </BaseButton>
-      <p v-if="player.balance < currentTilePlayerOn.rentLevels[currentTilePlayerOn.rentLevel]">* you don't have enough
-        money to pay rent, mortgage something</p>
-    </GameModal>
+    <!--SEND TRADE MODAL -->
+    <TradeModal v-if="tradePlayerUsername" :tradePlayerUsername="tradePlayerUsername" :tradeTiles="tradeTiles"
+      :player="player" :players="gameState.players" :boardState="boardState"
+      :yourTradableProperties="getYourTradableProperties()" :playerTradableProperties="getPlayerTradableProperties()"
+      @setTradePlayerUsername="(username: string) => setTradePlayerUsername(username)" @sendTrade="sendTrade" send />
+
+    <!-- RECEIVE TRADE MODAL -->
+    <TradeModal v-if="
+      gameState.currentAction === 'trade' &&
+      gameState.activeTrade.to === username" :tradePlayerUsername="tradePlayerUsername"
+      :activeTrade="gameState.activeTrade" :boardState="boardState" @acceptTrade="acceptTrade"
+      @declineTrade="declineTrade" receive />
 
     <!-- GAME BOARD -->
-    <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" />
+    <GameBoard :tilesState="tilesState" :gameState="gameState" :showTileInfo="showTileInfo" :players="players"
+      :player="player" @activateTrade="(username: string) => activateTrade(username)" />
   </div>
 
-
-
-
+  <div v-else>
+    Loading...
+  </div>
 </template>
 
 <style scoped lang="scss">
 .gameContainer {
   position: relative;
-  max-width: fit-content + 1rem;
+  max-width: 100%;
   max-height: fit-content;
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 4fr;
 
-  .tileInfo {
-    position: absolute;
-    z-index: 11;
-    background-color: white;
-    padding: 1rem;
-    border-radius: 12px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    min-width: 10vw;
+
+
+  .playersContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .player {
+    border: 1px solid black;
   }
 }
 </style>

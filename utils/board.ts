@@ -1,4 +1,4 @@
-export const getTilePosition = tileId => {
+export const getTilePosition = (tileId: number) => {
   if (tileId >= 1 && tileId <= 10) {
     return "top";
   }

@@ -1,7 +1,10 @@
 import prisma from "~/lib/prisma";
+import { CreatedGame } from "~/types";
 
 export default defineEventHandler(async event => {
-  const body: CreatedGame = await readBody(event);
+  console.log(`POST /games`);
+  const data: string = await readBody(event);
+  const body: CreatedGame = JSON.parse(data);
 
   const room = await prisma.room.create({
     data: {
@@ -11,5 +14,8 @@ export default defineEventHandler(async event => {
       status: "PENDING",
     },
   });
+
+  console.log("room created: ", room);
+
   return { body: JSON.stringify({ room: room }) };
 });

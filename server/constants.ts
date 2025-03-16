@@ -10,7 +10,7 @@ class PropertyTile {
   public mortgaged: boolean;
   public position: number;
   public rentLevel: number;
-  public rentLevels: number;
+  public rentLevels: number[];
   public mortgagePrice: number;
   public buybackPrice: number;
 
@@ -113,6 +113,8 @@ export const initialPlayersState = {
   ownedPropertiesGroup: [],
   jailed: false,
   turnsInJail: 0,
+  doublesInRow: 0,
+  bonusRoll: false,
 };
 
 export const initialTilesState = [
@@ -135,6 +137,7 @@ export const initialTilesState = [
   {
     id: 5,
     type: "tax",
+    taxAmount: 100,
     spriteName: "tax",
     position: 5,
     name: "Tax",
@@ -148,6 +151,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "Mercedes-Benz",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   new PropertyTile(7, 2, "staff", "Staff", 100, [6, 30, 90, 270, 400, 550]),
   {
@@ -191,6 +196,8 @@ export const initialTilesState = [
     price: 150,
     mortgaged: false,
     name: "Ukrnafta",
+    rentLevel: 0,
+    rentLevels: [4, 10],
   },
   new PropertyTile(
     14,
@@ -217,6 +224,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "Porsche",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   new PropertyTile(
     17,
@@ -289,6 +298,8 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "BMW",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   new PropertyTile(27, 6, "okko", "OKKO", 260, [22, 110, 330, 800, 975, 1150]),
   new PropertyTile(28, 6, "wog", "WOG", 260, [22, 110, 330, 800, 975, 1150]),
@@ -302,6 +313,8 @@ export const initialTilesState = [
     price: 150,
     mortgaged: false,
     name: "Naftogaz",
+    rentLevel: 0,
+    rentLevels: [4, 10],
   },
   new PropertyTile(
     30,
@@ -358,10 +371,13 @@ export const initialTilesState = [
     owner: "",
     mortgaged: false,
     name: "Toyota",
+    rentLevel: 0,
+    rentLevels: [25, 50, 100, 200],
   },
   {
     id: 37,
     type: "luxury-tax",
+    taxAmount: 75,
     spriteName: "luxurytax",
     position: 37,
     name: "Luxury Tax",
@@ -389,6 +405,29 @@ export const initialTilesState = [
     400,
     [50, 200, 600, 1400, 1700, 2000]
   ),
+];
+
+export const chances = [
+  {
+    type: "plusBalance",
+    amount: 100,
+    text: "You won a lottery! And get 100",
+  },
+  {
+    type: "minusBalance",
+    amount: 100,
+    text: "You lost a lottery! And lost 100",
+  },
+  {
+    type: "goToJail",
+    tileId: 11,
+    text: "Go to Jail for corruption!",
+  },
+  {
+    type: "plusBalance",
+    amount: 50,
+    text: "You won a beauty competition! And get 50",
+  },
 ];
 
 export const colors = [

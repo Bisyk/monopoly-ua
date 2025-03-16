@@ -2,7 +2,8 @@
 import { useRouter } from 'vue-router'
 import AvailableRoomCard from './AvailableRoomCard.vue'
 import CreateRoomModal from './CreateRoomModal.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import type { CreatedGame } from '~/types'
 
 const props = defineProps({
   username: { type: String, required: true },
@@ -12,13 +13,14 @@ const allGames = ref<CreatedGame[]>([])
 const roomConnections = ref<{ [key: string]: { status: any, send: any, open: any, close: any } }>({})
 const isCreateGameModalActive = ref(false)
 const router = useRouter()
+// @ts-ignore
 const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/rooms`)
 
 setInterval(() => {
   send('GET_GAMES')
 }, 1000)
 
-handleMessage((message) => {
+handleMessage((message: string) => {
   allGames.value = JSON.parse(message)
 })
 
@@ -33,22 +35,21 @@ const isConnectedToRoom = computed(() => {
 watch(allGames, () => {
   if (allGames.value.some(game => game.players.includes(props.username) && game.status === 'PENDING')) {
     const game = allGames.value.find(game => game.players.includes(props.username) && game.status === 'PENDING')
-    if (game?.players.length === game?.maxPlayers) {
+    if (game!.players.length === game?.maxPlayers) {
       startGame(game)
     }
   }
 })
 
 const createRoom = async (maxPlayers: number) => {
-
   try {
-    const { body } = await $fetch('/games', {
+    const { body } = await fetch('/games', {
       method: 'POST',
-      body: {
+      body: JSON.stringify({
         players: [props.username],
         createdBy: props.username,
         maxPlayers,
-      }
+      })
     })
 
     isCreateGameModalActive.value = false
@@ -63,9 +64,9 @@ const connectRoom = async (roomId: number) => {
   }
 
   try {
-    await $fetch('/games', {
+    await fetch('/games', {
       method: 'PUT',
-      body: { action: { type: 'JOIN_ROOM' }, payload: { username: props.username, roomId } }
+      body: JSON.stringify({ action: { type: 'JOIN_ROOM' }, payload: { username: props.username, roomId } })
     });
   } catch (error) {
     console.error(error);
@@ -76,7 +77,7 @@ const startGame = async (game: CreatedGame) => {
   try {
     for (const player of game.players) {
       if (player === props.username) {
-        router.push({path: `/game/${game.id}`})
+        router.push({ path: `/game/${game.id}` })
       }
     }
   } catch (error) {
