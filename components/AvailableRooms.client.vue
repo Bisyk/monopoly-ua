@@ -14,7 +14,8 @@ const roomConnections = ref<{ [key: string]: { status: any, send: any, open: any
 const isCreateGameModalActive = ref(false)
 const router = useRouter()
 // @ts-ignore
-const { send, handleMessage } = useWebsocketManager(`ws://${location.host}/api/rooms`)
+const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
+const { send, handleMessage } = useWebsocketManager(`${protocol}://${location.host}/api/rooms`)
 
 setInterval(() => {
   send('GET_GAMES')
