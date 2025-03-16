@@ -14,6 +14,12 @@ export default defineNuxtConfig({
   },
   modules: ["@pinia/nuxt", "@nuxt/fonts", "@prisma/nuxt"],
   vite: {
+    resolve: {
+      alias: {
+        ".prisma/client/index-browser":
+          "./node_modules/.prisma/client/index-browser.js",
+      },
+    },
     css: {
       preprocessorOptions: {
         scss: {
