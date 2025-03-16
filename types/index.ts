@@ -1,5 +1,6 @@
 // export { Tile, Player };
 
+type GameStatuses = "PENDING" | "STARTED" | "ENDED";
 export interface Tile {
   id: number;
   groupId: number;
@@ -37,4 +38,40 @@ export interface Group {
   upgradePrice: number;
   isFullSet: boolean;
   isUpgradeAvailable: boolean;
+}
+
+export interface CreatedGame {
+  id: string;
+  players: string[];
+  createdBy: string;
+  maxPlayers: number;
+  status: GameStatuses;
+  createdAt: string;
+}
+
+export interface GameState {
+  id: string;
+  associatedRoomId: string;
+  players: Player[];
+  currentTurn: string;
+  boardState: BoardState;
+  currentAction: string;
+  auctionParticipants: string[];
+  currentAuctionParticipant?: string;
+  currentAuctionBid?: number;
+  tileOnAuction?: number;
+  activeChance: Chance[];
+  activeTrade: Record<string, any>;
+}
+
+export interface BoardState {
+  tiles: Tile[];
+  groups: Group[];
+}
+
+export interface Chance {
+  type: string;
+  amount?: number;
+  text?: string;
+  tileId?: number;
 }

@@ -7,17 +7,18 @@ import {
   initialPlayersState,
   initialTilesState,
 } from "../constants";
+import { GameState } from "../../types";
 
 export default defineWebSocketHandler({
   async open(peer) {
     const roomId = getRoomIdFromPeer(peer!.request!.url!);
     peer.subscribe(roomId);
 
-    const game = await prisma.game.findUnique({
+    const game = (await prisma.game.findUnique({
       where: {
         associatedRoomId: roomId,
       },
-    });
+    })) as GameState;
 
     if (game) {
       console.log("game in websocket found", game);

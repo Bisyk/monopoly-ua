@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import type { PropType } from 'vue'
+import type { BoardState, Group, Player, Tile } from '~/types'
+
 defineEmits(['mortgageProperty', 'buyBackProperty', 'upgradeProperty', 'sellProperty'])
 
 const props = defineProps({
   selectedTile: {
-    type: Object,
+    type: Object as PropType<Tile>,
     required: true,
   },
   currentTurn: {
@@ -15,23 +18,23 @@ const props = defineProps({
     required: true,
   },
   player: {
-    type: Object,
+    type: Object as PropType<Player>,
     required: true,
   },
   tilesState: {
-    type: Array,
+    type: Array as PropType<Tile[]>,
     required: true,
   },
   boardState: {
-    type: Object,
+    type: Object as PropType<BoardState>,
     required: true,
   },
   groupsState: {
-    type: Array,
+    type: Array as PropType<Group[]>,
     required: true,
   },
   fullSetsGroups: {
-    type: Array,
+    type: Array as PropType<Number[]>,
     required: true,
   },
   tileInfoStyle: {
@@ -46,14 +49,14 @@ const props = defineProps({
 
 const checkIfUpgradeable = (propertyId: number) => {
   const property = props.tilesState.find(t => t.id === propertyId)
-  if (property.type !== 'property') return false
+  if (property!.type !== 'property') return false
 
-  const group = props.boardState.groups.find(g => g.groupId === property.groupId)
+  const group = props.boardState.groups.find(g => g.groupId === property!.groupId)
   if (!group) return false
 
-  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property.groupId)
+  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property!.groupId)
 
-  const allOwnedBySamePlayer = propertiesInGroup.every(p => p.owner === property.owner)
+  const allOwnedBySamePlayer = propertiesInGroup.every(p => p.owner === property!.owner)
   if (!allOwnedBySamePlayer) return false
 
   const allAtMaxRentLevel = propertiesInGroup.every(p => p.rentLevel >= 5)
@@ -65,31 +68,31 @@ const checkIfUpgradeable = (propertyId: number) => {
   const isOwner = props.player.properties.includes(propertyId)
   if (!isOwner) return false
 
-  const isUpgradable = props.groupsState.find(g => g.groupId === property.groupId).isUpgradeAvailable
+  const isUpgradable = props.groupsState.find(g => g.groupId === property!.groupId)!.isUpgradeAvailable
   if (!isUpgradable) return false
 
-  const isFullSet = props.fullSetsGroups.includes(property.groupId)
+  const isFullSet = props.fullSetsGroups.includes(property!.groupId)
   if (!isFullSet) return false
 
-  const isLevelEvenlyUpgraded = propertiesInGroup.every(p => p.rentLevel >= property.rentLevel)
+  const isLevelEvenlyUpgraded = propertiesInGroup.every(p => p.rentLevel >= property!.rentLevel)
 
   return isLevelEvenlyUpgraded
 }
 
 const checkIfMortgageable = (propertyId: number) => {
   const property = props.tilesState.find(t => t.id === propertyId)
-  if (!['car', 'property', 'bonus-property'].includes(property.type)) return false
+  if (!['car', 'property', 'bonus-property'].includes(property!.type)) return false
 
   const isOwner = props.player.properties.includes(propertyId)
   if (!isOwner) return false
 
-  const isMortgaged = property.mortgaged
+  const isMortgaged = property!.mortgaged
   if (isMortgaged) return false
 
-  const isRentLevelZero = property.rentLevel === 0
+  const isRentLevelZero = property!.rentLevel === 0
   if (!isRentLevelZero) return false
 
-  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property.groupId)
+  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property!.groupId)
 
   const isAnyPropertyUpgraded = propertiesInGroup.some(p => p.rentLevel > 0)
 
@@ -98,12 +101,12 @@ const checkIfMortgageable = (propertyId: number) => {
 
 const checkIfBuybackAble = (propertyId: number) => {
   const property = props.tilesState.find(t => t.id === propertyId)
-  if (!['car', 'property', 'bonus-property'].includes(property.type)) return false
+  if (!['car', 'property', 'bonus-property'].includes(property!.type)) return false
 
   const isOwner = props.player.properties.includes(propertyId)
   if (!isOwner) return false
 
-  const isMortgaged = property.mortgaged
+  const isMortgaged = property!.mortgaged
   if (!isMortgaged) return false
 
   return true
@@ -111,16 +114,16 @@ const checkIfBuybackAble = (propertyId: number) => {
 
 const checkIfSellable = (propertyId: number) => {
   const property = props.tilesState.find(t => t.id === propertyId)
-  if (property.type !== 'property') return false
+  if (property!.type !== 'property') return false
 
-  if (property.rentLevel < 1) return false
+  if (property!.rentLevel < 1) return false
 
-  const group = props.boardState.groups.find(g => g.groupId === property.groupId)
+  const group = props.boardState.groups.find(g => g.groupId === property!.groupId)
   if (!group) return false
 
-  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property.groupId)
+  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property!.groupId)
 
-  const notLowerThanAnyOtherProperty = propertiesInGroup.every(p => p.rentLevel <= property.rentLevel)
+  const notLowerThanAnyOtherProperty = propertiesInGroup.every(p => p.rentLevel <= property!.rentLevel)
 
   return notLowerThanAnyOtherProperty
 }
@@ -156,7 +159,7 @@ const checkIfSellable = (propertyId: number) => {
         checkIfUpgradeable(selectedTile.id) &&
         props.currentTurn === username
       " @click="$emit('upgradeProperty', selectedTile.id)" :disabled="player.balance <
-        groupsState.find((g) => g.groupId === selectedTile.groupId)
+        groupsState.find((g) => g.groupId === selectedTile.groupId)!
           .upgradePrice || isSending
         " bgColor="green">
         UPGRADE

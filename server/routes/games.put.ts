@@ -9,7 +9,10 @@ import {
 export default defineEventHandler(async event => {
   console.log("PUT /games");
 
-  const { action, payload } = await readBody(event);
+  const data: string = await readBody(event);
+  const body = JSON.parse(data);
+
+  const { action, payload } = body;
 
   if (action.type === "JOIN_ROOM") {
     console.log("PUT /games JOIN_ROOM");

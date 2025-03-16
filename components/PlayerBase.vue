@@ -1,24 +1,21 @@
-<template>
-  <div v-if="isPlayerOnTile" class="player-token"></div>
-</template>
-
 <script setup lang="ts">
-import { defineProps, computed } from 'vue'
+import { defineProps, computed, type PropType } from 'vue'
+import type { Player } from '~/types'
 
-const colorMap = {
-  "#9999FF": "#0000FF", // blue
-  "#99CC99": "#008000", // green
-  "#FF9999": "#FF0000", // red
-  "#FFFF99": "#FFFF00", // yellow
-  "#CC99CC": "#800080", // purple
-  "#FFCC99": "#FFA500", // orange
-  "#CC9980": "#8B4513", // brown
-  "#FFE6EB": "#FFC0CB", // pink
+const colorMap: Record<string, string> = {
+  "#9999FF": "#6666FF", // light blue
+  "#99CC99": "#66CC66", // light green
+  "#FF9999": "#FF6666", // light red
+  "#FFFF99": "#FFFF66", // light yellow
+  "#CC99CC": "#DDA0DD", // light purple
+  "#FFCC99": "#FFB266", // light orange
+  "#CC9980": "#D2B48C", // light brown
+  "#FFE6EB": "#FFB6C1", // light pink
 }
 
 const props = defineProps({
   player: {
-    type: Object,
+    type: Object as PropType<Player>,
     required: true
   },
   tileId: {
@@ -29,18 +26,27 @@ const props = defineProps({
 
 const isPlayerOnTile = computed(() => props.player.position === props.tileId)
 
-const borderColor = colorMap[props.player.color]
+const borderColor = computed(() => {
+  // Safely return the border color or a fallback (transparent)
+  return colorMap[props.player.color] || 'black'
+})
 
 </script>
+
+<template>
+  <div v-if="isPlayerOnTile" class="player-token" :style="{
+    backgroundColor: player.color,
+    borderColor: borderColor
+  }"></div>
+</template>
 
 <style scoped>
 .player-token {
   width: 3vmin;
   aspect-ratio: 1/1;
-  background-color: v-bind(player.color);
-  border: 0.5vh solid v-bind(borderColor);
   margin: 0.2vh;
   border-radius: 50%;
   transition: transform 0.5s ease;
+  border: 0.5vmin solid;
 }
 </style>
