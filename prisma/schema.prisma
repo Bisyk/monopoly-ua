@@ -31,8 +31,8 @@ model Game {
   currentAuctionParticipant String?
   currentAuctionBid         Int?
   tileOnAuction             Int?
-  activeChance              Chance[]
-  activeTrade               Json
+  activeChance              Chance
+  activeTrade               Trade
 }
 
 type Player {
@@ -91,3 +91,11 @@ type Chance {
   text   String?
 }
 
+type Trade {
+  from          String?
+  to            String?
+  given         Int[]
+  received      Int[]
+  givenMoney    Int?
+  receivedMoney Int?
+}

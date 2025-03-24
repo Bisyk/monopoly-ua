@@ -1,3 +1,5 @@
+import type { Chance } from "../types/index";
+
 class PropertyTile {
   public id: number;
   public groupId: number;
@@ -407,7 +409,7 @@ export const initialTilesState = [
   ),
 ];
 
-export const chances = [
+export const chances: Chance[] = [
   {
     type: "plusBalance",
     amount: 100,

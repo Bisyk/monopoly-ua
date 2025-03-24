@@ -165,7 +165,7 @@ const handleJailPay = () => {
 
 const handlePayChance = () => {
   isSending.value = true
-  send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.value.activeChance[0].amount } }))
+  send(JSON.stringify({ action: 'PAY_CHANCE', payload: { username, amount: gameState.value.activeChance.amount } }))
 }
 
 const handlePayTax = () => {
@@ -332,9 +332,9 @@ definePageMeta({
     <ModalPayChance v-if="
       gameState.currentTurn === username &&
       gameState.currentAction === 'chance' &&
-      gameState.activeChance[0].type === 'minusBalance'
-    " :chanceText="gameState.activeChance[0].text" :playerBalance="player.balance"
-      :chanceAmount="gameState.activeChance[0].amount" :isSending="isSending" @handlePayChance="handlePayChance" />
+      gameState.activeChance.type === 'minusBalance'
+    " :chanceText="gameState.activeChance.text" :playerBalance="player.balance"
+      :chanceAmount="gameState.activeChance.amount" :isSending="isSending" @handlePayChance="handlePayChance" />
 
     <ModalPayTax v-if="
       gameState.currentTurn === username &&

@@ -3,19 +3,20 @@
 type GameStatuses = "PENDING" | "STARTED" | "ENDED";
 export interface Tile {
   id: number;
-  groupId: number;
+  groupId?: number | null;
   spriteName: string;
   name: string;
-  price: number;
+  price: number | null;
   type: string;
-  owner: string;
-  houses: number;
-  mortgaged: boolean;
+  owner: string | null;
+  houses: number | null;
+  mortgaged: boolean | null;
   position: number;
-  rentLevel: number;
-  rentLevels: number[];
-  mortgagePrice: number;
-  buybackPrice: number;
+  rentLevel: number | null;
+  rentLevels: number[] | null;
+  mortgagePrice: number | null;
+  buybackPrice: number | null;
+  taxAmount: number | null;
 }
 
 export interface Player {
@@ -35,7 +36,7 @@ export interface Group {
   groupId: number;
   color: string;
   properties: number[];
-  upgradePrice: number;
+  upgradePrice: number | null;
   isFullSet: boolean;
   isUpgradeAvailable: boolean;
 }
@@ -50,18 +51,19 @@ export interface CreatedGame {
 }
 
 export interface GameState {
+  players: Player[];
+  gameLog: { username: string; msg: string }[];
+  boardState: BoardState;
+  activeChance: Chance;
   id: string;
   associatedRoomId: string;
-  players: Player[];
   currentTurn: string;
-  boardState: BoardState;
   currentAction: string;
   auctionParticipants: string[];
-  currentAuctionParticipant?: string;
-  currentAuctionBid?: number;
-  tileOnAuction?: number;
-  activeChance: Chance[];
-  activeTrade: Record<string, any>;
+  currentAuctionParticipant?: string | null;
+  currentAuctionBid?: number | null;
+  tileOnAuction?: number | null;
+  activeTrade: Trade | null;
 }
 
 export interface BoardState {
@@ -70,8 +72,17 @@ export interface BoardState {
 }
 
 export interface Chance {
-  type: string;
-  amount?: number;
-  text?: string;
-  tileId?: number;
+  type: string | null;
+  amount?: number | null;
+  text?: string | null;
+  tileId?: number | null;
+}
+
+export interface Trade {
+  from: string | null;
+  to: string | null;
+  given: number[];
+  received: number[];
+  givenMoney: number | null;
+  receivedMoney: number | null;
 }
