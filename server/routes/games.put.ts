@@ -67,10 +67,10 @@ export default defineEventHandler(async event => {
           activeTrade: {
             from: "",
             to: "",
-            tilesGiven: [],
-            tilesReceived: [],
-            moneyGiven: 0,
-            moneyReceived: 0,
+            given: [],
+            received: [],
+            givenMoney: 0,
+            receivedMoney: 0,
           },
           boardState: {
             tiles: initialTilesState,
