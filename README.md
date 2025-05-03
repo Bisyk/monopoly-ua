@@ -4,6 +4,12 @@ Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduct
 
 ## Setup
 
+Create MongoDB database (free tier on MongoDB Atlas)
+
+Create .env inside root
+
+Fill the DATABASE_URL variable inside .env with the database URL
+
 Make sure to install dependencies:
 
 ```bash
