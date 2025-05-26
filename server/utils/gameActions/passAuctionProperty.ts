@@ -10,8 +10,16 @@ export const passAuctionProperty = async (
   const propertyId = parsedMessage.payload.propertyId;
   const playerToPassUsername = parsedMessage.payload.username;
 
+  const playerToPassIdxInAuction = game.auctionParticipants.findIndex(
+    (p: string) => p === playerToPassUsername
+  );
+
   const remainingParticipants = game.auctionParticipants.filter(
     (p: string) => p !== playerToPassUsername
+  );
+
+  const tileOnAuction = game.boardState.tiles.find(
+    (t: Tile) => t.id === propertyId
   );
 
   if (!remainingParticipants.length) {
@@ -19,7 +27,10 @@ export const passAuctionProperty = async (
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
   }
 
-  if (remainingParticipants.length === 1) {
+  if (
+    remainingParticipants.length === 1 &&
+    game.currentAuctionBid! > tileOnAuction!.price!
+  ) {
     const winner = game.players.find(
       (p: Player) => p.username === remainingParticipants[0]
     );
@@ -34,6 +45,9 @@ export const passAuctionProperty = async (
   }
 
   game.auctionParticipants = remainingParticipants;
-  game.currentAuctionParticipant = game.auctionParticipants[0];
+  game.currentAuctionParticipant =
+    game.auctionParticipants[
+      playerToPassIdxInAuction % remainingParticipants.length
+    ];
   return;
 };
