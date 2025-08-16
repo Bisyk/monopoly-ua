@@ -165,6 +165,8 @@
     place-items: center;
     height: 100vh;
     gap: 4vmin;
+    margin-right: 10vmin;
+    border: 1px solid red;
 
     .players-container {
       padding: 3.5vmin 0 3.5vmin 0;

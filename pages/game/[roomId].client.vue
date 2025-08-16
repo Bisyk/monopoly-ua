@@ -63,7 +63,7 @@ const getYourTradableProperties = () => {
   const ownedAndNotMortgaged = tilesState.value.filter((t: Tile) => t.owner === username && ['car', 'property', 'bonus-property'].includes(t.type) && !t.mortgaged)
   const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
     const isFullSet = fullSetsGroups.value.includes(t.groupId)
-    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel > 0)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel! > 0)
 
     if (isFullSet && isAnyTileInFullSetUpgraded) {
       return false
@@ -80,7 +80,7 @@ const getPlayerTradableProperties = () => {
   console.log(ownedAndNotMortgaged);
   const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
     const isFullSet = fullSetsGroups.value.includes(t.groupId)
-    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel > 0)
+    const isAnyTileInFullSetUpgraded = tilesState.value.some((tile: Tile) => tile.groupId === t.groupId && tile.rentLevel! > 0)
 
     if (isFullSet && isAnyTileInFullSetUpgraded) {
       return false
@@ -102,8 +102,6 @@ const handleUserTurn = () => {
   turnResult.value = rollDice()
   send(JSON.stringify({ action: 'ROLL_DICE', payload: { username, turnResult: turnResult.value } }))
 }
-
-
 
 const handleBuyProperty = (propertyId: number) => {
   isSending.value = true
@@ -372,8 +370,6 @@ definePageMeta({
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 4fr;
-
-
 
   .playersContainer {
     display: flex;
