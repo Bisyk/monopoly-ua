@@ -5,6 +5,8 @@ import { getTilePosition } from "../../utils/board";
 import { onClickOutside } from "@vueuse/core";
 import { useGameActions } from "../../composables/useGameActions";
 import type { Player, Tile } from "~/types";
+import { useWebsocketManager } from "~/composables/useWebsocketManager";
+import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties";
 
 const route = useRoute();
 const router = useRouter();
@@ -46,55 +48,8 @@ const {
   handlePayTax,
   handleSendTrade,
   handleAcceptTrade,
-  handleDeclineTrade
+  handleDeclineTrade,
 } = useGameActions(send, username!);
-
-const getYourTradableProperties = () => {
-  const ownedAndNotMortgaged = tilesState.value.filter(
-    (t: Tile) =>
-      t.owner === username &&
-      ["car", "property", "bonus-property"].includes(t.type) &&
-      !t.mortgaged
-  );
-  const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
-    const isFullSet = fullSetsGroups.value.includes(t.groupId);
-    const isAnyTileInFullSetUpgraded = tilesState.value.some(
-      (tile: Tile) => tile.groupId === t.groupId && tile.rentLevel! > 0
-    );
-
-    if (isFullSet && isAnyTileInFullSetUpgraded) {
-      return false;
-    }
-
-    return true;
-  });
-
-  return tradeable.map((t: Tile) => t.id);
-};
-
-const getPlayerTradableProperties = () => {
-  const ownedAndNotMortgaged = tilesState.value.filter(
-    (t: Tile) =>
-      t.owner === tradePlayerUsername.value &&
-      ["car", "property", "bonus-property"].includes(t.type) &&
-      !t.mortgaged
-  );
-  console.log(ownedAndNotMortgaged);
-  const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
-    const isFullSet = fullSetsGroups.value.includes(t.groupId);
-    const isAnyTileInFullSetUpgraded = tilesState.value.some(
-      (tile: Tile) => tile.groupId === t.groupId && tile.rentLevel! > 0
-    );
-
-    if (isFullSet && isAnyTileInFullSetUpgraded) {
-      return false;
-    }
-
-    return true;
-  });
-
-  return tradeable.map((t: Tile) => t.id);
-};
 
 handleMessage((message: string) => {
   isSending.value = false;
@@ -309,8 +264,16 @@ definePageMeta({
       :player="player"
       :players="gameState.players"
       :boardState="boardState"
-      :yourTradableProperties="getYourTradableProperties()"
-      :playerTradableProperties="getPlayerTradableProperties()"
+      :yourTradableProperties="
+        getPlayerTradableProperties(tilesState, fullSetsGroups, username)
+      "
+      :playerTradableProperties="
+        getPlayerTradableProperties(
+          tilesState,
+          fullSetsGroups,
+          tradePlayerUsername
+        )
+      "
       @setTradePlayerUsername="(username: string) => setTradePlayerUsername(username)"
       @sendTrade="handleSendTrade"
       send
