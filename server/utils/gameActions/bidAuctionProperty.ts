@@ -1,5 +1,6 @@
 import { GameState, Player } from "~/types";
 import { changePlayerTurn } from "./changePlayerTurn";
+import { assignPropertyToPlayer } from "./shared";
 
 export const bidAuctionProperty = (
   game: GameState,
@@ -26,41 +27,17 @@ export const bidAuctionProperty = (
   game.currentAuctionBid! += 10;
 
   if (game.auctionParticipants.length === 1) {
-    const winner = game.players.find(p => p.username === playerToBidUsername);
-    const propertyToBuy = game.boardState.tiles.find(t => t.id === propertyId);
-    if (propertyToBuy!.type === "property") {
-      winner!.balance -= game.currentAuctionBid!;
-      winner!.properties.push(propertyId);
-      propertyToBuy!.owner = winner!.username;
-    }
+    const winner = game.players.find((p) => p.username === playerToBidUsername);
+    const propertyToBuy = game.boardState.tiles.find(
+      (t) => t.id === propertyId
+    );
 
-    if (propertyToBuy!.type === "car") {
-      winner!.balance -= game.currentAuctionBid!;
-      winner!.properties.push(propertyId);
-      propertyToBuy!.owner = winner!.username;
-
-      const boughtCars = game.boardState.tiles.filter(
-        t => t.type === "car" && t.owner === winner!.username
-      );
-
-      boughtCars.forEach(c => {
-        c.rentLevel = boughtCars.length - 1;
-      });
-    }
-
-    if (propertyToBuy!.type === "bonus-property") {
-      winner!.balance -= game.currentAuctionBid!;
-      winner!.properties.push(propertyId);
-      propertyToBuy!.owner = winner!.username;
-
-      const propertiesOwned = game.boardState.tiles.filter(
-        t => t.type === "bonus-property" && t.owner === winner!.username
-      );
-
-      propertiesOwned.forEach(p => {
-        p.rentLevel = propertiesOwned.length - 1;
-      });
-    }
+    assignPropertyToPlayer(
+      game,
+      propertyToBuy!,
+      winner!,
+      game.currentAuctionBid!
+    );
 
     game.currentAction = "roll";
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);

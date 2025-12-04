@@ -1,5 +1,6 @@
 import { GameState, Player, Tile } from "~/types";
 import { changePlayerTurn, checkIsFullPropertySet } from ".";
+import { assignPropertyToPlayer } from "./shared";
 
 export const buyProperty = (
   game: GameState,
@@ -17,44 +18,12 @@ export const buyProperty = (
     return;
   }
 
-  if (boughtProperty!.type === "property") {
-    boughtProperty!.owner = game.currentTurn;
-
-    currentTurnPlayer.properties.push(boughtProperty!.id);
-
-    currentTurnPlayer.balance =
-      currentTurnPlayer.balance - boughtProperty!.price!;
-
-    checkIsFullPropertySet(currentTurnPlayer, game.boardState);
-  }
-
-  if (boughtProperty!.type === "car") {
-    currentTurnPlayer.balance -= boughtProperty!.price!;
-    currentTurnPlayer.properties.push(boughtProperty!.id);
-    boughtProperty!.owner = currentTurnPlayer.username;
-
-    const boughtCars = game.boardState.tiles.filter(
-      t => t.type === "car" && t.owner === currentTurnPlayer.username
-    );
-
-    boughtCars.forEach(c => {
-      c.rentLevel = boughtCars.length - 1;
-    });
-  }
-
-  if (boughtProperty!.type === "bonus-property") {
-    currentTurnPlayer.balance -= boughtProperty!.price!;
-    currentTurnPlayer.properties.push(boughtProperty!.id);
-    boughtProperty!.owner = currentTurnPlayer.username;
-
-    const propertiesOwned = game.boardState.tiles.filter(
-      t => t.type === "bonus-property" && t.owner === currentTurnPlayer.username
-    );
-
-    propertiesOwned.forEach(p => {
-      p.rentLevel = propertiesOwned.length - 1;
-    });
-  }
+  assignPropertyToPlayer(
+    game,
+    boughtProperty!,
+    currentTurnPlayer,
+    boughtProperty?.price!
+  );
 
   changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
 
