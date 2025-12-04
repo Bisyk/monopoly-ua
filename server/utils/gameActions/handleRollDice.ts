@@ -1,6 +1,7 @@
 import { chances } from "~/server/constants";
 import { changePlayerTurn } from "./changePlayerTurn";
 import { GameState, Player, Tile } from "~/types";
+import { GAME_RULES } from "~/shared/constants/gameRules";
 
 export const handleRollDice = (
   game: GameState,
@@ -8,7 +9,7 @@ export const handleRollDice = (
   currentTurnPlayerIdx: number,
   parsedMessage: any
 ) => {
-  const boardSize = 40;
+  const boardSize = GAME_RULES.BOARD_SIZE;
   const { left, right } = parsedMessage.payload.turnResult;
 
   if (left === right) {
@@ -27,9 +28,9 @@ export const handleRollDice = (
     currentTurnPlayer.bonusRoll = false;
   }
 
-  if (currentTurnPlayer.doublesInRow === 3) {
+  if (currentTurnPlayer.doublesInRow === GAME_RULES.MAX_DOUBLES_BEFORE_JAIL) {
     currentTurnPlayer.jailed = true;
-    currentTurnPlayer.turnsInJail = 3;
+    currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
     currentTurnPlayer.position = 10;
     game.currentAction = "roll";
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
@@ -152,7 +153,7 @@ export const handleRollDice = (
   }
 
   if (tilePlayerOn!.type === "go") {
-    currentTurnPlayer.balance += 200;
+    currentTurnPlayer.balance += GAME_RULES.GO_BONUS;
     game.gameLog.push({
       username: game.currentTurn,
       msg: "You got 200$ for landing on go",

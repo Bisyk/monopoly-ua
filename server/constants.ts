@@ -1,3 +1,4 @@
+import { GAME_RULES } from "~/shared/constants/gameRules";
 import type { Chance } from "../types/index";
 
 class PropertyTile {
@@ -110,7 +111,7 @@ export const initialGroupsState = [
 
 export const initialPlayersState = {
   position: 1,
-  balance: 1500,
+  balance: GAME_RULES.STARTING_BALANCE,
   properties: [],
   ownedPropertiesGroup: [],
   jailed: false,

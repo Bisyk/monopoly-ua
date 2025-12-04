@@ -1,6 +1,7 @@
 import { GameState, Player } from "~/types";
 import { changePlayerTurn } from "./changePlayerTurn";
 import { assignPropertyToPlayer } from "./shared";
+import { GAME_RULES } from "~/shared/constants/gameRules";
 
 export const bidAuctionProperty = (
   game: GameState,
@@ -20,11 +21,14 @@ export const bidAuctionProperty = (
     (p: Player) => p.username === playerToBidUsername
   );
 
-  if (playerToBid!.balance < game.currentAuctionBid! + 10) {
+  if (
+    playerToBid!.balance <
+    game.currentAuctionBid! + GAME_RULES.AUCTION_BID_INCREMENT
+  ) {
     return;
   }
 
-  game.currentAuctionBid! += 10;
+  game.currentAuctionBid! += GAME_RULES.AUCTION_BID_INCREMENT;
 
   if (game.auctionParticipants.length === 1) {
     const winner = game.players.find((p) => p.username === playerToBidUsername);
