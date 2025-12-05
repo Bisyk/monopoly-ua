@@ -23,12 +23,12 @@ export const bidAuctionProperty = (
 
   if (
     playerToBid!.balance <
-    game.currentAuctionBid! + GAME_RULES.AUCTION_BID_INCREMENT
+    game.auctionBidAmount! + GAME_RULES.AUCTION_BID_INCREMENT
   ) {
     return;
   }
 
-  game.currentAuctionBid! += GAME_RULES.AUCTION_BID_INCREMENT;
+  game.auctionBidAmount! += GAME_RULES.AUCTION_BID_INCREMENT;
 
   if (game.auctionParticipants.length === 1) {
     const winner = game.players.find((p) => p.username === playerToBidUsername);
@@ -40,7 +40,7 @@ export const bidAuctionProperty = (
       game,
       propertyToBuy!,
       winner!,
-      game.currentAuctionBid!
+      game.auctionBidAmount!
     );
 
     game.currentAction = "roll";
@@ -48,9 +48,9 @@ export const bidAuctionProperty = (
   }
 
   if (playerToBidIdxInAuction === game.auctionParticipants.length - 1) {
-    game.currentAuctionParticipant = game.auctionParticipants[0];
+    game.activeAuctionBidder = game.auctionParticipants[0];
   } else {
-    game.currentAuctionParticipant =
+    game.activeAuctionBidder =
       game.auctionParticipants[playerToBidIdxInAuction + 1];
   }
   return;

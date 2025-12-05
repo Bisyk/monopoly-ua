@@ -29,7 +29,7 @@ export const passAuctionProperty = async (
 
   if (
     remainingParticipants.length === 1 &&
-    game.currentAuctionBid! > auctionedTileId!.price!
+    game.auctionBidAmount! > auctionedTileId!.price!
   ) {
     const winner = game.players.find(
       (p: Player) => p.username === remainingParticipants[0]
@@ -37,7 +37,7 @@ export const passAuctionProperty = async (
     const propertyToBuy = game.board.tiles.find(
       (t: Tile) => t.id === propertyId
     );
-    winner!.balance -= game.currentAuctionBid!;
+    winner!.balance -= game.auctionBidAmount!;
     winner!.properties.push(propertyId);
     propertyToBuy!.owner = winner!.username;
     game.currentAction = "roll";
@@ -45,7 +45,7 @@ export const passAuctionProperty = async (
   }
 
   game.auctionParticipants = remainingParticipants;
-  game.currentAuctionParticipant =
+  game.activeAuctionBidder =
     game.auctionParticipants[
       playerToPassIdxInAuction % remainingParticipants.length
     ];

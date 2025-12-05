@@ -30,8 +30,8 @@ export const passProperty = (
     game.auctionParticipants = auctionParticipants.map(
       (p: Player) => p.username
     );
-    game.currentAuctionParticipant = game.auctionParticipants[0];
-    game.currentAuctionBid = passedProperty!.price!;
+    game.activeAuctionBidder = game.auctionParticipants[0];
+    game.auctionBidAmount = passedProperty!.price!;
     game.auctionedTileId = propertyId;
   }
 };

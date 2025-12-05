@@ -28,8 +28,8 @@ model Game {
   board                     BoardState
   currentAction             String
   auctionParticipants       String[]
-  currentAuctionParticipant String?
-  currentAuctionBid         Int?
+  activeAuctionBidder String?
+  auctionBidAmount         Int?
   auctionedTileId           Int?
   activeChance              Chance
   activeTrade               Trade
@@ -41,7 +41,7 @@ type Player {
   position             Int
   balance              Int
   properties           Int[]
-  ownedPropertiesGroup Int[]
+  ownedPropertyGroupIds Int[]
   jailed               Boolean
   turnsInJail          Int
   doublesInRow         Int
@@ -56,7 +56,7 @@ type BoardState {
 type Tile {
   id            Int
   groupId       Int?
-  spriteName    String
+  assetId    String
   name          String
   price         Int?
   type          String

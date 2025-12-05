@@ -92,7 +92,7 @@ const isTradeValid = computed(() => {
           <div v-for="property in yourTradableProperties.sort((a, b) => a - b)">
             <div @click="() => toggleGivenProperty(property)" class="tradeProperty"
               :style="{ backgroundColor: tradeTiles.given.has(property) ? players.find(p => p.username === tradePlayerUsername)!.color : 'white' }">
-              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.assetId}.webp`" alt="">
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ const isTradeValid = computed(() => {
           <div v-for="property in playerTradableProperties.sort((a, b) => a - b)">
             <div @click="() => toggleReceivedProperty(property)" class="tradeProperty"
               :style="{ backgroundColor: tradeTiles.received.has(property) ? player.color : 'white' }">
-              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.assetId}.webp`" alt="">
             </div>
           </div>
         </div>
@@ -132,7 +132,7 @@ const isTradeValid = computed(() => {
           <p>Money: {{ activeTrade.givenMoney }}</p>
           <div v-for="property in activeTrade.given.sort((a: number, b: number) => a - b)">
             <div class="tradeProperty">
-              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.assetId}.webp`" alt="">
             </div>
           </div>
         </div>
@@ -141,7 +141,7 @@ const isTradeValid = computed(() => {
           <p>Money: {{ activeTrade.receivedMoney }}</p>
           <div v-for="property in activeTrade.received.sort((a: number, b: number) => a - b)">
             <div class="tradeProperty">
-              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.assetId}.webp`" alt="">
             </div>
           </div>
         </div>

@@ -58,8 +58,8 @@ export default defineEventHandler(async event => {
           currentTurn: room!.players[0],
           currentAction: "roll",
           auctionParticipants: [],
-          currentAuctionParticipant: "",
-          currentAuctionBid: 0,
+          activeAuctionBidder: "",
+          auctionBidAmount: 0,
           auctionedTileId: null,
           activeChance: {
             type: "",

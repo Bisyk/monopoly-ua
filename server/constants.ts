@@ -4,7 +4,7 @@ import type { Chance } from "../types/index";
 class PropertyTile {
   public id: number;
   public groupId: number;
-  public spriteName: string;
+  public assetId: string;
   public name: string;
   public price: number;
   public type: string;
@@ -20,14 +20,14 @@ class PropertyTile {
   public constructor(
     id: number,
     groupId: number,
-    spriteName: string,
+    assetId: string,
     name: string,
     price: number,
     rentLevels: number[]
   ) {
     this.id = id;
     this.groupId = groupId;
-    this.spriteName = spriteName;
+    this.assetId = assetId;
     this.name = name;
     this.price = price;
     this.rentLevel = 0;
@@ -113,7 +113,7 @@ export const defaultPlayerTemplate = {
   position: 1,
   balance: GAME_RULES.STARTING_BALANCE,
   properties: [],
-  ownedPropertiesGroup: [],
+  ownedPropertyGroupIds: [],
   jailed: false,
   turnsInJail: 0,
   doublesInRow: 0,
@@ -124,7 +124,7 @@ export const defaultTiles = [
   {
     id: 1,
     type: "go",
-    spriteName: "go",
+    assetId: "go",
     position: 1,
     name: "Go",
   },
@@ -132,7 +132,7 @@ export const defaultTiles = [
   {
     id: 3,
     type: "chance",
-    spriteName: "chance",
+    assetId: "chance",
     position: 3,
     name: "Chance",
   },
@@ -141,14 +141,14 @@ export const defaultTiles = [
     id: 5,
     type: "tax",
     taxAmount: 100,
-    spriteName: "tax",
+    assetId: "tax",
     position: 5,
     name: "Tax",
   },
   {
     id: 6,
     type: "car",
-    spriteName: "mercedes-benz",
+    assetId: "mercedes-benz",
     position: 6,
     price: 200,
     owner: "",
@@ -161,7 +161,7 @@ export const defaultTiles = [
   {
     id: 8,
     type: "chance",
-    spriteName: "chance",
+    assetId: "chance",
     position: 8,
     name: "Chance",
   },
@@ -177,7 +177,7 @@ export const defaultTiles = [
   {
     id: 11,
     type: "jail",
-    spriteName: "JAIL",
+    assetId: "JAIL",
     position: 11,
     name: "Jail",
   },
@@ -192,7 +192,7 @@ export const defaultTiles = [
   {
     id: 13,
     type: "bonus-property",
-    spriteName: "ukrnafta",
+    assetId: "ukrnafta",
     position: 13,
     owner: "",
     houses: 0,
@@ -221,7 +221,7 @@ export const defaultTiles = [
   {
     id: 16,
     type: "car",
-    spriteName: "porsche",
+    assetId: "porsche",
     position: 16,
     price: 200,
     owner: "",
@@ -241,7 +241,7 @@ export const defaultTiles = [
   {
     id: 18,
     type: "chance",
-    spriteName: "chance",
+    assetId: "chance",
     position: 18,
     name: "Chance",
   },
@@ -257,7 +257,7 @@ export const defaultTiles = [
   {
     id: 21,
     type: "parking",
-    spriteName: "parking",
+    assetId: "parking",
     position: 21,
     name: "Parking",
   },
@@ -272,7 +272,7 @@ export const defaultTiles = [
   {
     id: 23,
     type: "chance",
-    spriteName: "chance",
+    assetId: "chance",
     position: 23,
     name: "Chance",
   },
@@ -295,7 +295,7 @@ export const defaultTiles = [
   {
     id: 26,
     type: "car",
-    spriteName: "bmw",
+    assetId: "bmw",
     position: 26,
     price: 200,
     owner: "",
@@ -309,7 +309,7 @@ export const defaultTiles = [
   {
     id: 29,
     type: "bonus-property",
-    spriteName: "naftogaz",
+    assetId: "naftogaz",
     position: 29,
     owner: "",
     houses: 0,
@@ -330,7 +330,7 @@ export const defaultTiles = [
   {
     id: 31,
     type: "goToJail",
-    spriteName: "goToJail",
+    assetId: "goToJail",
     position: 31,
     name: "Go to Jail",
   },
@@ -353,7 +353,7 @@ export const defaultTiles = [
   {
     id: 34,
     type: "chance",
-    spriteName: "chance",
+    assetId: "chance",
     position: 34,
     name: "Chance",
   },
@@ -368,7 +368,7 @@ export const defaultTiles = [
   {
     id: 36,
     type: "car",
-    spriteName: "toyota",
+    assetId: "toyota",
     position: 36,
     price: 200,
     owner: "",
@@ -381,7 +381,7 @@ export const defaultTiles = [
     id: 37,
     type: "luxury-tax",
     taxAmount: 75,
-    spriteName: "luxurytax",
+    assetId: "luxurytax",
     position: 37,
     name: "Luxury Tax",
   },
@@ -396,7 +396,7 @@ export const defaultTiles = [
   {
     id: 39,
     type: "chance",
-    spriteName: "chance",
+    assetId: "chance",
     position: 39,
     name: "Chance",
   },

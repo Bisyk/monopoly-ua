@@ -153,7 +153,7 @@ export const handleRollDice = (
   }
 
   if (tilePlayerOn!.type === "go") {
-    currentTurnPlayer.balance += GAME_RULES.GO_BONUS;
+    currentTurnPlayer.balance += GAME_RULES.PASS_GO_BONUS;
     game.gameLog.push({
       username: game.currentTurn,
       msg: "You got 200$ for landing on go",

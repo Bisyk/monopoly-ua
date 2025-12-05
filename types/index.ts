@@ -4,7 +4,7 @@ type GameStatuses = "PENDING" | "STARTED" | "ENDED";
 export interface Tile {
   id: number;
   groupId?: number | null;
-  spriteName: string;
+  assetId: string;
   name: string;
   price: number | null;
   type: string;
@@ -25,7 +25,7 @@ export interface Player {
   position: number;
   balance: number;
   properties: number[];
-  ownedPropertiesGroup: number[];
+  ownedPropertyGroupIds: number[];
   jailed: boolean;
   turnsInJail: number;
   doublesInRow: number;
@@ -60,8 +60,8 @@ export interface GameState {
   currentTurn: string;
   currentAction: string;
   auctionParticipants: string[];
-  currentAuctionParticipant?: string | null;
-  currentAuctionBid?: number | null;
+  activeAuctionBidder?: string | null;
+  auctionBidAmount?: number | null;
   auctionedTileId?: number | null;
   activeTrade: Trade | null;
 }

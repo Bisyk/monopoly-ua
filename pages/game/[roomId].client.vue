@@ -207,10 +207,10 @@ definePageMeta({
     <ModalAuction
       v-if="
         gameState.currentAction === 'auction' &&
-        gameState.currentAuctionParticipant === username
+        gameState.activeAuctionBidder === username
       "
       :tileOnAuctionName="tiles.filter((t: Tile) => t.id === gameState.auctionedTileId)[0].name"
-      :tileOnAuctionPrice="gameState.currentAuctionBid + 10"
+      :tileOnAuctionPrice="gameState.auctionBidAmount + 10"
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleBidAuctionProperty="
