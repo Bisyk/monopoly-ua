@@ -74,7 +74,7 @@ export const handleRollDice = (
     ((currentTurnPlayer.position + left + right - 1) % boardSize) + 1;
 
   currentTurnPlayer.position = newPlayerPosition;
-  const tilePlayerOn = game.boardState.tiles.find(
+  const tilePlayerOn = game.board.tiles.find(
     (t: Tile) => t.id === newPlayerPosition
   );
 

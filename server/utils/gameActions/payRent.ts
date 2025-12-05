@@ -9,7 +9,7 @@ export const payRent = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const propertyToPayRent = game.boardState.tiles.find(
+  const propertyToPayRent = game.board.tiles.find(
     t => t.id === propertyId
   );
 

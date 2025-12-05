@@ -10,7 +10,7 @@ export const buyProperty = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const boughtProperty = game.boardState.tiles.find(
+  const boughtProperty = game.board.tiles.find(
     (t: Tile) => t.id === propertyId
   );
 

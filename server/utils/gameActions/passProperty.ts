@@ -10,7 +10,7 @@ export const passProperty = (
   const propertyId = parsedMessage.payload.propertyId;
   const playerToPassUsername = parsedMessage.payload.username;
 
-  const passedProperty = game.boardState.tiles.find(
+  const passedProperty = game.board.tiles.find(
     (t: Tile) => t.id === propertyId
   );
 
@@ -32,6 +32,6 @@ export const passProperty = (
     );
     game.currentAuctionParticipant = game.auctionParticipants[0];
     game.currentAuctionBid = passedProperty!.price!;
-    game.tileOnAuction = propertyId;
+    game.auctionedTileId = propertyId;
   }
 };

@@ -11,7 +11,7 @@ export const assignPropertyToPlayer = (
   property!.owner = player!.username;
 
   if (property!.type === "property") {
-    checkIsFullPropertySet(player, game.boardState);
+    checkIsFullPropertySet(player, game.board);
   }
 
   if (property!.type === "car") {
@@ -23,7 +23,7 @@ export const assignPropertyToPlayer = (
   }
 
   function updateCarRentLevels(player: Player, game: GameState) {
-    const boughtCars = game.boardState.tiles.filter(
+    const boughtCars = game.board.tiles.filter(
       (t) => t.type === "car" && t.owner === player!.username
     );
 
@@ -33,7 +33,7 @@ export const assignPropertyToPlayer = (
   }
 
   function updateBonusPropertyRentLevels(player: Player, game: GameState) {
-    const propertiesOwned = game.boardState.tiles.filter(
+    const propertiesOwned = game.board.tiles.filter(
       (t) => t.type === "bonus-property" && t.owner === player!.username
     );
 

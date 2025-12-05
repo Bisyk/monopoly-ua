@@ -21,15 +21,15 @@ const props = defineProps({
     type: Object as PropType<Player>,
     required: true,
   },
-  tilesState: {
+  tiles: {
     type: Array as PropType<Tile[]>,
     required: true,
   },
-  boardState: {
+  board: {
     type: Object as PropType<BoardState>,
     required: true,
   },
-  groupsState: {
+  propertyGroups: {
     type: Array as PropType<Group[]>,
     required: true,
   },
@@ -48,13 +48,13 @@ const props = defineProps({
 })
 
 const checkIfUpgradeable = (propertyId: number) => {
-  const property = props.tilesState.find(t => t.id === propertyId)
+  const property = props.tiles.find(t => t.id === propertyId)
   if (property!.type !== 'property') return false
 
-  const group = props.boardState.groups.find(g => g.groupId === property!.groupId)
+  const group = props.board.groups.find(g => g.groupId === property!.groupId)
   if (!group) return false
 
-  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property!.groupId)
+  const propertiesInGroup = props.tiles.filter(t => t.groupId === property!.groupId)
 
   const allOwnedBySamePlayer = propertiesInGroup.every(p => p.owner === property!.owner)
   if (!allOwnedBySamePlayer) return false
@@ -68,7 +68,7 @@ const checkIfUpgradeable = (propertyId: number) => {
   const isOwner = props.player.properties.includes(propertyId)
   if (!isOwner) return false
 
-  const isUpgradable = props.groupsState.find(g => g.groupId === property!.groupId)!.isUpgradeAvailable
+  const isUpgradable = props.propertyGroups.find(g => g.groupId === property!.groupId)!.isUpgradeAvailable
   if (!isUpgradable) return false
 
   const isFullSet = props.fullSetsGroups.includes(property!.groupId)
@@ -80,7 +80,7 @@ const checkIfUpgradeable = (propertyId: number) => {
 }
 
 const checkIfMortgageable = (propertyId: number) => {
-  const property = props.tilesState.find(t => t.id === propertyId)
+  const property = props.tiles.find(t => t.id === propertyId)
   if (!['car', 'property', 'bonus-property'].includes(property!.type)) return false
 
   const isOwner = props.player.properties.includes(propertyId)
@@ -92,7 +92,7 @@ const checkIfMortgageable = (propertyId: number) => {
   const isRentLevelZero = property!.rentLevel === 0
   if (!isRentLevelZero) return false
 
-  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property!.groupId)
+  const propertiesInGroup = props.tiles.filter(t => t.groupId === property!.groupId)
 
   const isAnyPropertyUpgraded = propertiesInGroup.some(p => p.rentLevel > 0)
 
@@ -100,7 +100,7 @@ const checkIfMortgageable = (propertyId: number) => {
 }
 
 const checkIfBuybackAble = (propertyId: number) => {
-  const property = props.tilesState.find(t => t.id === propertyId)
+  const property = props.tiles.find(t => t.id === propertyId)
   if (!['car', 'property', 'bonus-property'].includes(property!.type)) return false
 
   const isOwner = props.player.properties.includes(propertyId)
@@ -116,15 +116,15 @@ const checkIfSellable = (propertyId: number) => {
   const isOwner = props.player.properties.includes(propertyId)
   if (!isOwner) return false
 
-  const property = props.tilesState.find(t => t.id === propertyId)
+  const property = props.tiles.find(t => t.id === propertyId)
   if (property!.type !== 'property') return false
 
   if (property!.rentLevel < 1) return false
 
-  const group = props.boardState.groups.find(g => g.groupId === property!.groupId)
+  const group = props.board.groups.find(g => g.groupId === property!.groupId)
   if (!group) return false
 
-  const propertiesInGroup = props.tilesState.filter(t => t.groupId === property!.groupId)
+  const propertiesInGroup = props.tiles.filter(t => t.groupId === property!.groupId)
 
   const notLowerThanAnyOtherProperty = propertiesInGroup.every(p => p.rentLevel <= property!.rentLevel)
 
@@ -162,7 +162,7 @@ const checkIfSellable = (propertyId: number) => {
         checkIfUpgradeable(selectedTile.id) &&
         props.currentTurn === username
       " @click="$emit('upgradeProperty', selectedTile.id)" :disabled="player.balance <
-        groupsState.find((g) => g.groupId === selectedTile.groupId)!
+        propertyGroups.find((g) => g.groupId === selectedTile.groupId)!
           .upgradePrice || isSending
         " bgColor="green">
         UPGRADE

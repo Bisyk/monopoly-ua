@@ -21,16 +21,16 @@ export const useGameActions = (send: Function, username: string) => {
     }
   });
 
-  const boardState = computed(() => {
-    return gameState.value?.boardState ?? [];
+  const board = computed(() => {
+    return gameState.value?.board ?? [];
   });
 
-  const tilesState = computed(() => {
-    return gameState.value.boardState?.tiles ?? [];
+  const tiles = computed(() => {
+    return gameState.value.board?.tiles ?? [];
   });
 
-  const groupsState = computed(() => {
-    return gameState.value.boardState?.groups ?? [];
+  const propertyGroups = computed(() => {
+    return gameState.value.board?.groups ?? [];
   });
 
   const player = computed(() => {
@@ -40,13 +40,13 @@ export const useGameActions = (send: Function, username: string) => {
 
   const currentTilePlayerOn = computed(() => {
     return (
-      tilesState.value?.find((t: Tile) => t.id === player.value.position) ?? {}
+      tiles.value?.find((t: Tile) => t.id === player.value.position) ?? {}
     );
   });
 
   const fullSetsGroups = computed(() => {
     return (
-      groupsState.value
+      propertyGroups.value
         ?.filter((g: Group) => g.isFullSet)
         .map((g: Group) => g.groupId) ?? []
     );
@@ -234,9 +234,9 @@ export const useGameActions = (send: Function, username: string) => {
     tradePlayerUsername,
     gameState,
     tradeTiles,
-    boardState,
-    tilesState,
-    groupsState,
+    board,
+    tiles,
+    propertyGroups,
     player,
     currentTilePlayerOn,
     fullSetsGroups,

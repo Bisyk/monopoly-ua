@@ -53,7 +53,7 @@ export interface CreatedGame {
 export interface GameState {
   players: Player[];
   gameLog: { username: string; msg: string }[];
-  boardState: BoardState;
+  board: BoardState;
   activeChance: Chance;
   id: string;
   associatedRoomId: string;
@@ -62,7 +62,7 @@ export interface GameState {
   auctionParticipants: string[];
   currentAuctionParticipant?: string | null;
   currentAuctionBid?: number | null;
-  tileOnAuction?: number | null;
+  auctionedTileId?: number | null;
   activeTrade: Trade | null;
 }
 

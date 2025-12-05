@@ -1,11 +1,11 @@
 import type { Tile } from "~/types";
 
 export const getPlayerTradableProperties = (
-  tilesState: Tile[],
+  tiles: Tile[],
   fullSetsGroups: number[],
   username: string
 ) => {
-  const ownedAndNotMortgaged = tilesState.filter(
+  const ownedAndNotMortgaged = tiles.filter(
     (t: Tile) =>
       t.owner === username &&
       ["car", "property", "bonus-property"].includes(t.type) &&
@@ -14,7 +14,7 @@ export const getPlayerTradableProperties = (
 
   const tradeable = ownedAndNotMortgaged.filter((t: Tile) => {
     const isFullSet = fullSetsGroups.includes(t.groupId!);
-    const isAnyTileInFullSetUpgraded = tilesState.some(
+    const isAnyTileInFullSetUpgraded = tiles.some(
       (tile: Tile) => tile.groupId === t.groupId && tile.rentLevel! > 0
     );
 

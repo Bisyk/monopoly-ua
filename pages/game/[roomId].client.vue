@@ -23,9 +23,9 @@ const { status, send, open, close, handleMessage } = useWebsocketManager(
 const {
   isSending,
   gameState,
-  tilesState,
-  groupsState,
-  boardState,
+  tiles,
+  propertyGroups,
+  board,
   player,
   tradeTiles,
   tradePlayerUsername,
@@ -166,9 +166,9 @@ definePageMeta({
       :currentTurn="gameState.currentTurn"
       :username="username"
       :player="player"
-      :tilesState="tilesState"
-      :boardState="boardState"
-      :groupsState="groupsState"
+      :tiles="tiles"
+      :board="board"
+      :propertyGroups="propertyGroups"
       :fullSetsGroups="fullSetsGroups"
       :tileInfoStyle="tileInfoStyle"
       :isSending="isSending"
@@ -209,15 +209,15 @@ definePageMeta({
         gameState.currentAction === 'auction' &&
         gameState.currentAuctionParticipant === username
       "
-      :tileOnAuctionName="tilesState.filter((t: Tile) => t.id === gameState.tileOnAuction)[0].name"
+      :tileOnAuctionName="tiles.filter((t: Tile) => t.id === gameState.auctionedTileId)[0].name"
       :tileOnAuctionPrice="gameState.currentAuctionBid + 10"
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleBidAuctionProperty="
-        handleBidAuctionProperty(gameState.tileOnAuction)
+        handleBidAuctionProperty(gameState.auctionedTileId)
       "
       @handlePassAuctionProperty="
-        handlePassAuctionProperty(gameState.tileOnAuction)
+        handlePassAuctionProperty(gameState.auctionedTileId)
       "
     />
 
@@ -263,13 +263,13 @@ definePageMeta({
       :tradeTiles="tradeTiles"
       :player="player"
       :players="gameState.players"
-      :boardState="boardState"
+      :board="board"
       :yourTradableProperties="
-        getPlayerTradableProperties(tilesState, fullSetsGroups, username)
+        getPlayerTradableProperties(tiles, fullSetsGroups, username)
       "
       :playerTradableProperties="
         getPlayerTradableProperties(
-          tilesState,
+          tiles,
           fullSetsGroups,
           tradePlayerUsername
         )
@@ -287,7 +287,7 @@ definePageMeta({
       "
       :tradePlayerUsername="tradePlayerUsername"
       :activeTrade="gameState.activeTrade"
-      :boardState="boardState"
+      :board="board"
       @acceptTrade="handleAcceptTrade"
       @declineTrade="handleDeclineTrade"
       receive
@@ -295,7 +295,7 @@ definePageMeta({
 
     <!-- GAME BOARD -->
     <GameBoard
-      :tilesState="tilesState"
+      :tiles="tiles"
       :gameState="gameState"
       :showTileInfo="showTileInfo"
       :players="players"

@@ -7,7 +7,7 @@ export const buybackProperty = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const propertyToBuyBack = game.boardState.tiles.find(
+  const propertyToBuyBack = game.board.tiles.find(
     t => t.id === propertyId
   );
 

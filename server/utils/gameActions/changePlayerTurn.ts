@@ -5,7 +5,7 @@ export const changePlayerTurn = (
   currentTurnPlayer: Player,
   currentTurnPlayerIdx: number
 ) => {
-  game.boardState.groups.forEach(g => {
+  game.board.groups.forEach(g => {
     g.isUpgradeAvailable = true;
   });
 

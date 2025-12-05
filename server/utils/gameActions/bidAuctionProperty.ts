@@ -32,7 +32,7 @@ export const bidAuctionProperty = (
 
   if (game.auctionParticipants.length === 1) {
     const winner = game.players.find((p) => p.username === playerToBidUsername);
-    const propertyToBuy = game.boardState.tiles.find(
+    const propertyToBuy = game.board.tiles.find(
       (t) => t.id === propertyId
     );
 

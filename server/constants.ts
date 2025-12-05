@@ -42,7 +42,7 @@ class PropertyTile {
   }
 }
 
-export const initialGroupsState = [
+export const defaultPropertyGroups = [
   {
     groupId: 1,
     color: "#FFC0CB", // light pink
@@ -109,7 +109,7 @@ export const initialGroupsState = [
   },
 ];
 
-export const initialPlayersState = {
+export const defaultPlayerTemplate = {
   position: 1,
   balance: GAME_RULES.STARTING_BALANCE,
   properties: [],
@@ -120,7 +120,7 @@ export const initialPlayersState = {
   bonusRoll: false,
 };
 
-export const initialTilesState = [
+export const defaultTiles = [
   {
     id: 1,
     type: "go",

@@ -25,12 +25,12 @@ model Game {
   players                   Player[]
   currentTurn               String
   gameLog                   GameLogMsg[]
-  boardState                BoardState
+  board                     BoardState
   currentAction             String
   auctionParticipants       String[]
   currentAuctionParticipant String?
   currentAuctionBid         Int?
-  tileOnAuction             Int?
+  auctionedTileId           Int?
   activeChance              Chance
   activeTrade               Trade
 }

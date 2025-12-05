@@ -19,7 +19,7 @@ const props = defineProps({
     type: Array as PropType<Player[]>,
     required: true
   },
-  boardState: {
+  board: {
     type: Object as PropType<BoardState>,
     required: true
   },
@@ -57,17 +57,17 @@ const toggleReceivedProperty = (property: number) => {
 
 const givenPropertiesPrice = computed(() => {
   if (props.send) {
-    return Array.from(props.tradeTiles.given).reduce((acc, property) => (acc as number) + props.boardState.tiles.find(t => t.id === property)!.price, 0) + props.tradeTiles.givenMoney
+    return Array.from(props.tradeTiles.given).reduce((acc, property) => (acc as number) + props.board.tiles.find(t => t.id === property)!.price, 0) + props.tradeTiles.givenMoney
   } else {
-    return Array.from(props.activeTrade!.given).reduce((acc, property) => (acc as number) + props.boardState.tiles.find(t => t.id === property)!.price, 0) + props.activeTrade!.givenMoney
+    return Array.from(props.activeTrade!.given).reduce((acc, property) => (acc as number) + props.board.tiles.find(t => t.id === property)!.price, 0) + props.activeTrade!.givenMoney
   }
 })
 
 const receivedPropertiesPrice = computed(() => {
   if (props.send) {
-    return Array.from(props.tradeTiles.received).reduce((acc, property) => (acc as number) + props.boardState.tiles.find(t => t.id === property)!.price, 0) + props.tradeTiles.receivedMoney
+    return Array.from(props.tradeTiles.received).reduce((acc, property) => (acc as number) + props.board.tiles.find(t => t.id === property)!.price, 0) + props.tradeTiles.receivedMoney
   } else {
-    return Array.from(props.activeTrade!.received).reduce((acc, property) => (acc as number) + props.boardState.tiles.find(t => t.id === property)!.price, 0) + props.activeTrade!.receivedMoney
+    return Array.from(props.activeTrade!.received).reduce((acc, property) => (acc as number) + props.board.tiles.find(t => t.id === property)!.price, 0) + props.activeTrade!.receivedMoney
   }
 })
 
@@ -92,7 +92,7 @@ const isTradeValid = computed(() => {
           <div v-for="property in yourTradableProperties.sort((a, b) => a - b)">
             <div @click="() => toggleGivenProperty(property)" class="tradeProperty"
               :style="{ backgroundColor: tradeTiles.given.has(property) ? players.find(p => p.username === tradePlayerUsername)!.color : 'white' }">
-              <img :src="`/assets/sprites/ua/${boardState.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ const isTradeValid = computed(() => {
           <div v-for="property in playerTradableProperties.sort((a, b) => a - b)">
             <div @click="() => toggleReceivedProperty(property)" class="tradeProperty"
               :style="{ backgroundColor: tradeTiles.received.has(property) ? player.color : 'white' }">
-              <img :src="`/assets/sprites/ua/${boardState.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
             </div>
           </div>
         </div>
@@ -132,7 +132,7 @@ const isTradeValid = computed(() => {
           <p>Money: {{ activeTrade.givenMoney }}</p>
           <div v-for="property in activeTrade.given.sort((a: number, b: number) => a - b)">
             <div class="tradeProperty">
-              <img :src="`/assets/sprites/ua/${boardState.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
             </div>
           </div>
         </div>
@@ -141,7 +141,7 @@ const isTradeValid = computed(() => {
           <p>Money: {{ activeTrade.receivedMoney }}</p>
           <div v-for="property in activeTrade.received.sort((a: number, b: number) => a - b)">
             <div class="tradeProperty">
-              <img :src="`/assets/sprites/ua/${boardState.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
+              <img :src="`/assets/sprites/ua/${board.tiles.find(t => t.id === property)!.spriteName}.webp`" alt="">
             </div>
           </div>
         </div>
