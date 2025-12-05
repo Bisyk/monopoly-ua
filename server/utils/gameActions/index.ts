@@ -1,6 +1,6 @@
 export { changePlayerTurn } from "./changePlayerTurn";
 export { handleRollDice } from "./handleRollDice";
-export { syncGameState } from "./syncGameState";
+export { broadcastGameState } from "./broadcastGameState";
 export { buyProperty } from "./buyProperty";
 export { checkIsFullPropertySet } from "./checkIsFullPropertySet";
 export { passProperty } from "./passProperty";

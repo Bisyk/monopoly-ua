@@ -2,7 +2,7 @@ import { parse } from "url";
 import prisma from "~/lib/prisma";
 import { GameState } from "../../types";
 import {
-  syncGameState,
+  broadcastGameState,
   handleRollDice,
   buyProperty,
   passProperty,
@@ -79,12 +79,12 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
     }
 
     if (parsedMessage.action === "BUY_PROPERTY") {
       buyProperty(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
@@ -95,7 +95,7 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
@@ -106,7 +106,7 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
@@ -117,73 +117,73 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "PAY_RENT") {
       payRent(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "MORTGAGE_PROPERTY") {
       mortgageProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "BUY_BACK_PROPERTY") {
       buybackProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "UPGRADE_PROPERTY") {
       upgradeProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "SELL_PROPERTY") {
       sellProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "PAY_CHANCE") {
       payChance(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "JAIL_PAY") {
       payJail(game, currentTurnPlayer);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "PAY_TAX") {
       payTax(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "TRADE") {
       sendTrade(game, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "ACCEPT_TRADE") {
       acceptTrade(game);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "DECLINE_TRADE") {
       declineTrade(game);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
   },

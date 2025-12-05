@@ -1,7 +1,7 @@
 import prisma from "~/lib/prisma";
 import { GameState } from "~/types";
 
-export const syncGameState = async (
+export const broadcastGameState = async (
   roomId: string,
   peer: any,
   newGameState: GameState
