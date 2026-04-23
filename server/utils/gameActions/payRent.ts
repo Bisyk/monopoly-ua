@@ -1,5 +1,5 @@
 import { GameState, Player } from "~/types";
-import { changePlayerTurn } from ".";
+import { changePlayerTurn, resolveBankruptcy } from ".";
 
 export const payRent = (
   game: GameState,
@@ -30,6 +30,12 @@ export const payRent = (
   }
 
   if (currentTurnPlayer.balance < rentToPay) {
+    resolveBankruptcy({
+      game,
+      bankruptPlayer: currentTurnPlayer,
+      currentTurnPlayerIdx,
+      creditorUsername: owner?.username,
+    });
     return;
   }
 

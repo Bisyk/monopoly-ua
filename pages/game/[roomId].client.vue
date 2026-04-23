@@ -99,6 +99,17 @@ const setTradePlayerUsername = (username: string) => {
   tradePlayerUsername.value = username;
 };
 
+const isGameEnded = computed(() => gameState.value?.status === "ENDED");
+const gameWinnerText = computed(() => {
+  if (!isGameEnded.value) {
+    return "";
+  }
+
+  return gameState.value?.winnerUsername
+    ? `Winner: ${gameState.value.winnerUsername}`
+    : "Game ended";
+});
+
 onClickOutside(tileInfo, (event) => {
   selectedTile.value = null;
 });
@@ -155,6 +166,10 @@ definePageMeta({
   </div>
 
   <div class="gameContainer" v-if="gameState">
+    <div v-if="isGameEnded" class="gameEndedBanner">
+      {{ gameWinnerText }}
+    </div>
+
     <TileInfoCard
       v-if="selectedTile"
       ref="tileInfo"
@@ -326,5 +341,17 @@ definePageMeta({
   .player {
     border: 1px solid black;
   }
+}
+
+.gameEndedBanner {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 700;
 }
 </style>

@@ -22,6 +22,9 @@ model Room {
 model Game {
   id                        String       @id @default(auto()) @map("_id") @db.ObjectId
   associatedRoomId          String       @unique
+  status                    String       @default("STARTED")
+  winnerUsername            String?
+  eliminatedPlayers         String[]     @default([])
   players                   Player[]
   currentTurn               String
   gameLog                   GameLogMsg[]

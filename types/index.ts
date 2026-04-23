@@ -52,6 +52,9 @@ export interface CreatedGame {
 
 export interface GameState {
   players: Player[];
+  status: GameStatuses;
+  winnerUsername: string | null;
+  eliminatedPlayers: string[];
   gameLog: { username: string; msg: string }[];
   board: BoardState;
   activeChance: Chance;

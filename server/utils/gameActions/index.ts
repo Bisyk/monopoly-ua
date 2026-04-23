@@ -17,3 +17,4 @@ export { payTax } from "./payTax";
 export { sendTrade } from "./sendTrade";
 export { acceptTrade } from "./acceptTrade";
 export { declineTrade } from "./declineTrade";
+export { resolveBankruptcy } from "./resolveBankruptcy";

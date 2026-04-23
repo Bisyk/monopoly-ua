@@ -50,6 +50,9 @@ export default defineEventHandler(async event => {
       const game = await prisma.game.create({
         data: {
           associatedRoomId: roomId,
+          status: "STARTED",
+          winnerUsername: null,
+          eliminatedPlayers: [],
           players: room!.players.map((player, idx) => ({
             username: player,
             color: colors[idx],

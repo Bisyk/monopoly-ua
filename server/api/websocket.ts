@@ -22,6 +22,25 @@ import {
   declineTrade,
 } from "../utils/gameActions";
 
+const MUTATING_ACTIONS = new Set([
+  "ROLL_DICE",
+  "BUY_PROPERTY",
+  "PASS_PROPERTY",
+  "PASS_AUCTION_PROPERTY",
+  "BID_AUCTION_PROPERTY",
+  "PAY_RENT",
+  "MORTGAGE_PROPERTY",
+  "BUY_BACK_PROPERTY",
+  "UPGRADE_PROPERTY",
+  "SELL_PROPERTY",
+  "PAY_CHANCE",
+  "JAIL_PAY",
+  "PAY_TAX",
+  "TRADE",
+  "ACCEPT_TRADE",
+  "DECLINE_TRADE",
+]);
+
 export default defineWebSocketHandler({
   async open(peer) {
     const roomId = getRoomIdFromPeer(peer!.request!.url!);
@@ -56,13 +75,22 @@ export default defineWebSocketHandler({
 
     const parsedMessage = JSON.parse(message.text());
 
-    const game = await prisma.game.findUnique({
+    const game = (await prisma.game.findUnique({
       where: {
         associatedRoomId: roomId,
       },
-    });
+    })) as GameState | null;
 
     if (!game) {
+      return;
+    }
+
+    game.status = game.status || "STARTED";
+    game.winnerUsername = game.winnerUsername || null;
+    game.eliminatedPlayers = game.eliminatedPlayers || [];
+
+    if (game.status === "ENDED" && MUTATING_ACTIONS.has(parsedMessage.action)) {
+      peer.send(JSON.stringify(game));
       return;
     }
 
@@ -164,7 +192,7 @@ export default defineWebSocketHandler({
     }
 
     if (parsedMessage.action === "PAY_TAX") {
-      payTax(game, currentTurnPlayer, parsedMessage);
+      payTax(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
       broadcastGameState(roomId, peer, game);
       return;
     }

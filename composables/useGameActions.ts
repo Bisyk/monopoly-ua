@@ -52,162 +52,113 @@ export const useGameActions = (send: Function, username: string) => {
     );
   });
 
+  const sendAction = (action: string, payload: Record<string, unknown>) => {
+    if (gameState.value?.status === "ENDED") {
+      isSending.value = false;
+      return;
+    }
+
+    send(
+      JSON.stringify({
+        action,
+        payload,
+      })
+    );
+  };
+
   const handleUserTurn = () => {
     isSending.value = true;
     turnResult.value = rollDice();
-    send(
-      JSON.stringify({
-        action: "ROLL_DICE",
-        payload: { username, turnResult: turnResult.value },
-      })
-    );
+    sendAction("ROLL_DICE", { username, turnResult: turnResult.value });
   };
 
   const handleBuyProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "BUY_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("BUY_PROPERTY", { username, propertyId });
   };
 
   const handlePassProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "PASS_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("PASS_PROPERTY", { username, propertyId });
   };
 
   const handleMortgageProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "MORTGAGE_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("MORTGAGE_PROPERTY", { username, propertyId });
     selectedTile.value = null;
   };
 
   const handleBuyBackProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "BUY_BACK_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("BUY_BACK_PROPERTY", { username, propertyId });
     selectedTile.value = null;
   };
 
   const handleUpgradeProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "UPGRADE_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("UPGRADE_PROPERTY", { username, propertyId });
     selectedTile.value = null;
   };
 
   const handleSellProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "SELL_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("SELL_PROPERTY", { username, propertyId });
     selectedTile.value = null;
   };
 
   const handlePayRent = (propertyId: number) => {
     isSending.value = true;
     if (currentTilePlayerOn.value.type === "bonus-property") {
-      send(
-        JSON.stringify({
-          action: "PAY_RENT",
-          payload: { username, propertyId, turnResult: turnResult.value },
-        })
-      );
+      sendAction("PAY_RENT", {
+        username,
+        propertyId,
+        turnResult: turnResult.value,
+      });
     } else {
-      send(
-        JSON.stringify({
-          action: "PAY_RENT",
-          payload: { username, propertyId },
-        })
-      );
+      sendAction("PAY_RENT", { username, propertyId });
     }
   };
 
   const handlePassAuctionProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "PASS_AUCTION_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("PASS_AUCTION_PROPERTY", { username, propertyId });
   };
 
   const handleBidAuctionProperty = (propertyId: number) => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "BID_AUCTION_PROPERTY",
-        payload: { username, propertyId },
-      })
-    );
+    sendAction("BID_AUCTION_PROPERTY", { username, propertyId });
   };
 
   const handleJailPay = () => {
     isSending.value = true;
-    send(JSON.stringify({ action: "JAIL_PAY", payload: { username } }));
+    sendAction("JAIL_PAY", { username });
   };
 
   const handlePayChance = () => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "PAY_CHANCE",
-        payload: { username, amount: gameState.value.activeChance.amount },
-      })
-    );
+    sendAction("PAY_CHANCE", {
+      username,
+      amount: gameState.value.activeChance.amount,
+    });
   };
 
   const handlePayTax = () => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "PAY_TAX",
-        payload: { username, tax: currentTilePlayerOn.value.taxAmount },
-      })
-    );
+    sendAction("PAY_TAX", { username, tax: currentTilePlayerOn.value.taxAmount });
   };
 
   const handleSendTrade = () => {
     isSending.value = true;
-    send(
-      JSON.stringify({
-        action: "TRADE",
-        payload: {
-          username,
-          tradePlayerUsername: tradePlayerUsername.value,
-          tradeTiles: {
-            given: Array.from(tradeTiles.value.given),
-            received: Array.from(tradeTiles.value.received),
-            givenMoney: tradeTiles.value.givenMoney,
-            receivedMoney: tradeTiles.value.receivedMoney,
-          },
-        },
-      })
-    );
+    sendAction("TRADE", {
+      username,
+      tradePlayerUsername: tradePlayerUsername.value,
+      tradeTiles: {
+        given: Array.from(tradeTiles.value.given),
+        received: Array.from(tradeTiles.value.received),
+        givenMoney: tradeTiles.value.givenMoney,
+        receivedMoney: tradeTiles.value.receivedMoney,
+      },
+    });
     tradePlayerUsername.value = "";
     tradeTiles.value = {
       given: new Set(),
@@ -219,12 +170,12 @@ export const useGameActions = (send: Function, username: string) => {
 
   const handleAcceptTrade = () => {
     isSending.value = true;
-    send(JSON.stringify({ action: "ACCEPT_TRADE", payload: { username } }));
+    sendAction("ACCEPT_TRADE", { username });
   };
 
   const handleDeclineTrade = () => {
     isSending.value = true;
-    send(JSON.stringify({ action: "DECLINE_TRADE", payload: { username } }));
+    sendAction("DECLINE_TRADE", { username });
   };
 
   return {
