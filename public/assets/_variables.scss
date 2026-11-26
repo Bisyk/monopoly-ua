@@ -1,3 +1,32 @@
-$main-color: #4c7daf;
-$secondary-color: #f4f4f5;
-$white-color: #fff;
+// 16-Bit Cartridge Design System Tokens
+$main-color: #2667e8;
+$secondary-color: #d5e3f8;
+$white-color: #ffffff;
+
+$cartridge-bg: #d5e3f8;
+$cartridge-surface: #ffffff;
+$cartridge-surface-alt: #edf2fa;
+$cartridge-ink: #1e1b3a;
+$cartridge-muted: #585a7a;
+$cartridge-rule: #c7d0e4;
+
+$cartridge-primary: #2667e8;
+$cartridge-primary-dark: #153a8a;
+$cartridge-gold: #ffca28;
+$cartridge-gold-light: #ffe169;
+$cartridge-gold-dark: #b38300;
+$cartridge-positive: #1eb554;
+$cartridge-positive-dark: #0e6b2f;
+$cartridge-danger: #e63956;
+$cartridge-danger-dark: #8f182d;
+$cartridge-danger-soft: #feebef;
+$cartridge-chance: #4f3cc9;
+
+$font-display: "Chakra Petch", sans-serif;
+$font-body: "Rubik", sans-serif;
+$font-mono: "JetBrains Mono", monospace;
+
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 8px;
+$radius-board: 10px;
