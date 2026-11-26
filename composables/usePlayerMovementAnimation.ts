@@ -76,7 +76,7 @@ function computeSlotCoord(
   return { x: rect.cx + offset.dx, y: rect.cy + offset.dy };
 }
 
-function prepareSegments(segments: MoveSegment[]): PreparedSegment[] {
+export function prepareSegments(segments: MoveSegment[]): PreparedSegment[] {
   const prepared: PreparedSegment[] = [];
 
   for (const segment of segments) {
@@ -186,7 +186,7 @@ function computeSegmentPose(
   };
 }
 
-function buildFallbackSegment(from: number, to: number): MoveSegment {
+export function buildFallbackSegment(from: number, to: number): MoveSegment {
   const clockwiseDistance = (to - from + DEFAULT_BOARD_SIZE) % DEFAULT_BOARD_SIZE;
   return {
     from,
@@ -294,6 +294,7 @@ export function usePlayerMovementAnimation(
   ) => {
     const prepared = prepareSegments(segments);
     if (prepared.length === 0 || isReducedMotion.value) {
+      cancelActiveRun();
       syncAllToAuthoritative(authoritativePlayers);
       return;
     }
@@ -301,6 +302,7 @@ export function usePlayerMovementAnimation(
     const initialRects = getTileRects();
     const firstTileId = prepared[0].tileIds[0];
     if (!initialRects[firstTileId]) {
+      cancelActiveRun();
       syncAllToAuthoritative(authoritativePlayers);
       return;
     }

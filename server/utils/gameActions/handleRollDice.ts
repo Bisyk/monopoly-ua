@@ -44,6 +44,8 @@ export const handleRollDice = (
   ) => {
     currentTurnPlayer.jailed = true;
     currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
+    currentTurnPlayer.doublesInRow = 0;
+    currentTurnPlayer.bonusRoll = false;
     currentTurnPlayer.position = targetTileId;
     game.currentAction = "roll";
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
@@ -67,8 +69,6 @@ export const handleRollDice = (
   }
 
   if (currentTurnPlayer.doublesInRow === GAME_RULES.MAX_DOUBLES_BEFORE_JAIL) {
-    currentTurnPlayer.doublesInRow = 0;
-    currentTurnPlayer.bonusRoll = false;
     game.gameLog.push({
       username: game.currentTurn,
       msg: "Rolled 3 doubles in a row and went to jail",
