@@ -1,14 +1,21 @@
 <script setup lang="ts">
-  import type { PropType } from "vue";
-  import type { Tile } from "~/types";
+  import { computed, nextTick, onMounted, onUnmounted, ref, watch, type PropType } from "vue";
+  import { useResizeObserver } from "@vueuse/core";
+  import type { GameState, Player, Tile } from "~/types";
+  import {
+    SLOT_REFLOW_DURATION_MS,
+    usePlayerMovementAnimation,
+    type MeasuredTileRect,
+  } from "~/composables/usePlayerMovementAnimation";
+  import { getCoLocatedTokenOffset } from "~/utils/playerMovement";
 
-  defineProps({
+  const props = defineProps({
     tiles: {
       type: Array as PropType<Tile[]>,
       required: true,
     },
     gameState: {
-      type: Object,
+      type: Object as PropType<GameState>,
       required: true,
     },
     showTileInfo: {
@@ -25,7 +32,159 @@
     },
   });
 
-  defineEmits(["activateTrade"]);
+  const emit = defineEmits(["activateTrade", "animationStateChange"]);
+
+  const boardRef = ref<HTMLElement | null>(null);
+  const tileRects = ref<Record<number, MeasuredTileRect>>({});
+  const isSuppressingLayoutTransition = ref(false);
+  let layoutSuppressRafId: number | null = null;
+
+  const {
+    displayedPositions,
+    activePose,
+    isAnimating,
+    isReducedMotion,
+  } = usePlayerMovementAnimation(
+    () => props.gameState,
+    () => tileRects.value
+  );
+
+  watch(
+    isAnimating,
+    (animating) => {
+      emit("animationStateChange", animating);
+    },
+    { immediate: true }
+  );
+
+  const measureTilePositions = () => {
+    const boardEl = boardRef.value;
+    if (!boardEl) return;
+
+    const boardRect = boardEl.getBoundingClientRect();
+    if (boardRect.width === 0 || boardRect.height === 0) return;
+
+    const measured: Record<number, MeasuredTileRect> = {};
+    const tileEls = boardEl.querySelectorAll<HTMLElement>("[data-tile-id]");
+
+    tileEls.forEach((el) => {
+      const tileId = Number(el.dataset.tileId);
+      if (!Number.isFinite(tileId)) return;
+      const rect = el.getBoundingClientRect();
+      measured[tileId] = {
+        cx: rect.left - boardRect.left + rect.width / 2,
+        cy: rect.top - boardRect.top + rect.height / 2,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+
+    isSuppressingLayoutTransition.value = true;
+    if (layoutSuppressRafId !== null) {
+      cancelAnimationFrame(layoutSuppressRafId);
+    }
+    layoutSuppressRafId = requestAnimationFrame(() => {
+      isSuppressingLayoutTransition.value = false;
+      layoutSuppressRafId = null;
+    });
+
+    tileRects.value = measured;
+  };
+
+  useResizeObserver(boardRef, measureTilePositions);
+
+  onMounted(async () => {
+    await nextTick();
+    measureTilePositions();
+    window.addEventListener("resize", measureTilePositions);
+  });
+
+  onUnmounted(() => {
+    window.removeEventListener("resize", measureTilePositions);
+    if (layoutSuppressRafId !== null) {
+      cancelAnimationFrame(layoutSuppressRafId);
+    }
+  });
+
+  watch(
+    () => props.tiles.length,
+    async (len) => {
+      if (len > 0) {
+        await nextTick();
+        measureTilePositions();
+      }
+    }
+  );
+
+  interface RenderedToken {
+    player: Player;
+    x: number;
+    y: number;
+    transitionDurationMs: number;
+    transitionEasing: string;
+    isMoving: boolean;
+    lift: number;
+  }
+
+  const activePlayers = computed<Player[]>(() => props.gameState?.players ?? []);
+
+  const renderedTokens = computed<RenderedToken[]>(() => {
+    const playersList = activePlayers.value;
+    const pose = activePose.value;
+    const groupedByTile = new Map<number, string[]>();
+
+    for (const player of playersList) {
+      const tileId = displayedPositions.value[player.username] ?? player.position;
+      const group = groupedByTile.get(tileId) ?? [];
+      group.push(player.username);
+      groupedByTile.set(tileId, group);
+    }
+
+    const reflowDurationMs =
+      isSuppressingLayoutTransition.value || isReducedMotion.value
+        ? 0
+        : SLOT_REFLOW_DURATION_MS;
+
+    const tokens: RenderedToken[] = [];
+    for (const player of playersList) {
+      if (pose && pose.username === player.username) {
+        tokens.push({
+          player,
+          x: pose.x,
+          y: pose.y,
+          transitionDurationMs: 0,
+          transitionEasing: "linear",
+          isMoving: true,
+          lift: pose.lift,
+        });
+        continue;
+      }
+
+      const tileId = displayedPositions.value[player.username] ?? player.position;
+      const rect = tileRects.value[tileId];
+      if (!rect) continue;
+
+      const group = groupedByTile.get(tileId) ?? [player.username];
+      const offset = getCoLocatedTokenOffset(
+        group.indexOf(player.username),
+        group.length,
+        rect.width,
+        rect.height
+      );
+
+      tokens.push({
+        player,
+        x: rect.cx + offset.dx,
+        y: rect.cy + offset.dy,
+        transitionDurationMs: reflowDurationMs,
+        transitionEasing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        isMoving: false,
+        lift: 0,
+      });
+    }
+
+    return tokens;
+  });
 </script>
 
 <template>
@@ -43,6 +202,7 @@
 
       <div
         v-if="tiles && tiles.length"
+        ref="boardRef"
         class="board"
       >
         <div class="center">
@@ -130,6 +290,21 @@
             ]"
           />
         </div>
+
+        <!-- Persistent Player Tokens Overlay -->
+        <div class="player-tokens-layer">
+          <PlayerBase
+            v-for="token in renderedTokens"
+            :key="token.player.username"
+            :player="token.player"
+            :x="token.x"
+            :y="token.y"
+            :transition-duration-ms="token.transitionDurationMs"
+            :transition-easing="token.transitionEasing"
+            :is-moving="token.isMoving"
+            :lift="token.lift"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -179,12 +354,20 @@
   }
 
   .board {
+    position: relative;
     display: grid;
     grid-template-columns: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for columns
     grid-template-rows: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for rows
     grid-gap: 2px;
     max-height: 95vmin;
     width: fit-content;
+  }
+
+  .player-tokens-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
   }
 
   .center {

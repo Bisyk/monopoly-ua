@@ -14,6 +14,11 @@ const players = ref<Player[]>([]);
 const username = sessionStorage.getItem("username");
 const tileInfo = ref(null);
 const tileInfoStyle = ref({ top: 0, left: 0 });
+const isMoveAnimating = ref(false);
+
+const handleAnimationStateChange = (animating: boolean) => {
+  isMoveAnimating.value = animating;
+};
 
 // @ts-ignore
 const protocol = location.protocol === "https:" ? "wss" : "ws";
@@ -99,6 +104,9 @@ const setTradePlayerUsername = (username: string) => {
   tradePlayerUsername.value = username;
 };
 
+const isActiveTurnReady = computed(
+  () => !isMoveAnimating.value && gameState.value?.currentTurn === username
+);
 const isGameEnded = computed(() => gameState.value?.status === "ENDED");
 const gameWinnerText = computed(() => {
   if (!isGameEnded.value) {
@@ -191,7 +199,7 @@ definePageMeta({
 
     <ModalRoll
       v-if="
-        gameState.currentTurn === username &&
+        isActiveTurnReady &&
         gameState.currentAction === 'roll' &&
         !player.jailed
       "
@@ -200,7 +208,7 @@ definePageMeta({
     />
 
     <ModalJail
-      v-if="gameState.currentTurn === username && player.jailed"
+      v-if="isActiveTurnReady && player.jailed"
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleUserTurn="handleUserTurn"
@@ -208,9 +216,7 @@ definePageMeta({
     />
 
     <ModalBuy
-      v-if="
-        gameState.currentTurn === username && gameState.currentAction === 'buy'
-      "
+      v-if="isActiveTurnReady && gameState.currentAction === 'buy'"
       :tileName="currentTilePlayerOn.name"
       :tilePrice="currentTilePlayerOn.price"
       :playerBalance="player.balance"
@@ -237,10 +243,7 @@ definePageMeta({
     />
 
     <ModalPayRent
-      v-if="
-        gameState.currentTurn === username &&
-        gameState.currentAction === 'payRent'
-      "
+      v-if="isActiveTurnReady && gameState.currentAction === 'payRent'"
       :tilePlayerOn="currentTilePlayerOn"
       :turnResult="turnResult"
       :playerBalance="player.balance"
@@ -250,7 +253,7 @@ definePageMeta({
 
     <ModalPayChance
       v-if="
-        gameState.currentTurn === username &&
+        isActiveTurnReady &&
         gameState.currentAction === 'chance' &&
         gameState.activeChance.type === 'minusBalance'
       "
@@ -262,10 +265,7 @@ definePageMeta({
     />
 
     <ModalPayTax
-      v-if="
-        gameState.currentTurn === username &&
-        gameState.currentAction === 'payTax'
-      "
+      v-if="isActiveTurnReady && gameState.currentAction === 'payTax'"
       :taxAmount="currentTilePlayerOn.taxAmount"
       :playerBalance="player.balance"
       @handlePayTax="handlePayTax"
@@ -316,6 +316,7 @@ definePageMeta({
       :players="players"
       :player="player"
       @activateTrade="(username: string) => activateTrade(username)"
+      @animationStateChange="handleAnimationStateChange"
     />
   </div>
 
