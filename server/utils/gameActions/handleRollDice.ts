@@ -1,16 +1,20 @@
 import { chances } from "~/server/constants";
 import { changePlayerTurn } from "./changePlayerTurn";
-import { GameState, Player, Tile } from "~/types";
+import type { GameState, MoveSegment, Player, PlayerMoveEvent, Tile } from "~/types";
 import { GAME_RULES } from "~/shared/constants/gameRules";
+
+const JAIL_TILE_ID = 11;
 
 export const handleRollDice = (
   game: GameState,
   currentTurnPlayer: Player,
   currentTurnPlayerIdx: number,
   parsedMessage: any
-) => {
+): PlayerMoveEvent | null => {
   const boardSize = GAME_RULES.BOARD_SIZE;
   const { left, right } = parsedMessage.payload.turnResult;
+  const startPosition = currentTurnPlayer.position;
+  const segments: MoveSegment[] = [];
 
   if (left === right) {
     currentTurnPlayer.doublesInRow += 1;
@@ -31,9 +35,31 @@ export const handleRollDice = (
   if (currentTurnPlayer.doublesInRow === GAME_RULES.MAX_DOUBLES_BEFORE_JAIL) {
     currentTurnPlayer.jailed = true;
     currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
-    currentTurnPlayer.position = 10;
+    currentTurnPlayer.doublesInRow = 0;
+    currentTurnPlayer.bonusRoll = false;
+    currentTurnPlayer.position = JAIL_TILE_ID;
     game.currentAction = "roll";
+    game.gameLog.push({
+      username: game.currentTurn,
+      msg: "Rolled 3 doubles in a row and went to jail",
+    });
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
+
+    if (startPosition !== JAIL_TILE_ID) {
+      segments.push({
+        from: startPosition,
+        to: JAIL_TILE_ID,
+        mode: "direct",
+      });
+    }
+
+    return segments.length
+      ? {
+          moveId: crypto.randomUUID(),
+          username: currentTurnPlayer.username,
+          segments,
+        }
+      : null;
   }
 
   if (currentTurnPlayer.jailed) {
@@ -49,7 +75,7 @@ export const handleRollDice = (
         msg: `You failed to roll doubles and stay in jail. Turns left: ${currentTurnPlayer.turnsInJail}`,
       });
       changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
-      return;
+      return null;
     }
 
     if (left === right) {
@@ -74,6 +100,14 @@ export const handleRollDice = (
     ((currentTurnPlayer.position + left + right - 1) % boardSize) + 1;
 
   currentTurnPlayer.position = newPlayerPosition;
+  if (startPosition !== newPlayerPosition) {
+    segments.push({
+      from: startPosition,
+      to: newPlayerPosition,
+      mode: "step",
+    });
+  }
+
   const tilePlayerOn = game.board.tiles.find(
     (t: Tile) => t.id === newPlayerPosition
   );
@@ -118,11 +152,20 @@ export const handleRollDice = (
     });
 
     if (yourChance.type === "goToJail") {
-      currentTurnPlayer.position = yourChance.tileId!;
+      const targetTileId = yourChance.tileId ?? JAIL_TILE_ID;
+      currentTurnPlayer.position = targetTileId;
       currentTurnPlayer.jailed = true;
-      currentTurnPlayer.turnsInJail = 3;
+      currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
       game.currentAction = "roll";
       changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
+
+      if (newPlayerPosition !== targetTileId) {
+        segments.push({
+          from: newPlayerPosition,
+          to: targetTileId,
+          mode: "direct",
+        });
+      }
     }
 
     if (yourChance.type === "minusBalance") {
@@ -182,13 +225,29 @@ export const handleRollDice = (
 
   if (tilePlayerOn!.type === "goToJail") {
     currentTurnPlayer.jailed = true;
-    currentTurnPlayer.turnsInJail = 3;
-    currentTurnPlayer.position = 11;
+    currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
+    currentTurnPlayer.position = JAIL_TILE_ID;
     game.currentAction = "roll";
     game.gameLog.push({
       username: game.currentTurn,
       msg: "You are going in jail",
     });
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
+
+    if (newPlayerPosition !== JAIL_TILE_ID) {
+      segments.push({
+        from: newPlayerPosition,
+        to: JAIL_TILE_ID,
+        mode: "direct",
+      });
+    }
   }
+
+  return segments.length
+    ? {
+        moveId: crypto.randomUUID(),
+        username: currentTurnPlayer.username,
+        segments,
+      }
+    : null;
 };

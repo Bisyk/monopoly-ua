@@ -1,10 +1,11 @@
 import prisma from "~/lib/prisma";
-import { GameState } from "~/types";
+import type { GameState, PlayerMoveEvent } from "~/types";
 
 export const broadcastGameState = async (
   roomId: string,
   peer: any,
-  newGameState: GameState
+  newGameState: GameState,
+  lastMove?: PlayerMoveEvent | null
 ) => {
   const updatedGame = await prisma.game.update({
     where: {
@@ -20,11 +21,14 @@ export const broadcastGameState = async (
       activeAuctionBidder: newGameState.activeAuctionBidder,
       auctionBidAmount: newGameState.auctionBidAmount,
       auctionedTileId: newGameState.auctionedTileId,
-      activeChance: newGameState.activeChance ,
+      activeChance: newGameState.activeChance,
       activeTrade: newGameState.activeTrade,
     },
   });
 
-  peer.send(JSON.stringify(updatedGame));
-  peer.publish(roomId, JSON.stringify(updatedGame));
+  const payload = lastMove ? { ...updatedGame, lastMove } : updatedGame;
+  const serialized = JSON.stringify(payload);
+
+  peer.send(serialized);
+  peer.publish(roomId, serialized);
 };

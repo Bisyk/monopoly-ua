@@ -101,13 +101,14 @@ export default defineWebSocketHandler({
     const currentTurnPlayerIdx = game.players.indexOf(currentTurnPlayer);
 
     if (parsedMessage.action === "ROLL_DICE") {
-      handleRollDice(
+      const lastMove = handleRollDice(
         game,
         currentTurnPlayer,
         currentTurnPlayerIdx,
         parsedMessage
       );
-      broadcastGameState(roomId, peer, game);
+      await broadcastGameState(roomId, peer, game, lastMove);
+      return;
     }
 
     if (parsedMessage.action === "BUY_PROPERTY") {

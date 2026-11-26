@@ -50,6 +50,20 @@ export interface CreatedGame {
   createdAt: string;
 }
 
+export type MoveMode = "step" | "direct";
+
+export interface MoveSegment {
+  from: number;
+  to: number;
+  mode: MoveMode;
+}
+
+export interface PlayerMoveEvent {
+  moveId: string;
+  username: string;
+  segments: MoveSegment[];
+}
+
 export interface GameState {
   players: Player[];
   status: GameStatuses;
@@ -67,6 +81,7 @@ export interface GameState {
   auctionBidAmount?: number | null;
   auctionedTileId?: number | null;
   activeTrade: Trade | null;
+  lastMove?: PlayerMoveEvent | null;
 }
 
 export interface BoardState {

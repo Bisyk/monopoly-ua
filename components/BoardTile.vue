@@ -95,7 +95,7 @@ const tileBgColor = computed(() => {
 </script>
 
 <template>
-  <div :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`"
+  <div :data-tile-id="props.tile.id" :class="`space ${isCorner ? 'corner' : ''} ${props.tile.type}`" :style="`background-color: ${tileBgColor}`"
     @click="(e) => (['property', 'bonus-property', 'car'].includes(props.tile.type) ? $emit('showTileInfo', e, tile) : null)">
     <div v-if="props.tile.mortgaged" class="mortgaged-container">
       🔒
@@ -122,10 +122,6 @@ const tileBgColor = computed(() => {
       <div class="heroContainer">
         <img :src="`/assets/sprites/ua/${props.tile.assetId}.webp`" class="heroImage"
           :style="isHorizontalProperty ? { transform: 'rotate(270deg)' } : {}" />
-        <div class="player-container">
-          <PlayerBase v-for="player in props.players" :key="player.username" :player="player"
-            :tile-id="props.tile.id" />
-        </div>
       </div>
     </div>
   </div>
@@ -133,12 +129,6 @@ const tileBgColor = computed(() => {
 
 
 <style lang="scss" scoped>
-.player-container {
-  position: absolute;
-  z-index: 5;
-  top: 0;
-  left: 0;
-}
 
 .space {
   background: white;
@@ -254,18 +244,6 @@ const tileBgColor = computed(() => {
     justify-content: center;
     width: 100%;
   }
-}
-
-.player-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
 }
 
 .mortgaged-container {

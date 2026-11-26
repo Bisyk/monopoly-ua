@@ -14,6 +14,11 @@ const players = ref<Player[]>([]);
 const username = sessionStorage.getItem("username");
 const tileInfo = ref(null);
 const tileInfoStyle = ref({ top: 0, left: 0 });
+const isMoveAnimating = ref(false);
+
+const handleAnimationStateChange = (animating: boolean) => {
+  isMoveAnimating.value = animating;
+};
 
 // @ts-ignore
 const protocol = location.protocol === "https:" ? "wss" : "ws";
@@ -191,6 +196,7 @@ definePageMeta({
 
     <ModalRoll
       v-if="
+        !isMoveAnimating &&
         gameState.currentTurn === username &&
         gameState.currentAction === 'roll' &&
         !player.jailed
@@ -200,7 +206,11 @@ definePageMeta({
     />
 
     <ModalJail
-      v-if="gameState.currentTurn === username && player.jailed"
+      v-if="
+        !isMoveAnimating &&
+        gameState.currentTurn === username &&
+        player.jailed
+      "
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleUserTurn="handleUserTurn"
@@ -209,7 +219,9 @@ definePageMeta({
 
     <ModalBuy
       v-if="
-        gameState.currentTurn === username && gameState.currentAction === 'buy'
+        !isMoveAnimating &&
+        gameState.currentTurn === username &&
+        gameState.currentAction === 'buy'
       "
       :tileName="currentTilePlayerOn.name"
       :tilePrice="currentTilePlayerOn.price"
@@ -238,6 +250,7 @@ definePageMeta({
 
     <ModalPayRent
       v-if="
+        !isMoveAnimating &&
         gameState.currentTurn === username &&
         gameState.currentAction === 'payRent'
       "
@@ -250,6 +263,7 @@ definePageMeta({
 
     <ModalPayChance
       v-if="
+        !isMoveAnimating &&
         gameState.currentTurn === username &&
         gameState.currentAction === 'chance' &&
         gameState.activeChance.type === 'minusBalance'
@@ -263,6 +277,7 @@ definePageMeta({
 
     <ModalPayTax
       v-if="
+        !isMoveAnimating &&
         gameState.currentTurn === username &&
         gameState.currentAction === 'payTax'
       "
@@ -316,6 +331,7 @@ definePageMeta({
       :players="players"
       :player="player"
       @activateTrade="(username: string) => activateTrade(username)"
+      @animationStateChange="handleAnimationStateChange"
     />
   </div>
 

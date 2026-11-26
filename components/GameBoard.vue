@@ -1,14 +1,21 @@
 <script setup lang="ts">
-  import type { PropType } from "vue";
-  import type { Tile } from "~/types";
+  import { computed, nextTick, onMounted, onUnmounted, ref, watch, type PropType } from "vue";
+  import { useResizeObserver } from "@vueuse/core";
+  import type { GameState, Player, Tile } from "~/types";
+  import {
+    SLOT_REFLOW_DURATION_MS,
+    usePlayerMovementAnimation,
+    type MeasuredTileRect,
+  } from "~/composables/usePlayerMovementAnimation";
+  import { getCoLocatedTokenOffset } from "~/utils/playerMovement";
 
-  defineProps({
+  const props = defineProps({
     tiles: {
       type: Array as PropType<Tile[]>,
       required: true,
     },
     gameState: {
-      type: Object,
+      type: Object as PropType<GameState>,
       required: true,
     },
     showTileInfo: {
@@ -25,7 +32,157 @@
     },
   });
 
-  defineEmits(["activateTrade"]);
+  const emit = defineEmits(["activateTrade", "animationStateChange"]);
+
+  const boardRef = ref<HTMLElement | null>(null);
+  const tileRects = ref<Record<number, MeasuredTileRect>>({});
+  const isSuppressingLayoutTransition = ref(false);
+  let layoutSuppressRafId: number | null = null;
+
+  const {
+    displayedPositions,
+    activePose,
+    movingUsername,
+    isAnimating,
+    isReducedMotion,
+  } = usePlayerMovementAnimation(
+    () => props.gameState,
+    () => tileRects.value
+  );
+
+  watch(
+    isAnimating,
+    (animating) => {
+      emit("animationStateChange", animating);
+    },
+    { immediate: true }
+  );
+
+  const measureTilePositions = (suppressTransition = false) => {
+    const boardEl = boardRef.value;
+    if (!boardEl) return;
+
+    const boardRect = boardEl.getBoundingClientRect();
+    if (boardRect.width === 0 || boardRect.height === 0) return;
+
+    const measured: Record<number, MeasuredTileRect> = {};
+    const tileEls = boardEl.querySelectorAll<HTMLElement>("[data-tile-id]");
+
+    tileEls.forEach((el) => {
+      const tileId = Number(el.dataset.tileId);
+      if (!Number.isFinite(tileId)) return;
+      const rect = el.getBoundingClientRect();
+      measured[tileId] = {
+        cx: rect.left - boardRect.left + rect.width / 2,
+        cy: rect.top - boardRect.top + rect.height / 2,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+
+    if (suppressTransition) {
+      isSuppressingLayoutTransition.value = true;
+      if (layoutSuppressRafId !== null) {
+        cancelAnimationFrame(layoutSuppressRafId);
+      }
+      layoutSuppressRafId = requestAnimationFrame(() => {
+        isSuppressingLayoutTransition.value = false;
+        layoutSuppressRafId = null;
+      });
+    }
+
+    tileRects.value = measured;
+  };
+
+  useResizeObserver(boardRef, () => {
+    measureTilePositions(true);
+  });
+
+  const handleWindowResize = () => {
+    measureTilePositions(true);
+  };
+
+  onMounted(async () => {
+    await nextTick();
+    measureTilePositions(true);
+    window.addEventListener("resize", handleWindowResize);
+  });
+
+  onUnmounted(() => {
+    window.removeEventListener("resize", handleWindowResize);
+    if (layoutSuppressRafId !== null) {
+      cancelAnimationFrame(layoutSuppressRafId);
+    }
+  });
+
+  watch(
+    () => props.tiles.length,
+    async (len) => {
+      if (len > 0) {
+        await nextTick();
+        measureTilePositions(true);
+      }
+    }
+  );
+
+  const activePlayers = computed<Player[]>(() => props.gameState?.players ?? []);
+
+  const renderedTokens = computed(() => {
+    const playersList = activePlayers.value;
+    const pose = activePose.value;
+    const groupedByTile = new Map<number, string[]>();
+
+    for (const p of playersList) {
+      const tileId = displayedPositions.value[p.username] ?? p.position;
+      const group = groupedByTile.get(tileId) ?? [];
+      group.push(p.username);
+      groupedByTile.set(tileId, group);
+    }
+
+    return playersList
+      .map((p) => {
+        if (pose && pose.username === p.username) {
+          return {
+            player: p,
+            x: pose.x,
+            y: pose.y,
+            transitionDurationMs: 0,
+            transitionEasing: "linear",
+            isMoving: true,
+            moveMode: pose.mode,
+            lift: pose.lift,
+          };
+        }
+
+        const tileId = displayedPositions.value[p.username] ?? p.position;
+        const rect = tileRects.value[tileId];
+        if (!rect) return null;
+
+        const group = groupedByTile.get(tileId) ?? [p.username];
+        const slotIndex = group.indexOf(p.username);
+        const offset = getCoLocatedTokenOffset(
+          slotIndex,
+          group.length,
+          rect.width,
+          rect.height
+        );
+
+        return {
+          player: p,
+          x: rect.cx + offset.dx,
+          y: rect.cy + offset.dy,
+          transitionDurationMs:
+            isSuppressingLayoutTransition.value || isReducedMotion.value
+              ? 0
+              : SLOT_REFLOW_DURATION_MS,
+          transitionEasing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          isMoving: movingUsername.value === p.username,
+          moveMode: "idle" as const,
+          lift: 0,
+        };
+      })
+      .filter((t): t is NonNullable<typeof t> => t !== null);
+  });
 </script>
 
 <template>
@@ -43,6 +200,7 @@
 
       <div
         v-if="tiles && tiles.length"
+        ref="boardRef"
         class="board"
       >
         <div class="center">
@@ -130,6 +288,22 @@
             ]"
           />
         </div>
+
+        <!-- Persistent Player Tokens Overlay -->
+        <div class="player-tokens-layer">
+          <PlayerBase
+            v-for="token in renderedTokens"
+            :key="token.player.username"
+            :player="token.player"
+            :x="token.x"
+            :y="token.y"
+            :transition-duration-ms="token.transitionDurationMs"
+            :transition-easing="token.transitionEasing"
+            :is-moving="token.isMoving"
+            :move-mode="token.moveMode"
+            :lift="token.lift"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -179,12 +353,20 @@
   }
 
   .board {
+    position: relative;
     display: grid;
     grid-template-columns: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for columns
     grid-template-rows: $corner-tile-size repeat(9, $tile-size) $corner-tile-size; // Use viewport width units for rows
     grid-gap: 2px;
     max-height: 95vmin;
     width: fit-content;
+  }
+
+  .player-tokens-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
   }
 
   .center {
