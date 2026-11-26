@@ -11,7 +11,7 @@ import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties
 const route = useRoute();
 const router = useRouter();
 const players = ref<Player[]>([]);
-const username = sessionStorage.getItem("username");
+const username = sessionStorage.getItem("username") || "";
 const tileInfo = ref(null);
 const tileInfoStyle = ref({ top: 0, left: 0 });
 const isMoveAnimating = ref(false);
@@ -61,38 +61,46 @@ handleMessage((message: string) => {
   gameState.value = JSON.parse(message);
 });
 
-const showTileInfo = async (event: any, tile: Tile) => {
-  const tileRect = event.target.getBoundingClientRect();
-  const containerRect = document
-    .querySelector(".gameContainer")!
-    .getBoundingClientRect();
+const showTileInfo = async (event: Event, tile: Tile) => {
+  const targetEl =
+    (event.currentTarget as HTMLElement | null) ||
+    ((event.target as HTMLElement | null)?.closest(
+      "[data-tile-id]"
+    ) as HTMLElement | null) ||
+    (event.target as HTMLElement | null);
+
+  if (!targetEl) return;
+
+  const tileRect = targetEl.getBoundingClientRect();
   selectedTile.value = tile;
   const position = getTilePosition(tile.id);
+
   await nextTick();
 
-  let top = tileRect.top - containerRect.top;
-  let left = tileRect.left - containerRect.left;
+  const cardEl = (tileInfo.value as { $el?: HTMLElement } | null)?.$el;
+  const cardRect = cardEl?.getBoundingClientRect();
+  const cardWidth = cardRect?.width || 296;
+  const cardHeight = cardRect?.height || 420;
+  const gap = 12;
+  const pad = 12;
+
+  let top = tileRect.top + tileRect.height / 2 - cardHeight / 2;
+  let left = tileRect.left + tileRect.width / 2 - cardWidth / 2;
 
   if (position === "top") {
-    top += tileRect.height;
+    top = tileRect.bottom + gap;
+  } else if (position === "bottom") {
+    top = tileRect.top - cardHeight - gap;
+  } else if (position === "left") {
+    left = tileRect.right + gap;
+  } else if (position === "right") {
+    left = tileRect.left - cardWidth - gap;
   }
 
-  if (position === "right") {
-    left -= tileRect.width;
-    top -= tileRect.height * 1.8;
-  }
+  left = Math.max(pad, Math.min(left, window.innerWidth - cardWidth - pad));
+  top = Math.max(pad, Math.min(top, window.innerHeight - cardHeight - pad));
 
-  if (position === "bottom") {
-    top -= tileRect.height * 2.3;
-  }
-
-  if (position === "left") {
-    left += tileRect.width;
-    top -= tileRect.height * 1.8;
-  }
-
-  tileInfoStyle.value.top = top;
-  tileInfoStyle.value.left = left;
+  tileInfoStyle.value = { top, left };
 };
 
 const activateTrade = (username: string) => {
@@ -117,8 +125,11 @@ const gameWinnerText = computed(() => {
     ? `Winner: ${gameState.value.winnerUsername}`
     : "Game ended";
 });
+const auctionedTile = computed(() =>
+  tiles.value.find((t: Tile) => t.id === gameState.value?.auctionedTileId)
+);
 
-onClickOutside(tileInfo, (event) => {
+onClickOutside(tileInfo, () => {
   selectedTile.value = null;
 });
 
@@ -153,29 +164,13 @@ definePageMeta({
 </script>
 
 <template>
-  <div
-    style="
-      position: fixed;
-      top: 0;
-      right: 0;
-      z-index: 9999;
-      height: 100vh;
-      width: fit-content;
-      overflow-y: scroll;
-      max-width: 40vmin;
-    "
-  >
-    <pre>
-      {{ tradePlayerUsername }}
-      {{ tradeTiles }}
-      {{ fullSetsGroups }}
-      {{ gameState }}
-    </pre>
-  </div>
-
   <div class="gameContainer" v-if="gameState">
     <div v-if="isGameEnded" class="gameEndedBanner">
-      {{ gameWinnerText }}
+      <GameIcon name="trophy" :size="22" />
+      <span>{{ gameWinnerText }}</span>
+      <BaseButton size="sm" variant="secondary" @click="router.push('/')">
+        LOBBY
+      </BaseButton>
     </div>
 
     <TileInfoCard
@@ -217,8 +212,10 @@ definePageMeta({
 
     <ModalBuy
       v-if="isActiveTurnReady && gameState.currentAction === 'buy'"
+      :tileId="currentTilePlayerOn.id"
       :tileName="currentTilePlayerOn.name"
       :tilePrice="currentTilePlayerOn.price"
+      :assetId="currentTilePlayerOn.assetId"
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleBuyProperty="handleBuyProperty(currentTilePlayerOn.id)"
@@ -228,10 +225,12 @@ definePageMeta({
     <ModalAuction
       v-if="
         gameState.currentAction === 'auction' &&
-        gameState.activeAuctionBidder === username
+        gameState.activeAuctionBidder === username &&
+        auctionedTile
       "
-      :tileOnAuctionName="tiles.filter((t: Tile) => t.id === gameState.auctionedTileId)[0].name"
+      :tileOnAuctionName="auctionedTile.name"
       :tileOnAuctionPrice="gameState.auctionBidAmount + 10"
+      :assetId="auctionedTile.assetId"
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleBidAuctionProperty="
@@ -268,10 +267,11 @@ definePageMeta({
       v-if="isActiveTurnReady && gameState.currentAction === 'payTax'"
       :taxAmount="currentTilePlayerOn.taxAmount"
       :playerBalance="player.balance"
+      :isSending="isSending"
       @handlePayTax="handlePayTax"
     />
 
-    <!--SEND TRADE MODAL -->
+    <!-- SEND TRADE MODAL -->
     <TradeModal
       v-if="tradePlayerUsername"
       :tradePlayerUsername="tradePlayerUsername"
@@ -315,44 +315,102 @@ definePageMeta({
       :showTileInfo="showTileInfo"
       :players="players"
       :player="player"
+      :selectedTileId="selectedTile?.id ?? null"
       @activateTrade="(username: string) => activateTrade(username)"
       @animationStateChange="handleAnimationStateChange"
     />
   </div>
 
-  <div v-else>Loading...</div>
+  <div v-else class="loading-screen">
+    <div class="loading-card">
+      <div class="loading-card__bar">
+        <GameIcon name="dice" :size="20" />
+        <span>MONOPOLY UA</span>
+      </div>
+      <div class="loading-card__body">
+        <div class="loading-card__title">LOADING MATCH...</div>
+        <p class="loading-card__sub">Syncing board state and room players.</p>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">
 .gameContainer {
   position: relative;
-  max-width: 100%;
-  max-height: fit-content;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 4fr;
-
-  .playersContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-  }
-
-  .player {
-    border: 1px solid black;
-  }
+  width: 100%;
+  min-height: 100vh;
 }
 
 .gameEndedBanner {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 50;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--gold-light);
+  color: var(--ink);
+  padding: 10px 16px;
+  border: 2.5px solid var(--outline);
+  border-radius: var(--radius-md);
+  box-shadow: 0 5px 0 var(--outline);
+  font-family: var(--font-display);
+  font-size: 16px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.loading-card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border: 2.5px solid var(--outline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--modal-shadow);
+  overflow: hidden;
+}
+
+.loading-card__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  background: var(--accent);
+  color: #ffffff;
+  border-bottom: 2.5px solid var(--outline);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.loading-card__body {
+  padding: 20px 18px;
+  text-align: center;
+}
+
+.loading-card__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.loading-card__sub {
+  font-size: 13px;
+  color: var(--ink-muted);
 }
 </style>
