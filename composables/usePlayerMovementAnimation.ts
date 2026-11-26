@@ -1,12 +1,6 @@
-import {
-  computed,
-  onScopeDispose,
-  ref,
-  watch,
-  type Ref,
-} from "vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { usePreferredReducedMotion } from "@vueuse/core";
-import type { GameState, MoveMode, MoveSegment, Player, PlayerMoveEvent } from "~/types";
+import type { GameState, MoveMode, MoveSegment, Player } from "~/types";
 import {
   buildStepPath,
   computeStepSegmentDurationMs,
@@ -31,7 +25,6 @@ export interface AnimatedTokenPose {
   x: number;
   y: number;
   lift: number;
-  mode: MoveMode | "idle";
 }
 
 export const DIRECT_DURATION_MS = 520;
@@ -47,16 +40,172 @@ interface PreparedSegment {
   isLast: boolean;
 }
 
+function buildPositionsMap(players: Player[]): Record<string, number> {
+  const positions: Record<string, number> = {};
+  for (const player of players) {
+    positions[player.username] = player.position;
+  }
+  return positions;
+}
+
+function computeSlotCoord(
+  username: string,
+  tileId: number,
+  players: Player[],
+  positionsMap: Record<string, number>,
+  rects: Record<number, MeasuredTileRect>
+): Point2D | null {
+  const rect = rects[tileId];
+  if (!rect) return null;
+
+  const group = players
+    .filter((player) => (positionsMap[player.username] ?? player.position) === tileId)
+    .map((player) => player.username);
+
+  const slotIndex = group.indexOf(username);
+  if (slotIndex === -1) {
+    return { x: rect.cx, y: rect.cy };
+  }
+
+  const offset = getCoLocatedTokenOffset(
+    slotIndex,
+    group.length,
+    rect.width,
+    rect.height
+  );
+  return { x: rect.cx + offset.dx, y: rect.cy + offset.dy };
+}
+
+function prepareSegments(segments: MoveSegment[]): PreparedSegment[] {
+  const prepared: PreparedSegment[] = [];
+
+  for (const segment of segments) {
+    let tileIds: number[];
+    let durationMs: number;
+
+    if (segment.mode === "step") {
+      const steps = buildStepPath(segment.from, segment.to, DEFAULT_BOARD_SIZE);
+      if (steps.length === 0) continue;
+      tileIds = [segment.from, ...steps];
+      durationMs = computeStepSegmentDurationMs(steps.length);
+    } else if (segment.mode === "direct") {
+      if (segment.from === segment.to) continue;
+      tileIds = [segment.from, segment.to];
+      durationMs = DIRECT_DURATION_MS;
+    } else {
+      continue;
+    }
+
+    prepared.push({
+      mode: segment.mode,
+      tileIds,
+      durationMs,
+      pauseBeforeMs: prepared.length > 0 ? DEFAULT_SEGMENT_PAUSE_MS : 0,
+      isFirst: prepared.length === 0,
+      isLast: false,
+    });
+  }
+
+  if (prepared.length > 0) {
+    prepared[prepared.length - 1].isLast = true;
+  }
+
+  return prepared;
+}
+
+function buildSegmentPolyline(
+  segment: PreparedSegment,
+  username: string,
+  rects: Record<number, MeasuredTileRect>,
+  initialRects: Record<number, MeasuredTileRect>,
+  startPointSnapshot: Point2D,
+  latestPlayers: Player[]
+): Point2D[] | null {
+  const rawPoints: Point2D[] = [];
+
+  for (let i = 0; i < segment.tileIds.length; i++) {
+    const tileId = segment.tileIds[i];
+    const rect = rects[tileId];
+    if (!rect) return null;
+
+    if (i === 0 && segment.isFirst) {
+      // Preserve exact takeoff slot unless the board resized mid-animation.
+      rawPoints.push(
+        rects === initialRects ? startPointSnapshot : { x: rect.cx, y: rect.cy }
+      );
+    } else if (i === segment.tileIds.length - 1 && segment.isLast) {
+      const destCoord =
+        computeSlotCoord(
+          username,
+          tileId,
+          latestPlayers,
+          buildPositionsMap(latestPlayers),
+          rects
+        ) ?? { x: rect.cx, y: rect.cy };
+      rawPoints.push(destCoord);
+    } else {
+      rawPoints.push({ x: rect.cx, y: rect.cy });
+    }
+  }
+
+  if (segment.mode === "step" && rawPoints.length >= 3) {
+    return smoothPolylinePoints(rawPoints, 0.35, 8);
+  }
+
+  return rawPoints;
+}
+
+function computeSegmentPose(
+  username: string,
+  segment: PreparedSegment,
+  polyline: Point2D[],
+  rawT: number,
+  easedT: number
+): AnimatedTokenPose {
+  const point = samplePolylineAtProgress(polyline, easedT);
+  const sinWave = Math.sin(Math.PI * rawT);
+
+  if (segment.mode === "direct") {
+    const first = polyline[0];
+    const last = polyline[polyline.length - 1];
+    const dist = Math.hypot(last.x - first.x, last.y - first.y);
+    const arcHeight = Math.min(26, dist * 0.08);
+    return {
+      username,
+      x: point.x,
+      y: point.y - sinWave * arcHeight,
+      lift: sinWave * 1.25,
+    };
+  }
+
+  return {
+    username,
+    x: point.x,
+    y: point.y,
+    lift: sinWave,
+  };
+}
+
+function buildFallbackSegment(from: number, to: number): MoveSegment {
+  const clockwiseDistance = (to - from + DEFAULT_BOARD_SIZE) % DEFAULT_BOARD_SIZE;
+  return {
+    from,
+    to,
+    mode: clockwiseDistance > 0 && clockwiseDistance <= 12 ? "step" : "direct",
+  };
+}
+
 export function usePlayerMovementAnimation(
   getGameState: () => GameState | undefined,
   getTileRects: () => Record<number, MeasuredTileRect>
 ) {
   const displayedPositions = ref<Record<string, number>>({});
   const activePose = ref<AnimatedTokenPose | null>(null);
-  const movingUsername = ref<string | null>(null);
   const preferredReducedMotion = usePreferredReducedMotion();
 
-  const isAnimating = computed(() => movingUsername.value !== null);
+  const movingUsername = computed(() => activePose.value?.username ?? null);
+  const isAnimating = computed(() => activePose.value !== null);
+  const isReducedMotion = computed(() => preferredReducedMotion.value === "reduce");
 
   let hasHydrated = false;
   let lastProcessedMoveId: string | null = null;
@@ -83,47 +232,42 @@ export function usePlayerMovementAnimation(
     return timer;
   };
 
-  const computeSlotCoord = (
-    username: string,
-    tileId: number,
-    players: Player[],
-    positionsMap: Record<string, number>,
-    rects: Record<number, MeasuredTileRect>
-  ): Point2D | null => {
-    const rect = rects[tileId];
-    if (!rect) return null;
-
-    const group = players
-      .filter((p) => (positionsMap[p.username] ?? p.position) === tileId)
-      .map((p) => p.username);
-
-    const slotIndex = group.indexOf(username);
-    if (slotIndex === -1) {
-      return { x: rect.cx, y: rect.cy };
-    }
-
-    const offset = getCoLocatedTokenOffset(
-      slotIndex,
-      group.length,
-      rect.width,
-      rect.height
-    );
-    return { x: rect.cx + offset.dx, y: rect.cy + offset.dy };
-  };
-
   const syncAllToAuthoritative = (players: Player[]) => {
-    const nextPositions: Record<string, number> = {};
-    for (const p of players) {
-      nextPositions[p.username] = p.position;
-    }
-    displayedPositions.value = nextPositions;
+    displayedPositions.value = buildPositionsMap(players);
     activePose.value = null;
-    movingUsername.value = null;
     activeRunDeadline = 0;
   };
 
+  const cancelActiveRun = () => {
+    activeRunId += 1;
+    clearScheduledWork();
+    activePose.value = null;
+    activeRunDeadline = 0;
+  };
+
+  const finishRun = (fallbackPlayers: Player[]) => {
+    clearScheduledWork();
+    syncAllToAuthoritative(getGameState()?.players ?? fallbackPlayers);
+  };
+
+  const addMissingPlayers = (players: Player[]) => {
+    const nextPositions = { ...displayedPositions.value };
+    let added = false;
+
+    for (const player of players) {
+      if (nextPositions[player.username] === undefined) {
+        nextPositions[player.username] = player.position;
+        added = true;
+      }
+    }
+
+    if (added) {
+      displayedPositions.value = nextPositions;
+    }
+  };
+
   const pruneEliminatedPlayers = (players: Player[]) => {
-    const activeNames = new Set(players.map((p) => p.username));
+    const activeNames = new Set(players.map((player) => player.username));
     const currentPos = { ...displayedPositions.value };
     let changed = false;
 
@@ -135,51 +279,12 @@ export function usePlayerMovementAnimation(
     }
 
     if (movingUsername.value && !activeNames.has(movingUsername.value)) {
-      activeRunId += 1;
-      clearScheduledWork();
-      activePose.value = null;
-      movingUsername.value = null;
-      activeRunDeadline = 0;
+      cancelActiveRun();
     }
 
     if (changed) {
       displayedPositions.value = currentPos;
     }
-  };
-
-  const prepareSegments = (segments: MoveSegment[]): PreparedSegment[] => {
-    const prepared: PreparedSegment[] = [];
-
-    for (const segment of segments) {
-      if (segment.mode === "step") {
-        const steps = buildStepPath(segment.from, segment.to, DEFAULT_BOARD_SIZE);
-        if (steps.length === 0) continue;
-        prepared.push({
-          mode: "step",
-          tileIds: [segment.from, ...steps],
-          durationMs: computeStepSegmentDurationMs(steps.length),
-          pauseBeforeMs: prepared.length > 0 ? DEFAULT_SEGMENT_PAUSE_MS : 0,
-          isFirst: prepared.length === 0,
-          isLast: false,
-        });
-      } else if (segment.mode === "direct") {
-        if (segment.from === segment.to) continue;
-        prepared.push({
-          mode: "direct",
-          tileIds: [segment.from, segment.to],
-          durationMs: DIRECT_DURATION_MS,
-          pauseBeforeMs: prepared.length > 0 ? DEFAULT_SEGMENT_PAUSE_MS : 0,
-          isFirst: prepared.length === 0,
-          isLast: false,
-        });
-      }
-    }
-
-    if (prepared.length > 0) {
-      prepared[prepared.length - 1].isLast = true;
-    }
-
-    return prepared;
   };
 
   const runSegments = (
@@ -188,12 +293,7 @@ export function usePlayerMovementAnimation(
     authoritativePlayers: Player[]
   ) => {
     const prepared = prepareSegments(segments);
-    if (prepared.length === 0) {
-      syncAllToAuthoritative(authoritativePlayers);
-      return;
-    }
-
-    if (preferredReducedMotion.value === "reduce") {
+    if (prepared.length === 0 || isReducedMotion.value) {
       syncAllToAuthoritative(authoritativePlayers);
       return;
     }
@@ -205,7 +305,7 @@ export function usePlayerMovementAnimation(
       return;
     }
 
-    // Snapshot takeoff position BEFORE updating displayedPositions so there is zero takeoff jump.
+    // Snapshot takeoff position before updating displayedPositions so there is zero takeoff jump.
     const prevPositions = { ...displayedPositions.value };
     const startPointSnapshot =
       activePose.value?.username === username
@@ -222,21 +322,13 @@ export function usePlayerMovementAnimation(
     const runId = activeRunId;
     clearScheduledWork();
 
-    // Authoritative positions map (used to compute exact resting destination slot).
-    const finalPositions: Record<string, number> = {};
-    for (const p of authoritativePlayers) {
-      finalPositions[p.username] = p.position;
-    }
-
-    // Update all stationary players (and destination tile) so co-located tokens gently make room.
-    displayedPositions.value = finalPositions;
-    movingUsername.value = username;
+    // Update resting positions immediately so co-located tokens gently reflow to make room.
+    displayedPositions.value = buildPositionsMap(authoritativePlayers);
     activePose.value = {
       username,
       x: startPointSnapshot.x,
       y: startPointSnapshot.y,
       lift: 0,
-      mode: prepared[0].mode,
     };
 
     const expectedTotalMs = prepared.reduce(
@@ -245,141 +337,71 @@ export function usePlayerMovementAnimation(
     );
     activeRunDeadline = Date.now() + expectedTotalMs + 120;
 
-    // Watchdog guarantees modals can never get stuck hidden.
+    // Watchdog guarantees turn modals can never get stuck hidden.
     const watchdogMs = Math.max(ANIMATION_WATCHDOG_MS, expectedTotalMs + 1000);
     scheduleTimeout(() => {
       if (runId !== activeRunId) return;
-      clearScheduledWork();
-      const latestPlayers = getGameState()?.players ?? authoritativePlayers;
-      syncAllToAuthoritative(latestPlayers);
+      finishRun(authoritativePlayers);
     }, watchdogMs);
 
-    const buildSegmentPolyline = (
-      seg: PreparedSegment,
-      rects: Record<number, MeasuredTileRect>,
-      latestPlayers: Player[]
-    ): Point2D[] | null => {
-      const rawPoints: Point2D[] = [];
+    const animateSegment = (segment: PreparedSegment, onComplete: () => void) => {
+      if (runId !== activeRunId) return;
 
-      for (let i = 0; i < seg.tileIds.length; i++) {
-        const tileId = seg.tileIds[i];
-        const rect = rects[tileId];
-        if (!rect) return null;
+      let startTime: number | null = null;
 
-        if (i === 0 && seg.isFirst) {
-          // Use the exact takeoff slot if layout hasn't resized, else current tile center.
-          const currentStart =
-            rects === initialRects
-              ? startPointSnapshot
-              : { x: rect.cx, y: rect.cy };
-          rawPoints.push(currentStart);
-        } else if (i === seg.tileIds.length - 1 && seg.isLast) {
-          const latestFinalMap: Record<string, number> = {};
-          for (const p of latestPlayers) {
-            latestFinalMap[p.username] = p.position;
-          }
-          const destCoord =
-            computeSlotCoord(
-              username,
-              tileId,
-              latestPlayers,
-              latestFinalMap,
-              rects
-            ) ?? { x: rect.cx, y: rect.cy };
-          rawPoints.push(destCoord);
-        } else {
-          rawPoints.push({ x: rect.cx, y: rect.cy });
+      const tick = (now: number) => {
+        if (runId !== activeRunId) return;
+
+        startTime ??= now;
+        const rawT = Math.max(0, Math.min(1, (now - startTime) / segment.durationMs));
+        const easedT = easeSmoothMove(rawT);
+
+        const latestPlayers = getGameState()?.players ?? authoritativePlayers;
+        const polyline = buildSegmentPolyline(
+          segment,
+          username,
+          getTileRects(),
+          initialRects,
+          startPointSnapshot,
+          latestPlayers
+        );
+
+        if (!polyline || polyline.length === 0) {
+          finishRun(latestPlayers);
+          return;
         }
-      }
 
-      if (seg.mode === "step" && rawPoints.length >= 3) {
-        return smoothPolylinePoints(rawPoints, 0.35, 8);
-      }
+        activePose.value = computeSegmentPose(username, segment, polyline, rawT, easedT);
 
-      return rawPoints;
+        if (rawT < 1) {
+          activeRafId = requestAnimationFrame(tick);
+        } else {
+          activeRafId = null;
+          onComplete();
+        }
+      };
+
+      activeRafId = requestAnimationFrame(tick);
     };
 
     const playSegmentAt = (segIndex: number) => {
       if (runId !== activeRunId) return;
 
       if (segIndex >= prepared.length) {
-        clearScheduledWork();
-        const latestPlayers = getGameState()?.players ?? authoritativePlayers;
-        syncAllToAuthoritative(latestPlayers);
+        finishRun(authoritativePlayers);
         return;
       }
 
-      const seg = prepared[segIndex];
+      const segment = prepared[segIndex];
+      const startNext = () => playSegmentAt(segIndex + 1);
 
-      const startSegmentLoop = () => {
-        if (runId !== activeRunId) return;
-
-        let startTime: number | null = null;
-
-        const tick = (now: number) => {
-          if (runId !== activeRunId) return;
-
-          if (startTime === null) {
-            startTime = now;
-          }
-
-          const elapsed = now - startTime;
-          const rawT = Math.max(0, Math.min(1, elapsed / seg.durationMs));
-          const easedT = easeSmoothMove(rawT);
-
-          const latestPlayers = getGameState()?.players ?? authoritativePlayers;
-          const rects = getTileRects();
-          const polyline = buildSegmentPolyline(seg, rects, latestPlayers);
-
-          if (!polyline || polyline.length === 0) {
-            clearScheduledWork();
-            syncAllToAuthoritative(latestPlayers);
-            return;
-          }
-
-          const point = samplePolylineAtProgress(polyline, easedT);
-          let y = point.y;
-          let lift = Math.sin(Math.PI * rawT);
-
-          if (seg.mode === "direct") {
-            const first = polyline[0];
-            const last = polyline[polyline.length - 1];
-            const dist = Math.hypot(last.x - first.x, last.y - first.y);
-            const arcHeight = Math.min(26, dist * 0.08);
-            y -= Math.sin(Math.PI * rawT) * arcHeight;
-            lift = Math.sin(Math.PI * rawT) * 1.25;
-          }
-
-          activePose.value = {
-            username,
-            x: point.x,
-            y,
-            lift,
-            mode: seg.mode,
-          };
-
-          if (rawT < 1) {
-            activeRafId = requestAnimationFrame(tick);
-          } else {
-            activeRafId = null;
-            playSegmentAt(segIndex + 1);
-          }
-        };
-
-        activeRafId = requestAnimationFrame(tick);
-      };
-
-      if (seg.pauseBeforeMs > 0) {
+      if (segment.pauseBeforeMs > 0) {
         if (activePose.value) {
-          activePose.value = {
-            ...activePose.value,
-            lift: 0,
-            mode: "idle",
-          };
+          activePose.value = { ...activePose.value, lift: 0 };
         }
-        scheduleTimeout(startSegmentLoop, seg.pauseBeforeMs);
+        scheduleTimeout(() => animateSegment(segment, startNext), segment.pauseBeforeMs);
       } else {
-        startSegmentLoop();
+        animateSegment(segment, startNext);
       }
     };
 
@@ -401,17 +423,15 @@ export function usePlayerMovementAnimation(
 
     pruneEliminatedPlayers(players);
 
-    const incomingMove: PlayerMoveEvent | null | undefined = state.lastMove;
+    const incomingMove = state.lastMove;
     if (
-      incomingMove &&
-      incomingMove.moveId &&
+      incomingMove?.moveId &&
       incomingMove.moveId !== lastProcessedMoveId &&
       incomingMove.segments.length > 0
     ) {
       lastProcessedMoveId = incomingMove.moveId;
-
       const movingPlayerExists = players.some(
-        (p) => p.username === incomingMove.username
+        (player) => player.username === incomingMove.username
       );
       if (movingPlayerExists) {
         runSegments(incomingMove.username, incomingMove.segments, players);
@@ -419,78 +439,55 @@ export function usePlayerMovementAnimation(
       }
     }
 
-    // If an animation is active and a non-move state update arrives, don't interrupt
-    // unless another player's authoritative position changed.
+    // Don't interrupt an active animation on unrelated updates unless another player moved.
     if (movingUsername.value) {
       const othersChanged = players.some(
-        (p) =>
-          p.username !== movingUsername.value &&
-          displayedPositions.value[p.username] !== undefined &&
-          displayedPositions.value[p.username] !== p.position
+        (player) =>
+          player.username !== movingUsername.value &&
+          displayedPositions.value[player.username] !== undefined &&
+          displayedPositions.value[player.username] !== player.position
       );
       if (!othersChanged) {
-        for (const p of players) {
-          if (displayedPositions.value[p.username] === undefined) {
-            displayedPositions.value = {
-              ...displayedPositions.value,
-              [p.username]: p.position,
-            };
-          }
-        }
+        addMissingPlayers(players);
         return;
       }
     }
 
-    // Fallback: detect any position diff without lastMove metadata.
-    const movedPlayer = players.find((p) => {
-      const prev = displayedPositions.value[p.username];
-      return prev !== undefined && prev !== p.position;
+    // Fallback: animate any position diff arriving without lastMove metadata.
+    const movedPlayer = players.find((player) => {
+      const prev = displayedPositions.value[player.username];
+      return prev !== undefined && prev !== player.position;
     });
 
     if (movedPlayer) {
       const from = displayedPositions.value[movedPlayer.username];
-      const to = movedPlayer.position;
-      const clockwiseDistance =
-        (to - from + DEFAULT_BOARD_SIZE) % DEFAULT_BOARD_SIZE;
-      const fallbackSegment: MoveSegment = {
-        from,
-        to,
-        mode: clockwiseDistance > 0 && clockwiseDistance <= 12 ? "step" : "direct",
-      };
-      runSegments(movedPlayer.username, [fallbackSegment], players);
+      runSegments(
+        movedPlayer.username,
+        [buildFallbackSegment(from, movedPlayer.position)],
+        players
+      );
       return;
     }
 
-    // Initialize any newly added players cleanly.
-    const nextPositions = { ...displayedPositions.value };
-    let added = false;
-    for (const p of players) {
-      if (nextPositions[p.username] === undefined) {
-        nextPositions[p.username] = p.position;
-        added = true;
-      }
-    }
-    if (added) {
-      displayedPositions.value = nextPositions;
-    }
+    addMissingPlayers(players);
   };
 
   watch(getGameState, handleStateUpdate, { immediate: true, deep: false });
 
   const handleVisibilityChange = () => {
     if (
-      typeof document !== "undefined" &&
-      document.visibilityState === "visible" &&
-      movingUsername.value
+      typeof document === "undefined" ||
+      document.visibilityState !== "visible" ||
+      !movingUsername.value
     ) {
-      const deadlinePassed =
-        activeRunDeadline > 0 && Date.now() >= activeRunDeadline;
-      if (deadlinePassed || preferredReducedMotion.value === "reduce") {
-        activeRunId += 1;
-        clearScheduledWork();
-        const latestPlayers = getGameState()?.players ?? [];
-        syncAllToAuthoritative(latestPlayers);
-      }
+      return;
+    }
+
+    const deadlinePassed =
+      activeRunDeadline > 0 && Date.now() >= activeRunDeadline;
+    if (deadlinePassed || isReducedMotion.value) {
+      cancelActiveRun();
+      syncAllToAuthoritative(getGameState()?.players ?? []);
     }
   };
 
@@ -506,12 +503,8 @@ export function usePlayerMovementAnimation(
     }
   });
 
-  const isReducedMotion = computed(
-    () => preferredReducedMotion.value === "reduce"
-  );
-
   return {
-    displayedPositions: displayedPositions as Ref<Record<string, number>>,
+    displayedPositions,
     activePose,
     movingUsername,
     isAnimating,

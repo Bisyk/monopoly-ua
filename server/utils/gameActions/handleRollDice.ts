@@ -1,6 +1,13 @@
 import { chances } from "~/server/constants";
 import { changePlayerTurn } from "./changePlayerTurn";
-import type { GameState, MoveSegment, Player, PlayerMoveEvent, Tile } from "~/types";
+import type {
+  GameState,
+  MoveMode,
+  MoveSegment,
+  Player,
+  PlayerMoveEvent,
+  Tile,
+} from "~/types";
 import { GAME_RULES } from "~/shared/constants/gameRules";
 
 const JAIL_TILE_ID = 11;
@@ -15,6 +22,33 @@ export const handleRollDice = (
   const { left, right } = parsedMessage.payload.turnResult;
   const startPosition = currentTurnPlayer.position;
   const segments: MoveSegment[] = [];
+
+  const addSegment = (from: number, to: number, mode: MoveMode) => {
+    if (from !== to) {
+      segments.push({ from, to, mode });
+    }
+  };
+
+  const buildMoveEvent = (): PlayerMoveEvent | null =>
+    segments.length
+      ? {
+          moveId: crypto.randomUUID(),
+          username: currentTurnPlayer.username,
+          segments,
+        }
+      : null;
+
+  const sendPlayerToJail = (
+    fromTileId: number,
+    targetTileId: number = JAIL_TILE_ID
+  ) => {
+    currentTurnPlayer.jailed = true;
+    currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
+    currentTurnPlayer.position = targetTileId;
+    game.currentAction = "roll";
+    changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
+    addSegment(fromTileId, targetTileId, "direct");
+  };
 
   if (left === right) {
     currentTurnPlayer.doublesInRow += 1;
@@ -33,33 +67,14 @@ export const handleRollDice = (
   }
 
   if (currentTurnPlayer.doublesInRow === GAME_RULES.MAX_DOUBLES_BEFORE_JAIL) {
-    currentTurnPlayer.jailed = true;
-    currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
     currentTurnPlayer.doublesInRow = 0;
     currentTurnPlayer.bonusRoll = false;
-    currentTurnPlayer.position = JAIL_TILE_ID;
-    game.currentAction = "roll";
     game.gameLog.push({
       username: game.currentTurn,
       msg: "Rolled 3 doubles in a row and went to jail",
     });
-    changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
-
-    if (startPosition !== JAIL_TILE_ID) {
-      segments.push({
-        from: startPosition,
-        to: JAIL_TILE_ID,
-        mode: "direct",
-      });
-    }
-
-    return segments.length
-      ? {
-          moveId: crypto.randomUUID(),
-          username: currentTurnPlayer.username,
-          segments,
-        }
-      : null;
+    sendPlayerToJail(startPosition);
+    return buildMoveEvent();
   }
 
   if (currentTurnPlayer.jailed) {
@@ -100,13 +115,7 @@ export const handleRollDice = (
     ((currentTurnPlayer.position + left + right - 1) % boardSize) + 1;
 
   currentTurnPlayer.position = newPlayerPosition;
-  if (startPosition !== newPlayerPosition) {
-    segments.push({
-      from: startPosition,
-      to: newPlayerPosition,
-      mode: "step",
-    });
-  }
+  addSegment(startPosition, newPlayerPosition, "step");
 
   const tilePlayerOn = game.board.tiles.find(
     (t: Tile) => t.id === newPlayerPosition
@@ -152,20 +161,7 @@ export const handleRollDice = (
     });
 
     if (yourChance.type === "goToJail") {
-      const targetTileId = yourChance.tileId ?? JAIL_TILE_ID;
-      currentTurnPlayer.position = targetTileId;
-      currentTurnPlayer.jailed = true;
-      currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
-      game.currentAction = "roll";
-      changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
-
-      if (newPlayerPosition !== targetTileId) {
-        segments.push({
-          from: newPlayerPosition,
-          to: targetTileId,
-          mode: "direct",
-        });
-      }
+      sendPlayerToJail(newPlayerPosition, yourChance.tileId ?? JAIL_TILE_ID);
     }
 
     if (yourChance.type === "minusBalance") {
@@ -224,30 +220,12 @@ export const handleRollDice = (
   }
 
   if (tilePlayerOn!.type === "goToJail") {
-    currentTurnPlayer.jailed = true;
-    currentTurnPlayer.turnsInJail = GAME_RULES.JAIL_TURNS;
-    currentTurnPlayer.position = JAIL_TILE_ID;
-    game.currentAction = "roll";
     game.gameLog.push({
       username: game.currentTurn,
       msg: "You are going in jail",
     });
-    changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
-
-    if (newPlayerPosition !== JAIL_TILE_ID) {
-      segments.push({
-        from: newPlayerPosition,
-        to: JAIL_TILE_ID,
-        mode: "direct",
-      });
-    }
+    sendPlayerToJail(newPlayerPosition);
   }
 
-  return segments.length
-    ? {
-        moveId: crypto.randomUUID(),
-        username: currentTurnPlayer.username,
-        segments,
-      }
-    : null;
+  return buildMoveEvent();
 };

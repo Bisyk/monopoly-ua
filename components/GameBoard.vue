@@ -42,7 +42,6 @@
   const {
     displayedPositions,
     activePose,
-    movingUsername,
     isAnimating,
     isReducedMotion,
   } = usePlayerMovementAnimation(
@@ -58,7 +57,7 @@
     { immediate: true }
   );
 
-  const measureTilePositions = (suppressTransition = false) => {
+  const measureTilePositions = () => {
     const boardEl = boardRef.value;
     if (!boardEl) return;
 
@@ -80,36 +79,28 @@
       };
     });
 
-    if (suppressTransition) {
-      isSuppressingLayoutTransition.value = true;
-      if (layoutSuppressRafId !== null) {
-        cancelAnimationFrame(layoutSuppressRafId);
-      }
-      layoutSuppressRafId = requestAnimationFrame(() => {
-        isSuppressingLayoutTransition.value = false;
-        layoutSuppressRafId = null;
-      });
+    isSuppressingLayoutTransition.value = true;
+    if (layoutSuppressRafId !== null) {
+      cancelAnimationFrame(layoutSuppressRafId);
     }
+    layoutSuppressRafId = requestAnimationFrame(() => {
+      isSuppressingLayoutTransition.value = false;
+      layoutSuppressRafId = null;
+    });
 
     tileRects.value = measured;
   };
 
-  useResizeObserver(boardRef, () => {
-    measureTilePositions(true);
-  });
-
-  const handleWindowResize = () => {
-    measureTilePositions(true);
-  };
+  useResizeObserver(boardRef, measureTilePositions);
 
   onMounted(async () => {
     await nextTick();
-    measureTilePositions(true);
-    window.addEventListener("resize", handleWindowResize);
+    measureTilePositions();
+    window.addEventListener("resize", measureTilePositions);
   });
 
   onUnmounted(() => {
-    window.removeEventListener("resize", handleWindowResize);
+    window.removeEventListener("resize", measureTilePositions);
     if (layoutSuppressRafId !== null) {
       cancelAnimationFrame(layoutSuppressRafId);
     }
@@ -120,68 +111,79 @@
     async (len) => {
       if (len > 0) {
         await nextTick();
-        measureTilePositions(true);
+        measureTilePositions();
       }
     }
   );
 
+  interface RenderedToken {
+    player: Player;
+    x: number;
+    y: number;
+    transitionDurationMs: number;
+    transitionEasing: string;
+    isMoving: boolean;
+    lift: number;
+  }
+
   const activePlayers = computed<Player[]>(() => props.gameState?.players ?? []);
 
-  const renderedTokens = computed(() => {
+  const renderedTokens = computed<RenderedToken[]>(() => {
     const playersList = activePlayers.value;
     const pose = activePose.value;
     const groupedByTile = new Map<number, string[]>();
 
-    for (const p of playersList) {
-      const tileId = displayedPositions.value[p.username] ?? p.position;
+    for (const player of playersList) {
+      const tileId = displayedPositions.value[player.username] ?? player.position;
       const group = groupedByTile.get(tileId) ?? [];
-      group.push(p.username);
+      group.push(player.username);
       groupedByTile.set(tileId, group);
     }
 
-    return playersList
-      .map((p) => {
-        if (pose && pose.username === p.username) {
-          return {
-            player: p,
-            x: pose.x,
-            y: pose.y,
-            transitionDurationMs: 0,
-            transitionEasing: "linear",
-            isMoving: true,
-            moveMode: pose.mode,
-            lift: pose.lift,
-          };
-        }
+    const reflowDurationMs =
+      isSuppressingLayoutTransition.value || isReducedMotion.value
+        ? 0
+        : SLOT_REFLOW_DURATION_MS;
 
-        const tileId = displayedPositions.value[p.username] ?? p.position;
-        const rect = tileRects.value[tileId];
-        if (!rect) return null;
+    const tokens: RenderedToken[] = [];
+    for (const player of playersList) {
+      if (pose && pose.username === player.username) {
+        tokens.push({
+          player,
+          x: pose.x,
+          y: pose.y,
+          transitionDurationMs: 0,
+          transitionEasing: "linear",
+          isMoving: true,
+          lift: pose.lift,
+        });
+        continue;
+      }
 
-        const group = groupedByTile.get(tileId) ?? [p.username];
-        const slotIndex = group.indexOf(p.username);
-        const offset = getCoLocatedTokenOffset(
-          slotIndex,
-          group.length,
-          rect.width,
-          rect.height
-        );
+      const tileId = displayedPositions.value[player.username] ?? player.position;
+      const rect = tileRects.value[tileId];
+      if (!rect) continue;
 
-        return {
-          player: p,
-          x: rect.cx + offset.dx,
-          y: rect.cy + offset.dy,
-          transitionDurationMs:
-            isSuppressingLayoutTransition.value || isReducedMotion.value
-              ? 0
-              : SLOT_REFLOW_DURATION_MS,
-          transitionEasing: "cubic-bezier(0.22, 1, 0.36, 1)",
-          isMoving: movingUsername.value === p.username,
-          moveMode: "idle" as const,
-          lift: 0,
-        };
-      })
-      .filter((t): t is NonNullable<typeof t> => t !== null);
+      const group = groupedByTile.get(tileId) ?? [player.username];
+      const offset = getCoLocatedTokenOffset(
+        group.indexOf(player.username),
+        group.length,
+        rect.width,
+        rect.height
+      );
+
+      tokens.push({
+        player,
+        x: rect.cx + offset.dx,
+        y: rect.cy + offset.dy,
+        transitionDurationMs: reflowDurationMs,
+        transitionEasing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        isMoving: false,
+        lift: 0,
+      });
+    }
+
+    return tokens;
   });
 </script>
 
@@ -300,7 +302,6 @@
             :transition-duration-ms="token.transitionDurationMs"
             :transition-easing="token.transitionEasing"
             :is-moving="token.isMoving"
-            :move-mode="token.moveMode"
             :lift="token.lift"
           />
         </div>

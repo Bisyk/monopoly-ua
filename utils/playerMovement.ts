@@ -14,6 +14,15 @@ export interface TokenOffset {
   dy: number;
 }
 
+function isValidTileId(tileId: number, boardSize: number): boolean {
+  return (
+    boardSize >= 1 &&
+    Number.isInteger(tileId) &&
+    tileId >= 1 &&
+    tileId <= boardSize
+  );
+}
+
 /**
  * Returns the ordered list of clockwise tile IDs from `fromTileId` (exclusive)
  * to `toTileId` (inclusive), wrapping from `boardSize` back to `1`.
@@ -24,13 +33,8 @@ export function buildStepPath(
   boardSize: number = DEFAULT_BOARD_SIZE
 ): number[] {
   if (
-    !Number.isInteger(fromTileId) ||
-    !Number.isInteger(toTileId) ||
-    boardSize < 1 ||
-    fromTileId < 1 ||
-    fromTileId > boardSize ||
-    toTileId < 1 ||
-    toTileId > boardSize ||
+    !isValidTileId(fromTileId, boardSize) ||
+    !isValidTileId(toTileId, boardSize) ||
     fromTileId === toTileId
   ) {
     return [];
@@ -69,23 +73,36 @@ export function expandMoveSegments(
           pauseBeforeMs: hasPriorWaypoints && stepIdx === 0 ? segmentPauseMs : 0,
         });
       });
-    } else if (segment.mode === "direct") {
-      if (
-        Number.isInteger(segment.to) &&
-        segment.to >= 1 &&
-        segment.to <= boardSize &&
-        segment.from !== segment.to
-      ) {
-        waypoints.push({
-          tileId: segment.to,
-          mode: "direct",
-          pauseBeforeMs: hasPriorWaypoints ? segmentPauseMs : 0,
-        });
-      }
+    } else if (
+      segment.mode === "direct" &&
+      isValidTileId(segment.to, boardSize) &&
+      segment.from !== segment.to
+    ) {
+      waypoints.push({
+        tileId: segment.to,
+        mode: "direct",
+        pauseBeforeMs: hasPriorWaypoints ? segmentPauseMs : 0,
+      });
     }
   }
 
   return waypoints;
+}
+
+function getSlotGridDimensions(
+  totalOnTile: number,
+  isWideOrSquare: boolean
+): { cols: number; rows: number } {
+  if (totalOnTile === 2) {
+    return isWideOrSquare ? { cols: 2, rows: 1 } : { cols: 1, rows: 2 };
+  }
+  if (totalOnTile <= 4) {
+    return { cols: 2, rows: 2 };
+  }
+  if (totalOnTile <= 6) {
+    return isWideOrSquare ? { cols: 3, rows: 2 } : { cols: 2, rows: 3 };
+  }
+  return isWideOrSquare ? { cols: 4, rows: 2 } : { cols: 2, rows: 4 };
 }
 
 /**
@@ -103,24 +120,10 @@ export function getCoLocatedTokenOffset(
   }
 
   const clampedSlot = Math.max(0, Math.min(slotIndex, totalOnTile - 1));
-  const isWideOrSquare = tileWidth >= tileHeight;
-
-  let cols: number;
-  let rows: number;
-
-  if (totalOnTile === 2) {
-    cols = isWideOrSquare ? 2 : 1;
-    rows = isWideOrSquare ? 1 : 2;
-  } else if (totalOnTile <= 4) {
-    cols = 2;
-    rows = 2;
-  } else if (totalOnTile <= 6) {
-    cols = isWideOrSquare ? 3 : 2;
-    rows = isWideOrSquare ? 2 : 3;
-  } else {
-    cols = isWideOrSquare ? 4 : 2;
-    rows = isWideOrSquare ? 2 : 4;
-  }
+  const { cols, rows } = getSlotGridDimensions(
+    totalOnTile,
+    tileWidth >= tileHeight
+  );
 
   const row = Math.floor(clampedSlot / cols);
   const col = clampedSlot % cols;
@@ -187,16 +190,15 @@ export function smoothPolylinePoints(
       continue;
     }
 
-    const cutIn = Math.min(lenIn * cornerRadiusRatio, lenOut * cornerRadiusRatio);
-    const cutOut = cutIn;
+    const cut = Math.min(lenIn, lenOut) * cornerRadiusRatio;
 
     const pStart: Point2D = {
-      x: curr.x - (vInX / lenIn) * cutIn,
-      y: curr.y - (vInY / lenIn) * cutIn,
+      x: curr.x - (vInX / lenIn) * cut,
+      y: curr.y - (vInY / lenIn) * cut,
     };
     const pEnd: Point2D = {
-      x: curr.x + (vOutX / lenOut) * cutOut,
-      y: curr.y + (vOutY / lenOut) * cutOut,
+      x: curr.x + (vOutX / lenOut) * cut,
+      y: curr.y + (vOutY / lenOut) * cut,
     };
 
     for (let s = 0; s <= samplesPerCorner; s++) {

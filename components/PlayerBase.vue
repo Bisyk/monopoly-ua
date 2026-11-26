@@ -38,19 +38,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  moveMode: {
-    type: String as PropType<"idle" | "step" | "direct">,
-    default: "idle",
-  },
   lift: {
     type: Number,
     default: 0,
   },
 });
 
-const borderColor = computed(() => {
-  return colorMap[props.player.color] || "black";
-});
+const borderColor = computed(() => colorMap[props.player.color] || "black");
 
 const anchorStyle = computed<CSSProperties>(() => ({
   transform: `translate3d(${props.x}px, ${props.y}px, 0) translate(-50%, -50%)`,
