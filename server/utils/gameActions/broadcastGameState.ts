@@ -1,7 +1,7 @@
 import prisma from "~/lib/prisma";
 import { GameState } from "~/types";
 
-export const syncGameState = async (
+export const broadcastGameState = async (
   roomId: string,
   peer: any,
   newGameState: GameState
@@ -14,12 +14,12 @@ export const syncGameState = async (
       players: newGameState.players,
       currentTurn: newGameState.currentTurn,
       gameLog: newGameState.gameLog,
-      boardState: newGameState.boardState,
+      board: newGameState.board,
       currentAction: newGameState.currentAction,
       auctionParticipants: newGameState.auctionParticipants,
-      currentAuctionParticipant: newGameState.currentAuctionParticipant,
-      currentAuctionBid: newGameState.currentAuctionBid,
-      tileOnAuction: newGameState.tileOnAuction,
+      activeAuctionBidder: newGameState.activeAuctionBidder,
+      auctionBidAmount: newGameState.auctionBidAmount,
+      auctionedTileId: newGameState.auctionedTileId,
       activeChance: newGameState.activeChance ,
       activeTrade: newGameState.activeTrade,
     },

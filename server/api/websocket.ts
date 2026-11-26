@@ -2,7 +2,7 @@ import { parse } from "url";
 import prisma from "~/lib/prisma";
 import { GameState } from "../../types";
 import {
-  syncGameState,
+  broadcastGameState,
   handleRollDice,
   buyProperty,
   passProperty,
@@ -21,6 +21,25 @@ import {
   acceptTrade,
   declineTrade,
 } from "../utils/gameActions";
+
+const MUTATING_ACTIONS = new Set([
+  "ROLL_DICE",
+  "BUY_PROPERTY",
+  "PASS_PROPERTY",
+  "PASS_AUCTION_PROPERTY",
+  "BID_AUCTION_PROPERTY",
+  "PAY_RENT",
+  "MORTGAGE_PROPERTY",
+  "BUY_BACK_PROPERTY",
+  "UPGRADE_PROPERTY",
+  "SELL_PROPERTY",
+  "PAY_CHANCE",
+  "JAIL_PAY",
+  "PAY_TAX",
+  "TRADE",
+  "ACCEPT_TRADE",
+  "DECLINE_TRADE",
+]);
 
 export default defineWebSocketHandler({
   async open(peer) {
@@ -56,13 +75,22 @@ export default defineWebSocketHandler({
 
     const parsedMessage = JSON.parse(message.text());
 
-    const game = await prisma.game.findUnique({
+    const game = (await prisma.game.findUnique({
       where: {
         associatedRoomId: roomId,
       },
-    });
+    })) as GameState | null;
 
     if (!game) {
+      return;
+    }
+
+    game.status = game.status || "STARTED";
+    game.winnerUsername = game.winnerUsername || null;
+    game.eliminatedPlayers = game.eliminatedPlayers || [];
+
+    if (game.status === "ENDED" && MUTATING_ACTIONS.has(parsedMessage.action)) {
+      peer.send(JSON.stringify(game));
       return;
     }
 
@@ -79,12 +107,12 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
     }
 
     if (parsedMessage.action === "BUY_PROPERTY") {
       buyProperty(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
@@ -95,7 +123,7 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
@@ -106,7 +134,7 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
@@ -117,73 +145,73 @@ export default defineWebSocketHandler({
         currentTurnPlayerIdx,
         parsedMessage
       );
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "PAY_RENT") {
       payRent(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "MORTGAGE_PROPERTY") {
       mortgageProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "BUY_BACK_PROPERTY") {
       buybackProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "UPGRADE_PROPERTY") {
       upgradeProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "SELL_PROPERTY") {
       sellProperty(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "PAY_CHANCE") {
       payChance(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "JAIL_PAY") {
       payJail(game, currentTurnPlayer);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "PAY_TAX") {
-      payTax(game, currentTurnPlayer, parsedMessage);
-      syncGameState(roomId, peer, game);
+      payTax(game, currentTurnPlayer, currentTurnPlayerIdx, parsedMessage);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "TRADE") {
       sendTrade(game, parsedMessage);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "ACCEPT_TRADE") {
       acceptTrade(game);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
 
     if (parsedMessage.action === "DECLINE_TRADE") {
       declineTrade(game);
-      syncGameState(roomId, peer, game);
+      broadcastGameState(roomId, peer, game);
       return;
     }
   },

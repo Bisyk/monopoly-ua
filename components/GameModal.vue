@@ -22,8 +22,8 @@ onMounted(() => {
   position: fixed;
   z-index: 10;
   top: 50%;
-  left: 50%;
-  transform: translate(-30%, -50%);
+  left: 53%;
+  transform: translate(-53%, -50%);
   display: flex;
   justify-content: center;
   align-items: center;

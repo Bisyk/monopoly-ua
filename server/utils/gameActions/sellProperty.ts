@@ -8,9 +8,9 @@ export const sellProperty = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const propertyToSell = game.boardState.tiles.find(t => t.id === propertyId);
+  const propertyToSell = game.board.tiles.find(t => t.id === propertyId);
 
-  const propertyGroup = game.boardState.groups.find(g => {
+  const propertyGroup = game.board.groups.find(g => {
     return g.properties.includes(propertyId);
   });
 

@@ -13,17 +13,17 @@ export const acceptTrade = (game: GameState) => {
   given.forEach((g: number) => {
     playerFrom!.properties = playerFrom!.properties.filter(p => p !== g);
     playerTo!.properties.push(g);
-    game.boardState.tiles.find((t: Tile) => t.id === g)!.owner = to;
+    game.board.tiles.find((t: Tile) => t.id === g)!.owner = to;
   });
 
   received.forEach((r: number) => {
     playerTo!.properties = playerTo!.properties.filter(p => p !== r);
     playerFrom!.properties.push(r);
-    game.boardState.tiles.find((t: Tile) => t.id === r)!.owner = from;
+    game.board.tiles.find((t: Tile) => t.id === r)!.owner = from;
   });
 
-  checkIsFullPropertySet(playerFrom, game.boardState);
-  checkIsFullPropertySet(playerTo, game.boardState);
+  checkIsFullPropertySet(playerFrom, game.board);
+  checkIsFullPropertySet(playerTo, game.board);
 
   playerFrom!.balance -= givenMoney!;
   playerTo!.balance += givenMoney!;

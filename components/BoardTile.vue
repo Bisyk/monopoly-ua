@@ -120,7 +120,7 @@ const tileBgColor = computed(() => {
     </div>
     <div class="container">
       <div class="heroContainer">
-        <img :src="`/assets/sprites/ua/${props.tile.spriteName}.webp`" class="heroImage"
+        <img :src="`/assets/sprites/ua/${props.tile.assetId}.webp`" class="heroImage"
           :style="isHorizontalProperty ? { transform: 'rotate(270deg)' } : {}" />
         <div class="player-container">
           <PlayerBase v-for="player in props.players" :key="player.username" :player="player"

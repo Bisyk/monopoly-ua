@@ -3,7 +3,7 @@
   import type { Tile } from "~/types";
 
   defineProps({
-    tilesState: {
+    tiles: {
       type: Array as PropType<Tile[]>,
       required: true,
     },
@@ -42,7 +42,7 @@
       </div>
 
       <div
-        v-if="tilesState && tilesState.length"
+        v-if="tiles && tiles.length"
         class="board"
       >
         <div class="center">
@@ -59,74 +59,74 @@
         </div>
         <!-- Go Tile -->
         <BoardTile
-          :tile="tilesState[0]"
+          :tile="tiles[0]"
           :players="gameState.players"
         />
         <!-- Top Row -->
         <div class="row horizontal-row top-row">
           <BoardTile
-            v-for="tile in tilesState.slice(1, 10)"
+            v-for="tile in tiles.slice(1, 10)"
             :tile="tile"
             :players="gameState.players"
             @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[
-              gameState.boardState.groups[0],
-              gameState.boardState.groups[1],
+              gameState.board.groups[0],
+              gameState.board.groups[1],
             ]"
           />
         </div>
         <!-- Jail Tile -->
         <BoardTile
-          :tile="tilesState[10]"
-          :type="tilesState[10].type"
+          :tile="tiles[10]"
+          :type="tiles[10].type"
           :players="gameState.players"
         />
         <!-- Right Row -->
         <div class="row vertical-row right-row">
           <BoardTile
-            v-for="tile in tilesState.slice(11, 20)"
+            v-for="tile in tiles.slice(11, 20)"
             :tile="tile"
             :players="gameState.players"
             @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[
-              gameState.boardState.groups[2],
-              gameState.boardState.groups[3],
+              gameState.board.groups[2],
+              gameState.board.groups[3],
             ]"
           />
         </div>
         <!-- Free Parking Tile -->
         <BoardTile
-          :tile="tilesState[20]"
+          :tile="tiles[20]"
           :players="gameState.players"
         />
         <!-- Bottom Row -->
         <div class="row horizontal-row bottom-row">
           <BoardTile
-            v-for="tile in tilesState.slice(21, 30).reverse()"
+            v-for="tile in tiles.slice(21, 30).reverse()"
             :tile="tile"
             :players="gameState.players"
             @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[
-              gameState.boardState.groups[4],
-              gameState.boardState.groups[5],
+              gameState.board.groups[4],
+              gameState.board.groups[5],
             ]"
           />
         </div>
         <!-- Go to Jail Tile -->
         <BoardTile
-          :tile="tilesState[30]"
+          :tile="tiles[30]"
           :players="gameState.players"
         />
         <!-- Left Row -->
         <div class="row vertical-row left-row">
           <BoardTile
-            v-for="tile in tilesState.slice(31, 40).reverse()"
+            v-for="tile in tiles.slice(31, 40).reverse()"
             :tile="tile"
             :players="gameState.players"
             @show-tile-info="(e: Event, tile: Tile) => showTileInfo(e, tile)"
             :tileGroups="[
-              gameState.boardState.groups[6],
-              gameState.boardState.groups[7],
+              gameState.board.groups[6],
+              gameState.board.groups[7],
             ]"
           />
         </div>
@@ -165,6 +165,7 @@
     place-items: center;
     height: 100vh;
     gap: 4vmin;
+    margin-right: 10vmin;
 
     .players-container {
       padding: 3.5vmin 0 3.5vmin 0;

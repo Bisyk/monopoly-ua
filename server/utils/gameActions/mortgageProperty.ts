@@ -7,7 +7,7 @@ export const mortgageProperty = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const propertyToMortgage = game.boardState.tiles.find(
+  const propertyToMortgage = game.board.tiles.find(
     (t: Tile) => t.id === propertyId
   );
 

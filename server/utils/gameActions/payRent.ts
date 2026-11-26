@@ -1,5 +1,5 @@
 import { GameState, Player } from "~/types";
-import { changePlayerTurn } from ".";
+import { changePlayerTurn, resolveBankruptcy } from ".";
 
 export const payRent = (
   game: GameState,
@@ -9,7 +9,7 @@ export const payRent = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const propertyToPayRent = game.boardState.tiles.find(
+  const propertyToPayRent = game.board.tiles.find(
     t => t.id === propertyId
   );
 
@@ -30,6 +30,12 @@ export const payRent = (
   }
 
   if (currentTurnPlayer.balance < rentToPay) {
+    resolveBankruptcy({
+      game,
+      bankruptPlayer: currentTurnPlayer,
+      currentTurnPlayerIdx,
+      creditorUsername: owner?.username,
+    });
     return;
   }
 

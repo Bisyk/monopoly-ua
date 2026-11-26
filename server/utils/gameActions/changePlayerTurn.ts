@@ -5,7 +5,16 @@ export const changePlayerTurn = (
   currentTurnPlayer: Player,
   currentTurnPlayerIdx: number
 ) => {
-  game.boardState.groups.forEach(g => {
+  if (game.status === "ENDED") {
+    return;
+  }
+
+  if (game.players.length === 0) {
+    game.currentTurn = "";
+    return;
+  }
+
+  game.board.groups.forEach(g => {
     g.isUpgradeAvailable = true;
   });
 
@@ -13,9 +22,15 @@ export const changePlayerTurn = (
     return;
   }
 
-  if (currentTurnPlayerIdx < game.players.length - 1) {
-    game.currentTurn = game.players[currentTurnPlayerIdx + 1].username;
-  } else {
-    game.currentTurn = game.players[0].username;
+  let nextPlayerIdx =
+    currentTurnPlayerIdx < game.players.length - 1 ? currentTurnPlayerIdx + 1 : 0;
+
+  while (
+    game.eliminatedPlayers.includes(game.players[nextPlayerIdx]?.username) &&
+    nextPlayerIdx !== currentTurnPlayerIdx
+  ) {
+    nextPlayerIdx = nextPlayerIdx < game.players.length - 1 ? nextPlayerIdx + 1 : 0;
   }
+
+  game.currentTurn = game.players[nextPlayerIdx].username;
 };

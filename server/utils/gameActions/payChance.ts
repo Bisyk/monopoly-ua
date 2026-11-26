@@ -1,5 +1,6 @@
 import { GameState, Player } from "~/types";
 import { changePlayerTurn } from "./changePlayerTurn";
+import { resolveBankruptcy } from ".";
 
 export const payChance = (
   game: GameState,
@@ -10,6 +11,11 @@ export const payChance = (
   const amount = parsedMessage.payload.amount;
 
   if (currentTurnPlayer.balance < amount) {
+    resolveBankruptcy({
+      game,
+      bankruptPlayer: currentTurnPlayer,
+      currentTurnPlayerIdx,
+    });
     return;
   }
 

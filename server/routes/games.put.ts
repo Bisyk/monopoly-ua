@@ -1,9 +1,9 @@
 import prisma from "~/lib/prisma";
 import {
   colors,
-  initialGroupsState,
-  initialPlayersState,
-  initialTilesState,
+  defaultPropertyGroups,
+  defaultPlayerTemplate,
+  defaultTiles,
 } from "../constants";
 
 export default defineEventHandler(async event => {
@@ -50,17 +50,20 @@ export default defineEventHandler(async event => {
       const game = await prisma.game.create({
         data: {
           associatedRoomId: roomId,
+          status: "STARTED",
+          winnerUsername: null,
+          eliminatedPlayers: [],
           players: room!.players.map((player, idx) => ({
             username: player,
             color: colors[idx],
-            ...initialPlayersState,
+            ...defaultPlayerTemplate,
           })),
           currentTurn: room!.players[0],
           currentAction: "roll",
           auctionParticipants: [],
-          currentAuctionParticipant: "",
-          currentAuctionBid: 0,
-          tileOnAuction: null,
+          activeAuctionBidder: "",
+          auctionBidAmount: 0,
+          auctionedTileId: null,
           activeChance: {
             type: "",
           },
@@ -72,9 +75,9 @@ export default defineEventHandler(async event => {
             givenMoney: 0,
             receivedMoney: 0,
           },
-          boardState: {
-            tiles: initialTilesState,
-            groups: initialGroupsState,
+          board: {
+            tiles: defaultTiles,
+            groups: defaultPropertyGroups,
           },
           gameLog: [],
         },

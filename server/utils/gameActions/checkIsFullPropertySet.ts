@@ -1,7 +1,7 @@
-export const checkIsFullPropertySet = (player: any, boardState: any) => {
+export const checkIsFullPropertySet = (player: any, board: any) => {
   const playerProperties = player.properties;
 
-  for (const group of boardState.groups) {
+  for (const group of board.groups) {
     const groupProperties = group.properties;
 
     if (
@@ -10,7 +10,7 @@ export const checkIsFullPropertySet = (player: any, boardState: any) => {
     ) {
       group.isFullSet = false;
 
-      boardState.tiles.forEach((t: any) => {
+      board.tiles.forEach((t: any) => {
         if (groupProperties.includes(t.id)) {
           t.rentLevels[0] = t.rentLevels[0] / 2;
         }
@@ -20,7 +20,7 @@ export const checkIsFullPropertySet = (player: any, boardState: any) => {
     if (groupProperties.every((p: any) => playerProperties.includes(p))) {
       group.isFullSet = true;
 
-      boardState.tiles.forEach((t: any) => {
+      board.tiles.forEach((t: any) => {
         if (groupProperties.includes(t.id)) {
           t.rentLevels[0] = t.rentLevels[0] * 2;
         }

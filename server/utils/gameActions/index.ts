@@ -1,6 +1,6 @@
 export { changePlayerTurn } from "./changePlayerTurn";
 export { handleRollDice } from "./handleRollDice";
-export { syncGameState } from "./syncGameState";
+export { broadcastGameState } from "./broadcastGameState";
 export { buyProperty } from "./buyProperty";
 export { checkIsFullPropertySet } from "./checkIsFullPropertySet";
 export { passProperty } from "./passProperty";
@@ -17,3 +17,4 @@ export { payTax } from "./payTax";
 export { sendTrade } from "./sendTrade";
 export { acceptTrade } from "./acceptTrade";
 export { declineTrade } from "./declineTrade";
+export { resolveBankruptcy } from "./resolveBankruptcy";

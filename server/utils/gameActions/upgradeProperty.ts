@@ -6,11 +6,11 @@ export const upgradeProperty = (
   parsedMessage: any
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
-  const propertyGroup = game.boardState.groups.find(g => {
+  const propertyGroup = game.board.groups.find(g => {
     return g.properties.includes(propertyId);
   });
 
-  const propertyToUpgrade = game.boardState.tiles.find(
+  const propertyToUpgrade = game.board.tiles.find(
     t => t.id === propertyId
   );
 
