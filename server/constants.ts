@@ -118,6 +118,8 @@ export const defaultPlayerTemplate = {
   turnsInJail: 0,
   doublesInRow: 0,
   bonusRoll: false,
+  isBot: false,
+  botDifficulty: null,
 };
 
 export const defaultTiles = [

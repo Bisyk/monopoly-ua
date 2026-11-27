@@ -1,5 +1,6 @@
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { usePreferredReducedMotion } from "@vueuse/core";
+import { DICE_LEAD_IN_MS } from "~/shared/constants/animationTimings";
 import type { GameState, MoveMode, MoveSegment, Player } from "~/types";
 import {
   buildStepPath,
@@ -209,6 +210,7 @@ export function usePlayerMovementAnimation(
 
   let hasHydrated = false;
   let lastProcessedMoveId: string | null = null;
+  let lastProcessedRollId: string | null = null;
   let activeRunId = 0;
   let activeRunDeadline = 0;
   const activeTimers = new Set<ReturnType<typeof setTimeout>>();
@@ -290,7 +292,8 @@ export function usePlayerMovementAnimation(
   const runSegments = (
     username: string,
     segments: MoveSegment[],
-    authoritativePlayers: Player[]
+    authoritativePlayers: Player[],
+    initialDelayMs = 0
   ) => {
     const prepared = prepareSegments(segments);
     if (prepared.length === 0 || isReducedMotion.value) {
@@ -324,8 +327,11 @@ export function usePlayerMovementAnimation(
     const runId = activeRunId;
     clearScheduledWork();
 
-    // Update resting positions immediately so co-located tokens gently reflow to make room.
-    displayedPositions.value = buildPositionsMap(authoritativePlayers);
+    // Update resting positions immediately only when starting right away;
+    // when waiting for dice spin, keep resting tokens intact until takeoff.
+    if (initialDelayMs <= 0) {
+      displayedPositions.value = buildPositionsMap(authoritativePlayers);
+    }
     activePose.value = {
       username,
       x: startPointSnapshot.x,
@@ -333,14 +339,13 @@ export function usePlayerMovementAnimation(
       lift: 0,
     };
 
-    const expectedTotalMs = prepared.reduce(
-      (sum, seg) => sum + seg.pauseBeforeMs + seg.durationMs,
-      0
-    );
+    const expectedTotalMs =
+      initialDelayMs +
+      prepared.reduce((sum, seg) => sum + seg.pauseBeforeMs + seg.durationMs, 0);
     activeRunDeadline = Date.now() + expectedTotalMs + 120;
 
     // Watchdog guarantees turn modals can never get stuck hidden.
-    const watchdogMs = Math.max(ANIMATION_WATCHDOG_MS, expectedTotalMs + 1000);
+    const watchdogMs = Math.max(ANIMATION_WATCHDOG_MS, expectedTotalMs + 1200);
     scheduleTimeout(() => {
       if (runId !== activeRunId) return;
       finishRun(authoritativePlayers);
@@ -407,7 +412,17 @@ export function usePlayerMovementAnimation(
       }
     };
 
-    playSegmentAt(0);
+    if (initialDelayMs > 0) {
+      scheduleTimeout(() => {
+        if (runId !== activeRunId) return;
+        displayedPositions.value = buildPositionsMap(
+          getGameState()?.players ?? authoritativePlayers
+        );
+        playSegmentAt(0);
+      }, initialDelayMs);
+    } else {
+      playSegmentAt(0);
+    }
   };
 
   const handleStateUpdate = (state: GameState | undefined) => {
@@ -419,11 +434,21 @@ export function usePlayerMovementAnimation(
       if (state.lastMove?.moveId) {
         lastProcessedMoveId = state.lastMove.moveId;
       }
+      if (state.lastRoll?.rollId) {
+        lastProcessedRollId = state.lastRoll.rollId;
+      }
       syncAllToAuthoritative(players);
       return;
     }
 
     pruneEliminatedPlayers(players);
+
+    const incomingRoll = state.lastRoll;
+    let hasFreshRoll = false;
+    if (incomingRoll?.rollId && incomingRoll.rollId !== lastProcessedRollId) {
+      lastProcessedRollId = incomingRoll.rollId;
+      hasFreshRoll = true;
+    }
 
     const incomingMove = state.lastMove;
     if (
@@ -436,7 +461,13 @@ export function usePlayerMovementAnimation(
         (player) => player.username === incomingMove.username
       );
       if (movingPlayerExists) {
-        runSegments(incomingMove.username, incomingMove.segments, players);
+        const initialDelayMs = hasFreshRoll ? DICE_LEAD_IN_MS : 0;
+        runSegments(
+          incomingMove.username,
+          incomingMove.segments,
+          players,
+          initialDelayMs
+        );
         return;
       }
     }

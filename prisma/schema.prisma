@@ -11,44 +11,66 @@ datasource db {
 }
 
 model Room {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  players    String[] @default([])
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  players    String[]  @default([])
+  bots       BotSlot[]
   createdBy  String
   maxPlayers Int
   status     String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
+}
+
+type BotSlot {
+  username   String
+  difficulty String
 }
 
 model Game {
-  id                        String       @id @default(auto()) @map("_id") @db.ObjectId
-  associatedRoomId          String       @unique
-  status                    String       @default("STARTED")
-  winnerUsername            String?
-  eliminatedPlayers         String[]     @default([])
-  players                   Player[]
-  currentTurn               String
-  gameLog                   GameLogMsg[]
-  board                     BoardState
-  currentAction             String
-  auctionParticipants       String[]
+  id                  String          @id @default(auto()) @map("_id") @db.ObjectId
+  associatedRoomId    String          @unique
+  status              String          @default("STARTED")
+  winnerUsername      String?
+  eliminatedPlayers   String[]        @default([])
+  players             Player[]
+  currentTurn         String
+  gameLog             GameLogMsg[]
+  board               BoardState
+  currentAction       String
+  auctionParticipants String[]
   activeAuctionBidder String?
-  auctionBidAmount         Int?
-  auctionedTileId           Int?
-  activeChance              Chance
-  activeTrade               Trade
+  auctionBidAmount    Int?
+  auctionedTileId     Int?
+  activeChance        Chance
+  activeTrade         Trade
+  lastDiceRoll        DiceRoll?
+  declinedTrades      DeclinedTrade[]
+}
+
+type DiceRoll {
+  left  Int
+  right Int
+}
+
+type DeclinedTrade {
+  from      String
+  to        String
+  signature String
+  boardHash String
 }
 
 type Player {
-  username             String
-  color                String
-  position             Int
-  balance              Int
-  properties           Int[]
+  username              String
+  color                 String
+  position              Int
+  balance               Int
+  properties            Int[]
   ownedPropertyGroupIds Int[]
-  jailed               Boolean
-  turnsInJail          Int
-  doublesInRow         Int
-  bonusRoll            Boolean
+  jailed                Boolean
+  turnsInJail           Int
+  doublesInRow          Int
+  bonusRoll             Boolean
+  isBot                 Boolean @default(false)
+  botDifficulty         String?
 }
 
 type BoardState {
@@ -59,7 +81,7 @@ type BoardState {
 type Tile {
   id            Int
   groupId       Int?
-  assetId    String
+  assetId       String
   name          String
   price         Int?
   type          String

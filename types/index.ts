@@ -19,6 +19,25 @@ export interface Tile {
   taxAmount: number | null;
 }
 
+export type BotDifficulty = "EASY" | "MEDIUM" | "HARD";
+
+export interface BotSlot {
+  username: string;
+  difficulty: BotDifficulty;
+}
+
+export interface DiceRoll {
+  left: number;
+  right: number;
+}
+
+export interface DeclinedTrade {
+  from: string;
+  to: string;
+  signature: string;
+  boardHash: string;
+}
+
 export interface Player {
   username: string;
   color: string;
@@ -30,6 +49,8 @@ export interface Player {
   turnsInJail: number;
   doublesInRow: number;
   bonusRoll: boolean;
+  isBot?: boolean;
+  botDifficulty?: BotDifficulty | null;
 }
 
 export interface Group {
@@ -44,6 +65,7 @@ export interface Group {
 export interface CreatedGame {
   id: string;
   players: string[];
+  bots?: BotSlot[];
   createdBy: string;
   maxPlayers: number;
   status: GameStatuses;
@@ -64,6 +86,14 @@ export interface PlayerMoveEvent {
   segments: MoveSegment[];
 }
 
+export interface DiceRollEvent {
+  rollId: string;
+  username: string;
+  left: number;
+  right: number;
+  isDoubles: boolean;
+}
+
 export interface GameState {
   players: Player[];
   status: GameStatuses;
@@ -82,6 +112,9 @@ export interface GameState {
   auctionedTileId?: number | null;
   activeTrade: Trade | null;
   lastMove?: PlayerMoveEvent | null;
+  lastRoll?: DiceRollEvent | null;
+  lastDiceRoll?: DiceRoll | null;
+  declinedTrades?: DeclinedTrade[];
 }
 
 export interface BoardState {

@@ -31,6 +31,17 @@ const PLAYER_COLOR_MAP: Record<string, string> = {
   "#FFE6EB": "#E64E8A", // pink
 };
 
+const PLAYER_TILE_TINT_MAP: Record<string, string> = {
+  "#2667E8": "#DCEBFF", // blue pastel
+  "#1EB554": "#D7F5E3", // green pastel
+  "#E63956": "#FFE0E6", // red pastel
+  "#D99100": "#FFF0C7", // gold pastel
+  "#7B4CE2": "#EAE2FF", // purple pastel
+  "#F26B21": "#FFE6D6", // orange pastel
+  "#9E5A38": "#F1E2D7", // brown pastel
+  "#E64E8A": "#FFE1EE", // pink pastel
+};
+
 export function getCartridgeGroupColor(
   groupId?: number | null,
   fallback?: string
@@ -57,6 +68,14 @@ export function getCartridgePlayerColor(rawColor?: string | null): string {
   if (!rawColor) return "#2667E8";
   const upper = rawColor.toUpperCase();
   return PLAYER_COLOR_MAP[upper] || rawColor;
+}
+
+export function getCartridgePlayerTileTint(rawColor?: string | null): string {
+  const resolved = getCartridgePlayerColor(rawColor);
+  const upper = resolved.toUpperCase();
+  return (
+    PLAYER_TILE_TINT_MAP[upper] || `color-mix(in srgb, ${resolved} 18%, #ffffff)`
+  );
 }
 
 export function getPlayerInitials(username?: string | null): string {

@@ -1,8 +1,13 @@
-import { GameState, Player, Tile } from "~/types";
-import { checkIsFullPropertySet } from "./checkIsFullPropertySet";
+import type { GameState, Player, Tile } from "~/types";
+import {
+  recalculateSpecialPropertyRentLevels,
+  syncPropertySets,
+} from "./shared";
 
 export const acceptTrade = (game: GameState) => {
-  if (!game.activeTrade) return;
+  if (!game.activeTrade || !game.activeTrade.from || !game.activeTrade.to) {
+    return;
+  }
 
   const { from, to, given, received, givenMoney, receivedMoney } =
     game.activeTrade;
@@ -10,26 +15,48 @@ export const acceptTrade = (game: GameState) => {
   const playerFrom = game.players.find((p: Player) => p.username === from);
   const playerTo = game.players.find((p: Player) => p.username === to);
 
+  if (!playerFrom || !playerTo) {
+    return;
+  }
+
+  const normalizedGivenMoney = Number(givenMoney) || 0;
+  const normalizedReceivedMoney = Number(receivedMoney) || 0;
+
   given.forEach((g: number) => {
-    playerFrom!.properties = playerFrom!.properties.filter(p => p !== g);
-    playerTo!.properties.push(g);
-    game.board.tiles.find((t: Tile) => t.id === g)!.owner = to;
+    playerFrom.properties = playerFrom.properties.filter((p) => p !== g);
+    if (!playerTo.properties.includes(g)) {
+      playerTo.properties.push(g);
+    }
+    const tile = game.board.tiles.find((t: Tile) => t.id === g);
+    if (tile) {
+      tile.owner = to;
+    }
   });
 
   received.forEach((r: number) => {
-    playerTo!.properties = playerTo!.properties.filter(p => p !== r);
-    playerFrom!.properties.push(r);
-    game.board.tiles.find((t: Tile) => t.id === r)!.owner = from;
+    playerTo.properties = playerTo.properties.filter((p) => p !== r);
+    if (!playerFrom.properties.includes(r)) {
+      playerFrom.properties.push(r);
+    }
+    const tile = game.board.tiles.find((t: Tile) => t.id === r);
+    if (tile) {
+      tile.owner = from;
+    }
   });
 
-  checkIsFullPropertySet(playerFrom, game.board);
-  checkIsFullPropertySet(playerTo, game.board);
+  playerFrom.balance -= normalizedGivenMoney;
+  playerTo.balance += normalizedGivenMoney;
 
-  playerFrom!.balance -= givenMoney!;
-  playerTo!.balance += givenMoney!;
+  playerFrom.balance += normalizedReceivedMoney;
+  playerTo.balance -= normalizedReceivedMoney;
 
-  playerFrom!.balance += receivedMoney!;
-  playerTo!.balance -= receivedMoney!;
+  syncPropertySets(game);
+  recalculateSpecialPropertyRentLevels(game);
+
+  game.gameLog.push({
+    username: to,
+    msg: `accepted trade from ${from}`,
+  });
 
   game.activeTrade = {
     from: "",

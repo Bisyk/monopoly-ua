@@ -1,4 +1,4 @@
-import { GameState, Player } from "~/types";
+import type { GameState, Player } from "~/types";
 
 // same as downgrade property
 export const sellProperty = (
@@ -8,18 +8,39 @@ export const sellProperty = (
 ) => {
   const propertyId = parsedMessage.payload.propertyId;
 
-  const propertyToSell = game.board.tiles.find(t => t.id === propertyId);
+  const propertyToSell = game.board.tiles.find((t) => t.id === propertyId);
 
-  const propertyGroup = game.board.groups.find(g => {
-    return g.properties.includes(propertyId);
-  });
+  const propertyGroup = game.board.groups.find((g) =>
+    g.properties.includes(propertyId)
+  );
 
-  if (propertyToSell!.rentLevel! < 1) {
+  if (!propertyToSell || !propertyGroup || propertyToSell.type !== "property") {
     return;
   }
 
-  currentTurnPlayer.balance +=
-    propertyToSell!.rentLevels![propertyToSell!.rentLevel!] / 2;
-  propertyToSell!.rentLevel! -= 1;
+  if (propertyToSell.owner !== currentTurnPlayer.username) {
+    return;
+  }
+
+  const currentLevel = propertyToSell.rentLevel ?? 0;
+  if (currentLevel < 1) {
+    return;
+  }
+
+  const groupTiles = game.board.tiles.filter((t) =>
+    propertyGroup.properties.includes(t.id)
+  );
+
+  if (!groupTiles.every((t) => (t.rentLevel ?? 0) <= currentLevel)) {
+    return;
+  }
+
+  const refund = (propertyToSell.rentLevels?.[currentLevel] ?? 0) / 2;
+  currentTurnPlayer.balance += refund;
+  propertyToSell.rentLevel = currentLevel - 1;
+  game.gameLog.push({
+    username: currentTurnPlayer.username,
+    msg: `downgraded ${propertyToSell.name} to level ${propertyToSell.rentLevel} for $${refund}`,
+  });
   return;
 };

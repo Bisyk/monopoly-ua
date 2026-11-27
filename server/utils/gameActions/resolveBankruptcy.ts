@@ -1,4 +1,8 @@
-import { GameState, Player } from "~/types";
+import type { GameState, Player } from "~/types";
+import {
+  recalculateSpecialPropertyRentLevels,
+  syncPropertySets,
+} from "./shared";
 
 type ResolveBankruptcyParams = {
   game: GameState;
@@ -19,7 +23,7 @@ const setCurrentTurnAfterElimination = (
 
   if (game.currentTurn !== eliminatedPlayerUsername) {
     const currentTurnStillActive = game.players.some(
-      player => player.username === game.currentTurn
+      (player) => player.username === game.currentTurn
     );
     if (!currentTurnStillActive) {
       game.currentTurn = game.players[0].username;
@@ -31,69 +35,6 @@ const setCurrentTurnAfterElimination = (
   game.currentTurn = game.players[nextPlayerIdx].username;
 };
 
-const recalculateSpecialPropertyRentLevels = (game: GameState) => {
-  const ownedCarsCount: Record<string, number> = {};
-  const ownedBonusPropertiesCount: Record<string, number> = {};
-
-  game.board.tiles.forEach(tile => {
-    if (!tile.owner) {
-      return;
-    }
-
-    if (tile.type === "car") {
-      ownedCarsCount[tile.owner] = (ownedCarsCount[tile.owner] || 0) + 1;
-    }
-
-    if (tile.type === "bonus-property") {
-      ownedBonusPropertiesCount[tile.owner] =
-        (ownedBonusPropertiesCount[tile.owner] || 0) + 1;
-    }
-  });
-
-  game.board.tiles.forEach(tile => {
-    if (tile.type === "car") {
-      tile.rentLevel = tile.owner ? ownedCarsCount[tile.owner] - 1 : 0;
-    }
-
-    if (tile.type === "bonus-property") {
-      tile.rentLevel = tile.owner ? ownedBonusPropertiesCount[tile.owner] - 1 : 0;
-    }
-  });
-};
-
-const syncPropertySets = (game: GameState) => {
-  game.board.groups.forEach(group => {
-    const groupedTiles = game.board.tiles.filter(tile =>
-      group.properties.includes(tile.id)
-    );
-    const tileOwners = groupedTiles
-      .map(tile => tile.owner)
-      .filter((owner): owner is string => Boolean(owner));
-
-    const hasSingleOwner =
-      tileOwners.length === groupedTiles.length &&
-      new Set(tileOwners).size === 1;
-
-    if (group.isFullSet && !hasSingleOwner) {
-      groupedTiles.forEach(tile => {
-        if (tile.rentLevels?.length) {
-          tile.rentLevels[0] = tile.rentLevels[0] / 2;
-        }
-      });
-    }
-
-    if (!group.isFullSet && hasSingleOwner) {
-      groupedTiles.forEach(tile => {
-        if (tile.rentLevels?.length) {
-          tile.rentLevels[0] = tile.rentLevels[0] * 2;
-        }
-      });
-    }
-
-    group.isFullSet = hasSingleOwner;
-  });
-};
-
 export const resolveBankruptcy = ({
   game,
   bankruptPlayer,
@@ -101,13 +42,15 @@ export const resolveBankruptcy = ({
   creditorUsername,
 }: ResolveBankruptcyParams) => {
   const creditor = creditorUsername
-    ? game.players.find(player => player.username === creditorUsername)
+    ? game.players.find((player) => player.username === creditorUsername)
     : null;
 
   const bankruptProperties = [...bankruptPlayer.properties];
 
-  bankruptProperties.forEach(propertyId => {
-    const tile = game.board.tiles.find(boardTile => boardTile.id === propertyId);
+  bankruptProperties.forEach((propertyId) => {
+    const tile = game.board.tiles.find(
+      (boardTile) => boardTile.id === propertyId
+    );
     if (!tile) {
       return;
     }
@@ -143,17 +86,28 @@ export const resolveBankruptcy = ({
   }
 
   game.players = game.players.filter(
-    player => player.username !== bankruptPlayer.username
+    (player) => player.username !== bankruptPlayer.username
   );
 
   recalculateSpecialPropertyRentLevels(game);
   syncPropertySets(game);
+
+  game.gameLog.push({
+    username: bankruptPlayer.username,
+    msg: creditor
+      ? `went bankrupt to ${creditor.username}`
+      : "went bankrupt",
+  });
 
   if (game.players.length === 1) {
     game.status = "ENDED";
     game.winnerUsername = game.players[0].username;
     game.currentTurn = game.players[0].username;
     game.currentAction = "roll";
+    game.gameLog.push({
+      username: game.players[0].username,
+      msg: "won the game!",
+    });
     return;
   }
 

@@ -1,95 +1,186 @@
 import prisma from "~/lib/prisma";
 import {
-  colors,
-  defaultPropertyGroups,
-  defaultPlayerTemplate,
-  defaultTiles,
-} from "../constants";
+  generateBotUsername,
+  normalizeBotDifficulty,
+} from "~/shared/constants/botNames";
+import { broadcastRoomsUpdate } from "../api/rooms";
+import { startGameForRoom } from "../utils/startGameForRoom";
 
-export default defineEventHandler(async event => {
+export default defineEventHandler(async (event) => {
   console.log("PUT /games");
 
-  const data: string = await readBody(event);
-  const body = JSON.parse(data);
+  const rawBody = await readBody(event);
+  const body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
 
-  const { action, payload } = body;
+  const { action, payload } = body ?? {};
+  const actionType = action?.type;
 
-  if (action.type === "JOIN_ROOM") {
+  if (actionType === "JOIN_ROOM") {
     console.log("PUT /games JOIN_ROOM");
-    const game = await prisma.room.findUnique({
+    const room = await prisma.room.findUnique({
       where: {
         id: payload.roomId,
       },
     });
 
-    if (!game) {
+    if (!room) {
       console.log("room to join not found");
       return { status: 404 };
     }
 
-    if (game.players.includes(payload.username)) {
+    if (room.status !== "PENDING") {
+      return { status: 400, msg: "Room has already started" };
+    }
+
+    if (room.players.includes(payload.username)) {
       return { msg: "User already in room" };
     }
 
-    const updatedGame = await prisma.room.update({
+    if (room.players.length >= room.maxPlayers) {
+      return { status: 400, msg: "Room is full" };
+    }
+
+    const updatedRoom = await prisma.room.update({
       where: {
         id: payload.roomId,
       },
       data: {
-        players: [...game.players, payload.username],
+        players: [...room.players, payload.username],
       },
     });
 
-    console.log("room joined", updatedGame);
+    console.log("room joined", updatedRoom);
 
-    if (updatedGame.players.length === updatedGame.maxPlayers) {
-      console.log("create game");
-      const room = updatedGame;
-      const roomId = updatedGame.id;
+    let finalRoom = updatedRoom;
+    let gameStarted = false;
 
-      const game = await prisma.game.create({
-        data: {
-          associatedRoomId: roomId,
-          status: "STARTED",
-          winnerUsername: null,
-          eliminatedPlayers: [],
-          players: room!.players.map((player, idx) => ({
-            username: player,
-            color: colors[idx],
-            ...defaultPlayerTemplate,
-          })),
-          currentTurn: room!.players[0],
-          currentAction: "roll",
-          auctionParticipants: [],
-          activeAuctionBidder: "",
-          auctionBidAmount: 0,
-          auctionedTileId: null,
-          activeChance: {
-            type: "",
-          },
-          activeTrade: {
-            from: "",
-            to: "",
-            given: [],
-            received: [],
-            givenMoney: 0,
-            receivedMoney: 0,
-          },
-          board: {
-            tiles: defaultTiles,
-            groups: defaultPropertyGroups,
-          },
-          gameLog: [],
-        },
-      });
-
-      console.log("game created", game);
+    if (updatedRoom.players.length === updatedRoom.maxPlayers) {
+      console.log("starting game for full room", updatedRoom.id);
+      await startGameForRoom(updatedRoom);
+      finalRoom = { ...updatedRoom, status: "STARTED" };
+      gameStarted = true;
     }
+
+    await broadcastRoomsUpdate();
 
     return {
       body: JSON.stringify({
-        game: updatedGame,
+        game: finalRoom,
+        gameStarted,
       }),
     };
   }
+
+  if (actionType === "ADD_BOT") {
+    console.log("PUT /games ADD_BOT");
+    const room = await prisma.room.findUnique({
+      where: {
+        id: payload.roomId,
+      },
+    });
+
+    if (!room) {
+      return { status: 404 };
+    }
+
+    if (room.status !== "PENDING") {
+      return { status: 400, msg: "Cannot add bot to a started room" };
+    }
+
+    if (room.createdBy !== payload.username) {
+      return { status: 403, msg: "Only the room creator can add bots" };
+    }
+
+    if (room.players.length >= room.maxPlayers) {
+      return { status: 400, msg: "Room is full" };
+    }
+
+    const botUsername = generateBotUsername(room.players);
+    const difficulty = normalizeBotDifficulty(payload.difficulty);
+
+    const updatedRoom = await prisma.room.update({
+      where: {
+        id: payload.roomId,
+      },
+      data: {
+        players: [...room.players, botUsername],
+        bots: [...(room.bots ?? []), { username: botUsername, difficulty }],
+      },
+    });
+
+    let finalRoom = updatedRoom;
+    let gameStarted = false;
+
+    if (updatedRoom.players.length === updatedRoom.maxPlayers) {
+      console.log("starting game for full room after ADD_BOT", updatedRoom.id);
+      await startGameForRoom(updatedRoom);
+      finalRoom = { ...updatedRoom, status: "STARTED" };
+      gameStarted = true;
+    }
+
+    await broadcastRoomsUpdate();
+
+    return {
+      body: JSON.stringify({
+        game: finalRoom,
+        gameStarted,
+      }),
+    };
+  }
+
+  if (actionType === "REMOVE_BOT") {
+    console.log("PUT /games REMOVE_BOT");
+    const room = await prisma.room.findUnique({
+      where: {
+        id: payload.roomId,
+      },
+    });
+
+    if (!room) {
+      return { status: 404 };
+    }
+
+    if (room.status !== "PENDING") {
+      return { status: 400, msg: "Cannot remove bot from a started room" };
+    }
+
+    if (room.createdBy !== payload.username) {
+      return { status: 403, msg: "Only the room creator can remove bots" };
+    }
+
+    const botUsername = payload.botUsername;
+    const existingBots = room.bots ?? [];
+    if (
+      !existingBots.some(
+        (b: { username: string; difficulty: string }) =>
+          b.username === botUsername
+      )
+    ) {
+      return { status: 404, msg: "Bot not found in room" };
+    }
+
+    const updatedRoom = await prisma.room.update({
+      where: {
+        id: payload.roomId,
+      },
+      data: {
+        players: room.players.filter((p: string) => p !== botUsername),
+        bots: existingBots.filter(
+          (b: { username: string; difficulty: string }) =>
+            b.username !== botUsername
+        ),
+      },
+    });
+
+    await broadcastRoomsUpdate();
+
+    return {
+      body: JSON.stringify({
+        game: updatedRoom,
+        gameStarted: false,
+      }),
+    };
+  }
+
+  return { status: 400, msg: "Unsupported action" };
 });

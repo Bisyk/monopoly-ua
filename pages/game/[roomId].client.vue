@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, computed, useTemplateRef, nextTick } from "vue";
+import { onMounted, ref, computed, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { getTilePosition } from "../../utils/board";
 import { onClickOutside } from "@vueuse/core";
@@ -10,7 +10,6 @@ import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties
 
 const route = useRoute();
 const router = useRouter();
-const players = ref<Player[]>([]);
 const username = sessionStorage.getItem("username") || "";
 const tileInfo = ref(null);
 const tileInfoStyle = ref({ top: 0, left: 0 });
@@ -22,7 +21,7 @@ const handleAnimationStateChange = (animating: boolean) => {
 
 // @ts-ignore
 const protocol = location.protocol === "https:" ? "wss" : "ws";
-const { status, send, open, close, handleMessage } = useWebsocketManager(
+const { send, handleMessage } = useWebsocketManager(
   `${protocol}://${location.host}/api/websocket?roomId=${route.params.roomId}`
 );
 const {
@@ -54,12 +53,22 @@ const {
   handleSendTrade,
   handleAcceptTrade,
   handleDeclineTrade,
-} = useGameActions(send, username!);
+} = useGameActions(send, username);
 
 handleMessage((message: string) => {
   isSending.value = false;
   gameState.value = JSON.parse(message);
 });
+
+const players = computed<Player[]>(() => gameState.value?.players ?? []);
+
+const isSpectator = computed(
+  () =>
+    Boolean(gameState.value?.players?.length) &&
+    !gameState.value.players.some((p: Player) => p.username === username)
+);
+
+const boardPlayer = computed<Player>(() => player.value ?? ({} as Player));
 
 const showTileInfo = async (event: Event, tile: Tile) => {
   const targetEl =
@@ -103,17 +112,22 @@ const showTileInfo = async (event: Event, tile: Tile) => {
   tileInfoStyle.value = { top, left };
 };
 
-const activateTrade = (username: string) => {
+const activateTrade = (targetUsername: string) => {
+  if (isSpectator.value || !player.value) return;
   if (gameState.value.currentTurn !== player.value.username) return;
-  tradePlayerUsername.value = username;
+  tradePlayerUsername.value = targetUsername;
 };
 
-const setTradePlayerUsername = (username: string) => {
-  tradePlayerUsername.value = username;
+const setTradePlayerUsername = (targetUsername: string) => {
+  tradePlayerUsername.value = targetUsername;
 };
 
 const isActiveTurnReady = computed(
-  () => !isMoveAnimating.value && gameState.value?.currentTurn === username
+  () =>
+    !isSpectator.value &&
+    Boolean(player.value) &&
+    !isMoveAnimating.value &&
+    gameState.value?.currentTurn === username
 );
 const isGameEnded = computed(() => gameState.value?.status === "ENDED");
 const gameWinnerText = computed(() => {
@@ -134,17 +148,11 @@ onClickOutside(tileInfo, () => {
 });
 
 onMounted(async () => {
-  const username = sessionStorage.getItem("username");
   // @ts-ignore
   const { body } = await $fetch(`/games/${route.params.roomId}`);
   const { game } = JSON.parse(body);
 
   gameState.value = game;
-  players.value = game.players;
-
-  if (!game.players.some((p: Player) => p.username === username)) {
-    router.push({ path: "/" });
-  }
 });
 
 // @ts-ignore
@@ -164,10 +172,19 @@ definePageMeta({
 </script>
 
 <template>
-  <div class="gameContainer" v-if="gameState">
+  <div class="gameContainer" v-if="gameState && gameState.players">
     <div v-if="isGameEnded" class="gameEndedBanner">
       <GameIcon name="trophy" :size="22" />
       <span>{{ gameWinnerText }}</span>
+      <BaseButton size="sm" variant="secondary" @click="router.push('/')">
+        LOBBY
+      </BaseButton>
+    </div>
+
+    <div v-else-if="isSpectator" class="spectatorBanner">
+      <span class="spectator-dot" />
+      <GameIcon name="bolt" :size="18" />
+      <span>SPECTATING</span>
       <BaseButton size="sm" variant="secondary" @click="router.push('/')">
         LOBBY
       </BaseButton>
@@ -194,6 +211,8 @@ definePageMeta({
 
     <ModalRoll
       v-if="
+        !isSpectator &&
+        player &&
         isActiveTurnReady &&
         gameState.currentAction === 'roll' &&
         !player.jailed
@@ -203,7 +222,7 @@ definePageMeta({
     />
 
     <ModalJail
-      v-if="isActiveTurnReady && player.jailed"
+      v-if="!isSpectator && player && isActiveTurnReady && player.jailed"
       :playerBalance="player.balance"
       :isSending="isSending"
       @handleUserTurn="handleUserTurn"
@@ -211,7 +230,12 @@ definePageMeta({
     />
 
     <ModalBuy
-      v-if="isActiveTurnReady && gameState.currentAction === 'buy'"
+      v-if="
+        !isSpectator &&
+        player &&
+        isActiveTurnReady &&
+        gameState.currentAction === 'buy'
+      "
       :tileId="currentTilePlayerOn.id"
       :tileName="currentTilePlayerOn.name"
       :tilePrice="currentTilePlayerOn.price"
@@ -224,6 +248,8 @@ definePageMeta({
 
     <ModalAuction
       v-if="
+        !isSpectator &&
+        player &&
         gameState.currentAction === 'auction' &&
         gameState.activeAuctionBidder === username &&
         auctionedTile
@@ -242,7 +268,12 @@ definePageMeta({
     />
 
     <ModalPayRent
-      v-if="isActiveTurnReady && gameState.currentAction === 'payRent'"
+      v-if="
+        !isSpectator &&
+        player &&
+        isActiveTurnReady &&
+        gameState.currentAction === 'payRent'
+      "
       :tilePlayerOn="currentTilePlayerOn"
       :turnResult="turnResult"
       :playerBalance="player.balance"
@@ -252,9 +283,11 @@ definePageMeta({
 
     <ModalPayChance
       v-if="
+        !isSpectator &&
+        player &&
         isActiveTurnReady &&
         gameState.currentAction === 'chance' &&
-        gameState.activeChance.type === 'minusBalance'
+        gameState.activeChance?.type === 'minusBalance'
       "
       :chanceText="gameState.activeChance.text"
       :playerBalance="player.balance"
@@ -264,7 +297,12 @@ definePageMeta({
     />
 
     <ModalPayTax
-      v-if="isActiveTurnReady && gameState.currentAction === 'payTax'"
+      v-if="
+        !isSpectator &&
+        player &&
+        isActiveTurnReady &&
+        gameState.currentAction === 'payTax'
+      "
       :taxAmount="currentTilePlayerOn.taxAmount"
       :playerBalance="player.balance"
       :isSending="isSending"
@@ -273,7 +311,7 @@ definePageMeta({
 
     <!-- SEND TRADE MODAL -->
     <TradeModal
-      v-if="tradePlayerUsername"
+      v-if="!isSpectator && player && tradePlayerUsername"
       :tradePlayerUsername="tradePlayerUsername"
       :tradeTiles="tradeTiles"
       :player="player"
@@ -289,7 +327,7 @@ definePageMeta({
           tradePlayerUsername
         )
       "
-      @setTradePlayerUsername="(username: string) => setTradePlayerUsername(username)"
+      @setTradePlayerUsername="(targetUsername: string) => setTradePlayerUsername(targetUsername)"
       @sendTrade="handleSendTrade"
       send
     />
@@ -297,10 +335,14 @@ definePageMeta({
     <!-- RECEIVE TRADE MODAL -->
     <TradeModal
       v-if="
+        !isSpectator &&
+        player &&
         gameState.currentAction === 'trade' &&
-        gameState.activeTrade.to === username
+        gameState.activeTrade?.to === username
       "
       :tradePlayerUsername="tradePlayerUsername"
+      :player="player"
+      :players="gameState.players"
       :activeTrade="gameState.activeTrade"
       :board="board"
       @acceptTrade="handleAcceptTrade"
@@ -314,9 +356,9 @@ definePageMeta({
       :gameState="gameState"
       :showTileInfo="showTileInfo"
       :players="players"
-      :player="player"
+      :player="boardPlayer"
       :selectedTileId="selectedTile?.id ?? null"
-      @activateTrade="(username: string) => activateTrade(username)"
+      @activateTrade="(targetUsername: string) => activateTrade(targetUsername)"
       @animationStateChange="handleAnimationStateChange"
     />
   </div>
@@ -342,7 +384,8 @@ definePageMeta({
   min-height: 100vh;
 }
 
-.gameEndedBanner {
+.gameEndedBanner,
+.spectatorBanner {
   position: fixed;
   top: 16px;
   left: 50%;
@@ -351,8 +394,6 @@ definePageMeta({
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  background: var(--gold-light);
-  color: var(--ink);
   padding: 10px 16px;
   border: 2.5px solid var(--outline);
   border-radius: var(--radius-md);
@@ -362,6 +403,28 @@ definePageMeta({
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.gameEndedBanner {
+  background: var(--gold-light);
+  color: var(--ink);
+}
+
+.spectatorBanner {
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 14px;
+  padding: 8px 14px;
+  gap: 10px;
+}
+
+.spectator-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--gold-light);
+  border: 1.5px solid var(--outline);
+  flex-shrink: 0;
 }
 
 .loading-screen {
