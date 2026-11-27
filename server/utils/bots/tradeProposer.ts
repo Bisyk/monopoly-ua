@@ -3,6 +3,11 @@ import {
   buildTradeSignature,
   isTradePreviouslyDeclined,
 } from "~/shared/utils/tradeSignature";
+import {
+  computeMortgageTransferFee,
+  getTileMortgageTransferFee,
+  getTileTradeParityValue,
+} from "~/shared/utils/mortgageTransferFee";
 import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties";
 import {
   applyTradeToOwnershipMap,
@@ -184,6 +189,8 @@ export function findBestTradeProposal(
       }
 
       const wantedPrice = wantedTile.price ?? 100;
+      const wantedParityPrice = getTileTradeParityValue(wantedTile);
+      const wantedTransferFee = getTileMortgageTransferFee(wantedTile);
       const wantedValBot = evaluateTileStrategicValue(
         game,
         wantedTile,
@@ -204,7 +211,8 @@ export function findBestTradeProposal(
       const allowCashOnlyOffer =
         difficulty === "EASY" || (!isCompleting && !groupHasUnowned);
 
-      if (allowCashOnlyOffer && surplusCash >= wantedPrice) {
+      const availableForCashOffer = Math.max(0, surplusCash - wantedTransferFee);
+      if (allowCashOnlyOffer && availableForCashOffer >= wantedParityPrice) {
         const minPremiumMult =
           difficulty === "EASY"
             ? 1.1
@@ -213,18 +221,24 @@ export function findBestTradeProposal(
               : 1.6;
         const cashOfferRaw =
           difficulty === "EASY"
-            ? wantedPrice * 1.1
+            ? wantedParityPrice * 1.1
             : Math.min(
-                wantedPrice * 2.0,
-                Math.max(wantedPrice * minPremiumMult, wantedValOpp * 1.2)
+                wantedParityPrice * 2.0,
+                Math.max(wantedParityPrice * minPremiumMult, wantedValOpp * 1.2)
               );
 
         const cashOffer = roundToTen(
-          Math.min(surplusCash, Math.max(wantedPrice * minPremiumMult, cashOfferRaw))
+          Math.min(
+            availableForCashOffer,
+            Math.max(wantedParityPrice * minPremiumMult, cashOfferRaw)
+          )
         );
 
-        const minRequiredCash = Math.round(wantedPrice * minPremiumMult);
-        if (cashOffer >= minRequiredCash && cashOffer <= surplusCash) {
+        const minRequiredCash = Math.round(wantedParityPrice * minPremiumMult);
+        if (
+          cashOffer >= minRequiredCash &&
+          cashOffer <= availableForCashOffer
+        ) {
           pushCandidate({
             from: bot.username,
             to: opp.username,
@@ -243,7 +257,7 @@ export function findBestTradeProposal(
 
       // (b) 1-for-1 tile swap (+ smart cash balancing for mutual-set swaps)
       for (const giveTile of eligibleGiveTiles) {
-        const givePrice = giveTile.price ?? 100;
+        const giveParityPrice = getTileTradeParityValue(giveTile);
         const giveValOpp = evaluateTileStrategicValue(
           game,
           giveTile,
@@ -266,7 +280,9 @@ export function findBestTradeProposal(
 
           if (powerDiff > 40) {
             // Bot is getting the stronger set: offer cash sweetener to make swap realistic
-            const sweetener = roundToTen(Math.min(surplusCash, powerDiff * 0.55));
+            const sweetener = roundToTen(
+              Math.min(availableForCashOffer, powerDiff * 0.55)
+            );
             if (sweetener > 0) {
               givenMoney = sweetener;
             }
@@ -280,18 +296,31 @@ export function findBestTradeProposal(
             }
           }
         } else {
-          const targetBaseNeed = Math.max(wantedPrice, wantedValOpp);
+          const targetBaseNeed = Math.min(
+            wantedParityPrice * 2.0,
+            Math.max(wantedParityPrice, wantedValOpp)
+          );
           if (giveValOpp < targetBaseNeed) {
-            const gap = roundToTen((targetBaseNeed - giveValOpp) * 1.05);
-            if (gap > 0 && gap <= surplusCash) {
+            const maxLegalGap = Math.max(
+              0,
+              wantedParityPrice * 2.0 - giveParityPrice
+            );
+            const gap = roundToTen(
+              Math.min(
+                availableForCashOffer,
+                maxLegalGap,
+                (targetBaseNeed - giveValOpp) * 1.05
+              )
+            );
+            if (gap > 0 && gap <= availableForCashOffer) {
               givenMoney = gap;
             }
           } else if (
             difficulty !== "EASY" &&
-            givePrice > wantedPrice + 40 &&
+            giveParityPrice > wantedParityPrice + 40 &&
             opp.balance >= 120
           ) {
-            const ask = roundToTen((givePrice - wantedPrice) * 0.5);
+            const ask = roundToTen((giveParityPrice - wantedParityPrice) * 0.5);
             if (ask > 0 && opp.balance - ask >= 100) {
               receivedMoney = ask;
             }
@@ -536,8 +565,18 @@ export function findBestTradeProposal(
 
     const givenMoney = trade.givenMoney ?? 0;
     const receivedMoney = trade.receivedMoney ?? 0;
-    const postBotBalance = bot.balance - givenMoney + receivedMoney;
-    const postOppBalance = opp.balance - receivedMoney + givenMoney;
+    const botMortgageFee = computeMortgageTransferFee(
+      game.board.tiles,
+      trade.received
+    );
+    const oppMortgageFee = computeMortgageTransferFee(
+      game.board.tiles,
+      trade.given
+    );
+    const postBotBalance =
+      bot.balance - givenMoney + receivedMoney - botMortgageFee;
+    const postOppBalance =
+      opp.balance - receivedMoney + givenMoney - oppMortgageFee;
 
     if (postBotBalance < 0 || postOppBalance < 0) {
       continue;
@@ -686,32 +725,30 @@ export function findBestTradeProposal(
     // Target fairness / plausibility check
     const isMutualSwap = botNewMonos.length > 0 && oppNewMonos.length > 0;
     const offeredToOppVal =
-      trade.given.reduce(
-        (s, id) =>
+      trade.given.reduce((s, id) => {
+        const tile = getTileById(game, id);
+        return (
           s +
           Math.max(
-            getTileById(game, id)?.price ?? 0,
-            evaluateTileStrategicValue(game, getTileById(game, id)!, opp.username)
-          ),
-        0
-      ) + givenMoney;
+            getTileTradeParityValue(tile),
+            tile ? evaluateTileStrategicValue(game, tile, opp.username) : 0
+          )
+        );
+      }, 0) + givenMoney;
 
     const requestedFromOppVal =
-      trade.received.reduce(
-        (s, id) =>
+      trade.received.reduce((s, id) => {
+        const tile = getTileById(game, id);
+        return (
           s +
           (isMutualSwap
             ? Math.max(
-                getTileById(game, id)?.price ?? 0,
-                evaluateTileStrategicValue(
-                  game,
-                  getTileById(game, id)!,
-                  bot.username
-                )
+                getTileTradeParityValue(tile),
+                tile ? evaluateTileStrategicValue(game, tile, bot.username) : 0
               )
-            : getTileById(game, id)?.price ?? 0),
-        0
-      ) + receivedMoney;
+            : getTileTradeParityValue(tile))
+        );
+      }, 0) + receivedMoney;
 
     if (requestedFromOppVal > 0) {
       const ratio = offeredToOppVal / requestedFromOppVal;
@@ -735,7 +772,7 @@ export function findBestTradeProposal(
       if (difficulty !== "EASY") {
         if (trade.given.length === 0 && trade.received.length > 0) {
           const requestedFace = trade.received.reduce(
-            (s, id) => s + (getTileById(game, id)?.price ?? 0),
+            (s, id) => s + getTileTradeParityValue(getTileById(game, id)),
             0
           );
           const minCashMult = opp.balance < 300 ? 1.4 : 1.6;

@@ -11,6 +11,10 @@ import {
   getPlayerInitials,
   getTileSpriteUrl,
 } from "~/utils/cartridgeTheme";
+import {
+  computeMortgageTransferFee,
+  getTileTradeParityValue,
+} from "~/shared/utils/mortgageTransferFee";
 
 const props = defineProps({
   tradePlayerUsername: {
@@ -110,22 +114,34 @@ const buildPlayerIdentity = (
   };
 };
 
+const selfPlayer = computed<Player | null>(
+  () => props.player ?? findPlayerByUsername(props.activeTrade?.to)
+);
+
+const counterpartyPlayer = computed<Player | null>(() => {
+  const targetUsername = props.send
+    ? props.tradePlayerUsername
+    : props.activeTrade?.from || props.tradePlayerUsername;
+  return findPlayerByUsername(targetUsername);
+});
+
 const selfIdentity = computed<TradePlayerIdentity>(() => {
   const fallbackName = props.player?.username || props.activeTrade?.to || "You";
-  const playerObj = props.player ?? findPlayerByUsername(props.activeTrade?.to);
-  return buildPlayerIdentity(playerObj, fallbackName, true);
+  return buildPlayerIdentity(selfPlayer.value, fallbackName, true);
 });
 
 const counterpartyIdentity = computed<TradePlayerIdentity>(() => {
   const targetUsername = props.send
     ? props.tradePlayerUsername
     : props.activeTrade?.from || props.tradePlayerUsername;
-  const playerObj = findPlayerByUsername(targetUsername);
-  return buildPlayerIdentity(playerObj, targetUsername, false);
+  return buildPlayerIdentity(counterpartyPlayer.value, targetUsername, false);
 });
 
 const findTile = (propertyId: number) =>
   props.board.tiles.find((t) => t.id === propertyId);
+
+const getTileDisplayPrice = (propertyId: number) =>
+  getTileTradeParityValue(findTile(propertyId));
 
 const toggleGivenProperty = (property: number) => {
   if (props.tradeTiles.given.has(property)) {
@@ -162,13 +178,13 @@ const sortedActiveReceived = computed(() =>
 const givenPropertiesPrice = computed(() => {
   if (props.send) {
     const propsSum = Array.from(props.tradeTiles.given as Set<number>).reduce(
-      (acc, id) => acc + (findTile(id)?.price ?? 0),
+      (acc, id) => acc + getTileTradeParityValue(findTile(id)),
       0
     );
     return propsSum + Number(props.tradeTiles.givenMoney || 0);
   }
   const propsSum = (props.activeTrade?.given ?? []).reduce(
-    (acc, id) => acc + (findTile(id)?.price ?? 0),
+    (acc, id) => acc + getTileTradeParityValue(findTile(id)),
     0
   );
   return propsSum + Number(props.activeTrade?.givenMoney || 0);
@@ -178,14 +194,65 @@ const receivedPropertiesPrice = computed(() => {
   if (props.send) {
     const propsSum = Array.from(
       props.tradeTiles.received as Set<number>
-    ).reduce((acc, id) => acc + (findTile(id)?.price ?? 0), 0);
+    ).reduce((acc, id) => acc + getTileTradeParityValue(findTile(id)), 0);
     return propsSum + Number(props.tradeTiles.receivedMoney || 0);
   }
   const propsSum = (props.activeTrade?.received ?? []).reduce(
-    (acc, id) => acc + (findTile(id)?.price ?? 0),
+    (acc, id) => acc + getTileTradeParityValue(findTile(id)),
     0
   );
   return propsSum + Number(props.activeTrade?.receivedMoney || 0);
+});
+
+const selfMortgageFee = computed(() => {
+  if (props.send) {
+    return computeMortgageTransferFee(
+      props.board.tiles,
+      Array.from(props.tradeTiles.received as Set<number>)
+    );
+  }
+  return computeMortgageTransferFee(
+    props.board.tiles,
+    props.activeTrade?.given ?? []
+  );
+});
+
+const counterpartyMortgageFee = computed(() => {
+  if (props.send) {
+    return computeMortgageTransferFee(
+      props.board.tiles,
+      Array.from(props.tradeTiles.given as Set<number>)
+    );
+  }
+  return computeMortgageTransferFee(
+    props.board.tiles,
+    props.activeTrade?.received ?? []
+  );
+});
+
+const hasMortgageTransferFee = computed(
+  () => selfMortgageFee.value > 0 || counterpartyMortgageFee.value > 0
+);
+
+const canAffordTrade = computed(() => {
+  const selfBal = selfPlayer.value?.balance ?? Infinity;
+  const oppBal = counterpartyPlayer.value?.balance ?? Infinity;
+
+  if (props.send) {
+    const givenMoney = Number(props.tradeTiles.givenMoney || 0);
+    const receivedMoney = Number(props.tradeTiles.receivedMoney || 0);
+    const postSelf = selfBal - givenMoney + receivedMoney - selfMortgageFee.value;
+    const postOpp =
+      oppBal - receivedMoney + givenMoney - counterpartyMortgageFee.value;
+    return postSelf >= 0 && postOpp >= 0;
+  }
+
+  const givenMoney = Number(props.activeTrade?.givenMoney || 0);
+  const receivedMoney = Number(props.activeTrade?.receivedMoney || 0);
+  const postSelf = selfBal + givenMoney - receivedMoney - selfMortgageFee.value;
+  const postOpp =
+    oppBal - givenMoney + receivedMoney - counterpartyMortgageFee.value;
+  return postSelf >= 0 && postOpp >= 0;
 });
 
 const isTradeValid = computed(() => {
@@ -273,7 +340,10 @@ const modalTitle = computed(() => {
                 :key="property"
                 type="button"
                 class="trade-chip"
-                :class="{ 'is-selected': tradeTiles.given.has(property) }"
+                :class="{
+                  'is-selected': tradeTiles.given.has(property),
+                  'is-mortgaged': findTile(property)?.mortgaged,
+                }"
                 @click="toggleGivenProperty(property)"
               >
                 <img
@@ -281,8 +351,15 @@ const modalTitle = computed(() => {
                   :alt="findTile(property)?.name"
                 />
                 <span>{{ findTile(property)?.name }}</span>
+                <span
+                  v-if="findTile(property)?.mortgaged"
+                  class="trade-chip__mort"
+                  title="Mortgaged — recipient pays 10% transfer fee to bank"
+                >
+                  MORT
+                </span>
                 <span class="trade-chip__price">
-                  ${{ findTile(property)?.price }}
+                  ${{ getTileDisplayPrice(property) }}
                 </span>
               </button>
               <p v-if="!sortedYourProperties.length" class="trade-empty">
@@ -351,7 +428,10 @@ const modalTitle = computed(() => {
                 :key="property"
                 type="button"
                 class="trade-chip"
-                :class="{ 'is-selected': tradeTiles.received.has(property) }"
+                :class="{
+                  'is-selected': tradeTiles.received.has(property),
+                  'is-mortgaged': findTile(property)?.mortgaged,
+                }"
                 @click="toggleReceivedProperty(property)"
               >
                 <img
@@ -359,8 +439,15 @@ const modalTitle = computed(() => {
                   :alt="findTile(property)?.name"
                 />
                 <span>{{ findTile(property)?.name }}</span>
+                <span
+                  v-if="findTile(property)?.mortgaged"
+                  class="trade-chip__mort"
+                  title="Mortgaged — recipient pays 10% transfer fee to bank"
+                >
+                  MORT
+                </span>
                 <span class="trade-chip__price">
-                  ${{ findTile(property)?.price }}
+                  ${{ getTileDisplayPrice(property) }}
                 </span>
               </button>
               <p v-if="!sortedOpponentProperties.length" class="trade-empty">
@@ -371,10 +458,33 @@ const modalTitle = computed(() => {
         </div>
       </div>
 
+      <div v-if="hasMortgageTransferFee" class="trade-mortgage-fee">
+        <GameIcon name="lock" :size="16" />
+        <span>
+          <strong>10% Mortgage Transfer Fee (bank):</strong>
+          <template v-if="selfMortgageFee > 0">
+            You pay ${{ selfMortgageFee }}
+          </template>
+          <template v-if="selfMortgageFee > 0 && counterpartyMortgageFee > 0">
+            ·
+          </template>
+          <template v-if="counterpartyMortgageFee > 0">
+            {{ counterpartyIdentity.username }} pays ${{ counterpartyMortgageFee }}
+          </template>
+        </span>
+      </div>
+
       <div v-if="!isTradeValid" class="modal-warning">
         <GameIcon name="warn" :size="19" />
         <span>
           Trade offer must stay within 50%–200% of the requested value.
+        </span>
+      </div>
+
+      <div v-else-if="!canAffordTrade" class="modal-warning">
+        <GameIcon name="warn" :size="19" />
+        <span>
+          Insufficient cash to cover trade money and 10% mortgage transfer fee.
         </span>
       </div>
 
@@ -395,7 +505,7 @@ const modalTitle = computed(() => {
           </BaseButton>
           <BaseButton
             variant="positive"
-            :disabled="!isTradeValid"
+            :disabled="!isTradeValid || !canAffordTrade"
             @click="$emit('sendTrade')"
           >
             <GameIcon name="swap" :size="18" />
@@ -459,14 +569,22 @@ const modalTitle = computed(() => {
                 v-for="property in sortedActiveGiven"
                 :key="property"
                 class="trade-chip is-readonly"
+                :class="{ 'is-mortgaged': findTile(property)?.mortgaged }"
               >
                 <img
                   :src="getTileSpriteUrl(findTile(property)?.assetId)"
                   :alt="findTile(property)?.name"
                 />
                 <span>{{ findTile(property)?.name }}</span>
+                <span
+                  v-if="findTile(property)?.mortgaged"
+                  class="trade-chip__mort"
+                  title="Mortgaged — 10% transfer fee due to bank on accept"
+                >
+                  MORT
+                </span>
                 <span class="trade-chip__price">
-                  ${{ findTile(property)?.price }}
+                  ${{ getTileDisplayPrice(property) }}
                 </span>
               </div>
               <p v-if="!sortedActiveGiven.length" class="trade-empty">
@@ -524,14 +642,22 @@ const modalTitle = computed(() => {
                 v-for="property in sortedActiveReceived"
                 :key="property"
                 class="trade-chip is-readonly"
+                :class="{ 'is-mortgaged': findTile(property)?.mortgaged }"
               >
                 <img
                   :src="getTileSpriteUrl(findTile(property)?.assetId)"
                   :alt="findTile(property)?.name"
                 />
                 <span>{{ findTile(property)?.name }}</span>
+                <span
+                  v-if="findTile(property)?.mortgaged"
+                  class="trade-chip__mort"
+                  title="Mortgaged — 10% transfer fee due to bank on accept"
+                >
+                  MORT
+                </span>
                 <span class="trade-chip__price">
-                  ${{ findTile(property)?.price }}
+                  ${{ getTileDisplayPrice(property) }}
                 </span>
               </div>
               <p v-if="!sortedActiveReceived.length" class="trade-empty">
@@ -542,6 +668,29 @@ const modalTitle = computed(() => {
         </div>
       </div>
 
+      <div v-if="hasMortgageTransferFee" class="trade-mortgage-fee">
+        <GameIcon name="lock" :size="16" />
+        <span>
+          <strong>10% Mortgage Transfer Fee (bank):</strong>
+          <template v-if="selfMortgageFee > 0">
+            You pay ${{ selfMortgageFee }}
+          </template>
+          <template v-if="selfMortgageFee > 0 && counterpartyMortgageFee > 0">
+            ·
+          </template>
+          <template v-if="counterpartyMortgageFee > 0">
+            {{ counterpartyIdentity.username }} pays ${{ counterpartyMortgageFee }}
+          </template>
+        </span>
+      </div>
+
+      <div v-if="!canAffordTrade" class="modal-warning">
+        <GameIcon name="warn" :size="19" />
+        <span>
+          Insufficient cash to cover trade money and 10% mortgage transfer fee.
+        </span>
+      </div>
+
       <div class="trade-footer">
         <div class="trade-parity">
           <RetroBadge variant="gold">INCOMING OFFER</RetroBadge>
@@ -550,7 +699,11 @@ const modalTitle = computed(() => {
           <BaseButton variant="danger" @click="$emit('declineTrade')">
             DECLINE
           </BaseButton>
-          <BaseButton variant="positive" @click="$emit('acceptTrade')">
+          <BaseButton
+            variant="positive"
+            :disabled="!canAffordTrade"
+            @click="$emit('acceptTrade')"
+          >
             <GameIcon name="swap" :size="18" />
             <span>ACCEPT</span>
           </BaseButton>
@@ -755,15 +908,51 @@ const modalTitle = computed(() => {
     color: #ffffff;
   }
 
+  &.is-mortgaged:not(.is-selected) {
+    border-style: dashed;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--surface),
+      var(--surface) 6px,
+      rgba(220, 38, 38, 0.08) 6px,
+      rgba(220, 38, 38, 0.08) 12px
+    );
+  }
+
   &.is-readonly {
     cursor: default;
   }
+}
+
+.trade-chip__mort {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--danger, #dc2626);
+  color: #ffffff;
+  border: 1px solid var(--outline);
 }
 
 .trade-chip__price {
   font-family: var(--font-mono);
   font-size: 10.5px;
   opacity: 0.78;
+}
+
+.trade-mortgage-fee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 2px solid var(--outline);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink);
 }
 
 .trade-empty {

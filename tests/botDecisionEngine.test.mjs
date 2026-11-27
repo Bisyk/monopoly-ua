@@ -384,16 +384,18 @@ test("HARD bot never breaks an existing full set unless getting a strictly super
   );
 });
 
-test("Trade evaluator rejects non-tradable mortgaged or upgraded full-set properties", () => {
+test("Trade evaluator allows Strict Hasbro mortgaged trades (with 10% fee) and rejects upgraded full-set properties", () => {
   const game = createGame([
     { username: "human", isBot: false, botDifficulty: null, balance: 1500 },
     { username: "bot_easy", isBot: true, botDifficulty: "EASY", balance: 1000 },
   ]);
 
+  // Tile 20 ($200, mortgage $100, parity $100, 10% transfer fee = $10)
   assignTiles(game, "human", [20], { mortgaged: true });
   const bot = game.players[1];
 
-  const mortgagedTrade = {
+  // Paying $100 cash + $10 transfer fee ($110) for $100 parity -> rejected as insufficient
+  const overpricedMortgagedTrade = {
     from: "human",
     to: "bot_easy",
     given: [20],
@@ -401,9 +403,41 @@ test("Trade evaluator rejects non-tradable mortgaged or upgraded full-set proper
     givenMoney: 0,
     receivedMoney: 100,
   };
-  const res1 = evaluateIncomingTrade(game, bot, mortgagedTrade);
+  const res1 = evaluateIncomingTrade(game, bot, overpricedMortgagedTrade);
   assert.equal(res1.accept, false);
-  assert.equal(res1.reason, "sender_property_not_tradable");
+  assert.equal(res1.reason, "easy_face_value_insufficient");
+
+  // Paying $90 cash + $10 transfer fee ($100) for $100 parity -> accepted!
+  const fairMortgagedTrade = {
+    from: "human",
+    to: "bot_easy",
+    given: [20],
+    received: [],
+    givenMoney: 0,
+    receivedMoney: 90,
+  };
+  assert.equal(evaluateIncomingTrade(game, bot, fairMortgagedTrade).accept, true);
+
+  // If bot cannot afford the $10 transfer fee on top of $90 cash -> rejected
+  bot.balance = 95;
+  const cantAffordFee = evaluateIncomingTrade(game, bot, fairMortgagedTrade);
+  assert.equal(cantAffordFee.accept, false);
+  assert.equal(cantAffordFee.reason, "insufficient_funds_for_mortgage_fee");
+  bot.balance = 1000;
+
+  // Upgraded full set owned by sender is non-tradable
+  assignTiles(game, "human", [38, 40], { rentLevel: 1 });
+  const senderUpgradedTrade = {
+    from: "human",
+    to: "bot_easy",
+    given: [38],
+    received: [],
+    givenMoney: 0,
+    receivedMoney: 200,
+  };
+  const resSenderUpgraded = evaluateIncomingTrade(game, bot, senderUpgradedTrade);
+  assert.equal(resSenderUpgraded.accept, false);
+  assert.equal(resSenderUpgraded.reason, "sender_property_not_tradable");
 
   // Upgraded full set owned by bot is also non-tradable
   assignTiles(game, "bot_easy", [2, 4], { rentLevel: 1 });
@@ -767,17 +801,28 @@ test("tradeProposer finds valid set-completing proposal and respects cooldowns &
   }
 });
 
-test("tradeProposer does not propose non-tradable mortgaged tiles", () => {
+test("tradeProposer skips non-tradable upgraded full sets and can swap for mortgaged set-completing tiles", () => {
   const game = createGame([
     { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 1200 },
     { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
   ]);
 
-  assignTiles(game, "bot_hard", [17, 19]);
+  // Bot holds 17, 19 + singleton 7; human holds mortgaged 20 (completes Orange)
+  assignTiles(game, "bot_hard", [17, 19, 7]);
   assignTiles(game, "human", [20], { mortgaged: true });
 
   const proposal = findBestTradeProposal(game, game.players[0], {});
-  assert.equal(proposal, null);
+  assert.ok(proposal, "expected bot to propose swap for mortgaged set-completing tile 20");
+  assert.deepEqual(proposal.received, [20]);
+
+  // Upgraded full set owned by human is non-tradable -> never proposed
+  const upgradedGame = createGame([
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 1200 },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+  ]);
+  assignTiles(upgradedGame, "bot_hard", [7]);
+  assignTiles(upgradedGame, "human", [2, 4], { rentLevel: 1 });
+  assert.equal(findBestTradeProposal(upgradedGame, upgradedGame.players[0], {}), null);
 });
 
 test("tradeProposer avoids cheap fire-sale on HARD and sells singleton at 1.4x-2.0x when opponent needs it", () => {

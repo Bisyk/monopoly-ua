@@ -1,5 +1,9 @@
 import type { BotDifficulty, GameState, Player, Tile, Trade } from "~/types";
 import { isTradePreviouslyDeclined } from "~/shared/utils/tradeSignature";
+import {
+  computeMortgageTransferFee,
+  getTileTradeParityValue,
+} from "~/shared/utils/mortgageTransferFee";
 import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties";
 import {
   getActionReserve,
@@ -390,7 +394,7 @@ export function evaluateIncomingTrade(
     }
   }
 
-  // 3. Validate ownership & tradability (not mortgaged, not in an upgraded full set)
+  // 3. Validate ownership & tradability (mortgaged tiles are tradable under Strict Hasbro; upgraded full sets are not)
   const fullSetGroupIds = getFullSetGroupIds(game);
   const fromTradable = new Set(
     getPlayerTradableProperties(
@@ -428,9 +432,25 @@ export function evaluateIncomingTrade(
     return { accept: false, score: -Infinity, reason: "previously_declined" };
   }
 
+  const botMortgageFee = computeMortgageTransferFee(game.board.tiles, given);
+  const fromMortgageFee = computeMortgageTransferFee(
+    game.board.tiles,
+    received
+  );
+
   const difficulty: BotDifficulty = bot.botDifficulty ?? "MEDIUM";
-  const postBotBalance = bot.balance - receivedMoney + givenMoney;
-  const postFromBalance = fromPlayer.balance - givenMoney + receivedMoney;
+  const postBotBalance =
+    bot.balance - receivedMoney + givenMoney - botMortgageFee;
+  const postFromBalance =
+    fromPlayer.balance - givenMoney + receivedMoney - fromMortgageFee;
+
+  if (postBotBalance < 0 || postFromBalance < 0) {
+    return {
+      accept: false,
+      score: -Infinity,
+      reason: "insufficient_funds_for_mortgage_fee",
+    };
+  }
 
   // 5. Tier-specific deterministic evaluation
   if (difficulty === "EASY") {
@@ -440,6 +460,7 @@ export function evaluateIncomingTrade(
       received,
       givenMoney,
       receivedMoney,
+      botMortgageFee,
       postBotBalance
     );
   }
@@ -453,6 +474,7 @@ export function evaluateIncomingTrade(
       received,
       givenMoney,
       receivedMoney,
+      botMortgageFee,
       postBotBalance
     );
   }
@@ -464,6 +486,7 @@ export function evaluateIncomingTrade(
     trade,
     givenMoney,
     receivedMoney,
+    botMortgageFee,
     postBotBalance,
     postFromBalance
   );
@@ -475,19 +498,20 @@ function evaluateEasyTrade(
   received: number[],
   givenMoney: number,
   receivedMoney: number,
+  botMortgageFee: number,
   postBotBalance: number
 ): TradeEvaluationResult {
   const gainedFaceValue = given.reduce(
-    (sum, id) => sum + (getTileById(game, id)?.price ?? 0),
+    (sum, id) => sum + getTileTradeParityValue(getTileById(game, id)),
     0
   );
   const lostFaceValue = received.reduce(
-    (sum, id) => sum + (getTileById(game, id)?.price ?? 0),
+    (sum, id) => sum + getTileTradeParityValue(getTileById(game, id)),
     0
   );
 
   const gainedTotal = gainedFaceValue + givenMoney;
-  const lostTotal = lostFaceValue + receivedMoney;
+  const lostTotal = lostFaceValue + receivedMoney + botMortgageFee;
   const threshold = lostTotal * 0.95;
   const score = Math.round(gainedTotal - threshold);
 
@@ -510,6 +534,7 @@ function evaluateMediumTrade(
   received: number[],
   givenMoney: number,
   receivedMoney: number,
+  botMortgageFee: number,
   postBotBalance: number
 ): TradeEvaluationResult {
   const ownershipBefore = buildOwnershipMap(game);
@@ -705,7 +730,12 @@ function evaluateMediumTrade(
       }
     }
 
-    gainedTileValue += price * multiplier;
+    let tileVal = price * multiplier;
+    if (tile.mortgaged) {
+      const buyback = tile.buybackPrice ?? Math.round(price * 0.6);
+      tileVal = Math.max(0, tileVal - buyback * 0.85);
+    }
+    gainedTileValue += tileVal;
   }
 
   const isPureCashSale = given.length === 0 && received.length > 0;
@@ -800,14 +830,20 @@ function evaluateMediumTrade(
       }
     }
 
-    lostTileValue += price * multiplier;
+    let tileVal = price * multiplier;
+    if (tile.mortgaged) {
+      const buyback = tile.buybackPrice ?? Math.round(price * 0.6);
+      tileVal = Math.max(0, tileVal - buyback * 0.85);
+    }
+    lostTileValue += tileVal;
   }
 
   const gainedTotal = gainedTileValue + givenMoney;
-  const lostTotal = lostTileValue + receivedMoney;
+  const lostTotal = lostTileValue + receivedMoney + botMortgageFee;
   const score = Math.round(gainedTotal - lostTotal);
 
-  const helpsLowCashBot = givenMoney > receivedMoney && postBotBalance >= 0;
+  const helpsLowCashBot =
+    givenMoney > receivedMoney + botMortgageFee && postBotBalance >= 0;
   const hasLiquidity = postBotBalance >= 50 || helpsLowCashBot;
 
   if (!hasLiquidity) {
@@ -833,6 +869,7 @@ function evaluateHardTrade(
   trade: Trade,
   givenMoney: number,
   receivedMoney: number,
+  botMortgageFee: number,
   postBotBalance: number,
   postFromBalance: number
 ): TradeEvaluationResult {
@@ -996,7 +1033,7 @@ function evaluateHardTrade(
     };
   }
 
-  if (receivedMoney > givenMoney) {
+  if (receivedMoney + botMortgageFee > givenMoney) {
     const minCashAfterSpending =
       botNewMonopolies.length > 0
         ? Math.min(tradeReserve, Math.max(50, Math.round(tradeReserve * 0.45)))
@@ -1020,8 +1057,8 @@ function evaluateHardTrade(
     let minPureCashRequired = 0;
     for (const id of trade.received) {
       const tile = getTileById(game, id);
-      const price = tile?.price ?? 0;
-      if (!tile || price <= 0) {
+      const parityPrice = getTileTradeParityValue(tile);
+      if (!tile || parityPrice <= 0) {
         continue;
       }
 
@@ -1044,7 +1081,7 @@ function evaluateHardTrade(
         requiredMult = 1.55;
       }
 
-      minPureCashRequired += price * requiredMult;
+      minPureCashRequired += parityPrice * requiredMult;
     }
 
     if (givenMoney < minPureCashRequired) {

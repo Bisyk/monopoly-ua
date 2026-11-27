@@ -1,4 +1,5 @@
 import type { GameState, Player, Tile } from "~/types";
+import { computeMortgageTransferFee } from "~/shared/utils/mortgageTransferFee";
 import {
   recalculateSpecialPropertyRentLevels,
   syncPropertySets,
@@ -22,6 +23,28 @@ export const acceptTrade = (game: GameState) => {
   const normalizedGivenMoney = Number(givenMoney) || 0;
   const normalizedReceivedMoney = Number(receivedMoney) || 0;
 
+  // Strict Hasbro rule: recipients of mortgaged properties immediately pay 10% of mortgage value to the bank
+  const toMortgageFee = computeMortgageTransferFee(game.board.tiles, given);
+  const fromMortgageFee = computeMortgageTransferFee(
+    game.board.tiles,
+    received
+  );
+
+  const postFromBalance =
+    playerFrom.balance -
+    normalizedGivenMoney +
+    normalizedReceivedMoney -
+    fromMortgageFee;
+  const postToBalance =
+    playerTo.balance +
+    normalizedGivenMoney -
+    normalizedReceivedMoney -
+    toMortgageFee;
+
+  if (postFromBalance < 0 || postToBalance < 0) {
+    return;
+  }
+
   given.forEach((g: number) => {
     playerFrom.properties = playerFrom.properties.filter((p) => p !== g);
     if (!playerTo.properties.includes(g)) {
@@ -44,11 +67,8 @@ export const acceptTrade = (game: GameState) => {
     }
   });
 
-  playerFrom.balance -= normalizedGivenMoney;
-  playerTo.balance += normalizedGivenMoney;
-
-  playerFrom.balance += normalizedReceivedMoney;
-  playerTo.balance -= normalizedReceivedMoney;
+  playerFrom.balance = postFromBalance;
+  playerTo.balance = postToBalance;
 
   syncPropertySets(game);
   recalculateSpecialPropertyRentLevels(game);
@@ -57,6 +77,20 @@ export const acceptTrade = (game: GameState) => {
     username: to,
     msg: `accepted trade from ${from}`,
   });
+
+  if (toMortgageFee > 0) {
+    game.gameLog.push({
+      username: to,
+      msg: `paid $${toMortgageFee} mortgage transfer fee (10%)`,
+    });
+  }
+
+  if (fromMortgageFee > 0) {
+    game.gameLog.push({
+      username: from,
+      msg: `paid $${fromMortgageFee} mortgage transfer fee (10%)`,
+    });
+  }
 
   const returnAction = game.activeTrade.returnAction || "roll";
 
