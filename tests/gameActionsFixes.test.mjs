@@ -430,3 +430,41 @@ test("mortgage, buyback, upgrade, and sell actions enforce ownership and Monopol
   upgradeProperty(game, alice, { payload: { propertyId: 2 } });
   assert.equal(atb.rentLevel, 1);
 });
+
+test("Cars and Energy Utilities can be mortgaged and redeemed (including when owning sets with rentLevel > 0)", () => {
+  const game = createTestGame([{ balance: 500 }, { balance: 1500 }]);
+  const alice = game.players[0];
+
+  const mercedes = game.board.tiles.find((t) => t.id === 6);
+  const porsche = game.board.tiles.find((t) => t.id === 16);
+  const ukrnafta = game.board.tiles.find((t) => t.id === 13);
+  const naftogaz = game.board.tiles.find((t) => t.id === 29);
+
+  // Assign 2 Cars + 2 Utilities so rentLevel becomes 1 on all of them
+  assignPropertyToPlayer(game, mercedes, alice, 0);
+  assignPropertyToPlayer(game, porsche, alice, 0);
+  assignPropertyToPlayer(game, ukrnafta, alice, 0);
+  assignPropertyToPlayer(game, naftogaz, alice, 0);
+
+  assert.equal(mercedes.rentLevel, 1);
+  assert.equal(ukrnafta.rentLevel, 1);
+
+  // Mortgage Car ($200 -> +$100) and Energy Utility ($150 -> +$75)
+  mortgageProperty(game, alice, { payload: { propertyId: 6 } });
+  assert.equal(mercedes.mortgaged, true);
+  assert.equal(alice.balance, 600);
+
+  mortgageProperty(game, alice, { payload: { propertyId: 13 } });
+  assert.equal(ukrnafta.mortgaged, true);
+  assert.equal(alice.balance, 675);
+
+  // Redeem Car (-$120) and Energy Utility (-$90)
+  buybackProperty(game, alice, { payload: { propertyId: 6 } });
+  assert.equal(mercedes.mortgaged, false);
+  assert.equal(alice.balance, 555);
+
+  buybackProperty(game, alice, { payload: { propertyId: 13 } });
+  assert.equal(ukrnafta.mortgaged, false);
+  assert.equal(alice.balance, 465);
+});
+

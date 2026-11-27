@@ -885,8 +885,20 @@ function buildRankedLiquidationCandidates(
             tier = 1; // Weak ungrouped singletons first
           }
         }
+      } else if (tile.type === "car") {
+        const ownedCars = game.board.tiles.filter(
+          (t) => t.type === "car" && t.owner === bot.username && !t.mortgaged
+        ).length;
+        tier = ownedCars >= 3 ? 3 : 2;
+      } else if (tile.type === "bonus-property") {
+        const ownedUtils = game.board.tiles.filter(
+          (t) =>
+            t.type === "bonus-property" &&
+            t.owner === bot.username &&
+            !t.mortgaged
+        ).length;
+        tier = ownedUtils >= 2 ? 3 : 2;
       } else {
-        // Cars / utilities (if mortgagePrice is configured)
         tier = 2;
       }
 

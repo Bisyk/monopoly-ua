@@ -109,13 +109,15 @@ const checkIfMortgageable = (propertyId: number) => {
 
   if (!props.player?.properties?.includes(propertyId)) return false;
   if (property.mortgaged) return false;
-  if ((property.rentLevel ?? 0) !== 0) return false;
+  if (property.type === "property") {
+    if ((property.rentLevel ?? 0) !== 0) return false;
 
-  if (property.groupId != null) {
-    const propertiesInGroup = props.tiles.filter(
-      (t) => t.groupId === property.groupId
-    );
-    if (propertiesInGroup.some((p) => (p.rentLevel ?? 0) > 0)) return false;
+    if (property.groupId != null) {
+      const propertiesInGroup = props.tiles.filter(
+        (t) => t.groupId === property.groupId
+      );
+      if (propertiesInGroup.some((p) => (p.rentLevel ?? 0) > 0)) return false;
+    }
   }
 
   return true;

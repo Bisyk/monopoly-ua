@@ -503,7 +503,9 @@ test("HARD bot liquidates weak assets before paying rent to avoid bankruptcy and
 
   // Human owns tile 40 (DTEK, rent level 1 = 200)
   assignTiles(game, "human", [38, 40], { rentLevel: 1 });
-  // Bot owns: singleton tile 7 ($100, mortgage 50), car tile 6 (no mortgagePrice!), and upgraded Group 4 (17@2, 19@1, 20@1)
+  // Bot owns: singleton tile 7 ($100, mortgage 50), car tile 6 ($200, mortgage 100), and upgraded Group 4 (17@2, 19@1, 20@1)
+  // Balance 0 -> owes $200: must mortgage tile 7 (+50) -> mortgage car 6 (+100) -> sell house on tile 17 (+100) -> PAY_RENT!
+  game.players[0].balance = 0;
   assignTiles(game, "bot_hard", [6, 7, 17, 19, 20]);
   game.board.tiles.find((t) => t.id === 17).rentLevel = 2;
   game.board.tiles.find((t) => t.id === 19).rentLevel = 1;
@@ -514,7 +516,7 @@ test("HARD bot liquidates weak assets before paying rent to avoid bankruptcy and
 
   assert.equal(getAmountOwedForCurrentAction(game, game.players[0]), 200);
 
-  // Step 1: Must mortgage weak singleton tile 7 first (NOT car 6 which has no mortgagePrice, NOT Group 4 houses)
+  // Step 1: Must mortgage weak singleton tile 7 first (Tier 1)
   const step1 = decideBotAction(
     game,
     game.players[0],
@@ -526,11 +528,11 @@ test("HARD bot liquidates weak assets before paying rent to avoid bankruptcy and
     payload: { username: "bot_hard", propertyId: 7 },
   });
 
-  // Apply mortgage -> balance becomes 100 (still < 200)
+  // Apply mortgage -> balance becomes 50 (still < 200)
   game.board.tiles.find((t) => t.id === 7).mortgaged = true;
   game.players[0].balance += 50;
 
-  // Step 2: Must sell house on tile 17 (rentLevel 2, obeying even-selling rule!)
+  // Step 2: Must mortgage single car tile 6 (Tier 2) before selling Group 4 houses (Tier 4)
   const step2 = decideBotAction(
     game,
     game.players[0],
@@ -538,15 +540,15 @@ test("HARD bot liquidates weak assets before paying rent to avoid bankruptcy and
     forbiddenRng
   );
   assert.deepEqual(step2, {
-    action: "SELL_PROPERTY",
-    payload: { username: "bot_hard", propertyId: 17 },
+    action: "MORTGAGE_PROPERTY",
+    payload: { username: "bot_hard", propertyId: 6 },
   });
 
-  // Apply sell -> balance becomes 100 + 200/2 = 200 (>= 200)
-  game.board.tiles.find((t) => t.id === 17).rentLevel = 1;
+  // Apply mortgage -> balance becomes 150 (still < 200)
+  game.board.tiles.find((t) => t.id === 6).mortgaged = true;
   game.players[0].balance += 100;
 
-  // Step 3: Now affordable -> emits PAY_RENT!
+  // Step 3: Must sell house on tile 17 (rentLevel 2, obeying even-selling rule!)
   const step3 = decideBotAction(
     game,
     game.players[0],
@@ -554,6 +556,22 @@ test("HARD bot liquidates weak assets before paying rent to avoid bankruptcy and
     forbiddenRng
   );
   assert.deepEqual(step3, {
+    action: "SELL_PROPERTY",
+    payload: { username: "bot_hard", propertyId: 17 },
+  });
+
+  // Apply sell -> balance becomes 150 + 100 = 250 (>= 200)
+  game.board.tiles.find((t) => t.id === 17).rentLevel = 1;
+  game.players[0].balance += 100;
+
+  // Step 4: Now affordable -> emits PAY_RENT!
+  const step4 = decideBotAction(
+    game,
+    game.players[0],
+    { proposedTradeThisTurn: false, turnStepCount: 3, tradeCooldownByTarget: {} },
+    forbiddenRng
+  );
+  assert.deepEqual(step4, {
     action: "PAY_RENT",
     payload: { username: "bot_hard", propertyId: 40 },
   });
@@ -792,8 +810,8 @@ test("planNextLiquidationAction returns null when no legal liquidation exists", 
     { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
   ]);
 
-  // Car tile has no mortgagePrice in defaultTiles -> cannot mortgage safely
-  assignTiles(game, "bot_hard", [6]);
+  // All owned assets are already mortgaged -> no legal liquidation exists
+  assignTiles(game, "bot_hard", [6, 13], { mortgaged: true });
   assert.equal(planNextLiquidationAction(game, game.players[0]), null);
 });
 
