@@ -30,7 +30,7 @@ const props = defineProps({
 const emit = defineEmits(["showTileInfo"]);
 
 const CORNER_LABELS: Record<string, string> = {
-  go: "GO +$200",
+  go: "GO +$200/$400",
   jail: "JAIL",
   parking: "PARKING",
   goToJail: "GO JAIL",
@@ -142,7 +142,11 @@ const handleClick = (event: MouseEvent) => {
       },
     ]"
     :style="tileStyle"
-    :title="`${formattedIndex} · ${props.tile.name}${priceLabel ? ` (${priceLabel})` : ''}`"
+    :title="
+      props.tile.type === 'go'
+        ? `${formattedIndex} · GO (Pass +$200 / Land +$400)`
+        : `${formattedIndex} · ${props.tile.name}${priceLabel ? ` (${priceLabel})` : ''}`
+    "
     @click="handleClick"
   >
     <!-- Outer owner color rail paired with pastel full-tile wash -->
