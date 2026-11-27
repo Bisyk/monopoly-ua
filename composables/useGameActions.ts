@@ -33,15 +33,20 @@ export const useGameActions = (send: Function, username: string) => {
     return gameState.value.board?.groups ?? [];
   });
 
-  const player = computed(() => {
-    if (!gameState.value.players) return {};
-    return gameState.value.players.find((p: Player) => p.username === username);
+  const player = computed<Player | null>(() => {
+    if (!Array.isArray(gameState.value?.players)) return null;
+    return (
+      gameState.value.players.find((p: Player) => p.username === username) ??
+      null
+    );
   });
 
   const currentTilePlayerOn = computed(() => {
-    return (
-      tiles.value?.find((t: Tile) => t.id === player.value.position) ?? {}
-    );
+    const position = player.value?.position;
+    if (position === undefined || position === null) {
+      return {} as Tile;
+    }
+    return tiles.value?.find((t: Tile) => t.id === position) ?? ({} as Tile);
   });
 
   const fullSetsGroups = computed(() => {
@@ -53,7 +58,7 @@ export const useGameActions = (send: Function, username: string) => {
   });
 
   const sendAction = (action: string, payload: Record<string, unknown>) => {
-    if (gameState.value?.status === "ENDED") {
+    if (gameState.value?.status === "ENDED" || !player.value) {
       isSending.value = false;
       return;
     }

@@ -3,6 +3,11 @@ import { computed, ref, useTemplateRef, type PropType } from "vue";
 import { onClickOutside } from "@vueuse/core";
 import type { Player, Tile } from "~/types";
 import {
+  BOT_DIFFICULTY_LABELS,
+  getBotPersonaByUsername,
+  normalizeBotDifficulty,
+} from "~/shared/constants/botNames";
+import {
   getCartridgeGroupColor,
   getCartridgePlayerColor,
   getPlayerInitials,
@@ -14,8 +19,8 @@ const props = defineProps({
     required: true,
   },
   player: {
-    type: Object as PropType<Player>,
-    required: true,
+    type: Object as PropType<Player | null>,
+    default: null,
   },
   currentTurn: {
     type: String,
@@ -25,6 +30,10 @@ const props = defineProps({
     type: Array as PropType<Tile[]>,
     default: () => [],
   },
+  isSpectator: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["activateTrade"]);
@@ -32,13 +41,45 @@ const emit = defineEmits(["activateTrade"]);
 const isPlayerActionsVisible = ref(false);
 const target = useTemplateRef<HTMLElement>("target");
 
+const effectiveIsSpectator = computed(
+  () => props.isSpectator || !props.player?.username
+);
+
 const isSelf = computed(
-  () => props.playerFromPlayers.username === props.player?.username
+  () =>
+    !effectiveIsSpectator.value &&
+    props.playerFromPlayers.username === props.player?.username
+);
+
+const canInteract = computed(
+  () => !effectiveIsSpectator.value && !isSelf.value
 );
 
 const isActiveTurn = computed(
   () => props.currentTurn === props.playerFromPlayers.username
 );
+
+const isBot = computed(() => Boolean(props.playerFromPlayers.isBot));
+
+const botPersona = computed(() =>
+  isBot.value
+    ? getBotPersonaByUsername(props.playerFromPlayers.username)
+    : null
+);
+
+const botDifficulty = computed(() =>
+  normalizeBotDifficulty(props.playerFromPlayers.botDifficulty)
+);
+
+const botBadgeLabel = computed(
+  () => `BOT · ${BOT_DIFFICULTY_LABELS[botDifficulty.value]}`
+);
+
+const botBadgeVariant = computed(() => {
+  if (botDifficulty.value === "EASY") return "positive";
+  if (botDifficulty.value === "HARD") return "danger";
+  return "gold";
+});
 
 const playerColor = computed(() =>
   getCartridgePlayerColor(props.playerFromPlayers.color)
@@ -53,12 +94,13 @@ const ownedTiles = computed(() =>
 );
 
 const togglePlayerActions = () => {
-  if (isSelf.value) return;
+  if (!canInteract.value) return;
   isPlayerActionsVisible.value = !isPlayerActionsVisible.value;
 };
 
 const handleTradeClick = (event: MouseEvent) => {
   event.stopPropagation();
+  if (!canInteract.value) return;
   isPlayerActionsVisible.value = false;
   emit("activateTrade", props.playerFromPlayers.username);
 };
@@ -74,7 +116,7 @@ onClickOutside(target, () => {
     class="player-card"
     :class="{
       'is-active': isActiveTurn,
-      'is-clickable': !isSelf,
+      'is-clickable': canInteract,
     }"
     @click="togglePlayerActions"
   >
@@ -88,20 +130,58 @@ onClickOutside(target, () => {
         <div class="player-card__identity">
           <div
             class="player-card__badge"
+            :class="{ 'player-card__badge--avatar': Boolean(botPersona) }"
             :style="{ backgroundColor: playerColor }"
+            :title="
+              botPersona
+                ? `${playerFromPlayers.username} — ${botPersona.title}`
+                : playerFromPlayers.username
+            "
           >
-            {{ initials }}
+            <img
+              v-if="botPersona"
+              :src="botPersona.avatarUrl"
+              :alt="playerFromPlayers.username"
+              class="player-card__avatar-img"
+            />
+            <template v-else>{{ initials }}</template>
           </div>
-          <h2 class="player-card__name" :title="playerFromPlayers.username">
-            {{ playerFromPlayers.username }}
-          </h2>
+          <div class="player-card__name-wrap">
+            <h2
+              class="player-card__name"
+              :title="
+                botPersona
+                  ? `${playerFromPlayers.username} — ${botPersona.title}`
+                  : playerFromPlayers.username
+              "
+            >
+              {{ playerFromPlayers.username }}
+            </h2>
+            <div v-if="isBot" class="player-card__bot-meta">
+              <RetroBadge
+                :variant="botBadgeVariant"
+                class="player-card__bot-badge"
+              >
+                {{ botBadgeLabel }}
+              </RetroBadge>
+              <span
+                v-if="botPersona?.title"
+                class="player-card__persona-title"
+                :title="botPersona.title"
+              >
+                {{ botPersona.title }}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <RetroBadge v-if="isActiveTurn" variant="primary">TURN</RetroBadge>
-        <RetroBadge v-else-if="playerFromPlayers.jailed" variant="danger">
-          JAIL
-        </RetroBadge>
-        <RetroBadge v-else-if="isSelf" variant="gold">YOU</RetroBadge>
+        <div class="player-card__status">
+          <RetroBadge v-if="isActiveTurn" variant="primary">TURN</RetroBadge>
+          <RetroBadge v-else-if="playerFromPlayers.jailed" variant="danger">
+            JAIL
+          </RetroBadge>
+          <RetroBadge v-else-if="isSelf" variant="gold">YOU</RetroBadge>
+        </div>
       </div>
 
       <div class="player-card__balance">
@@ -124,7 +204,7 @@ onClickOutside(target, () => {
         </div>
 
         <BaseButton
-          v-if="!isSelf"
+          v-if="canInteract"
           variant="secondary"
           size="sm"
           class="trade-trigger"
@@ -140,7 +220,7 @@ onClickOutside(target, () => {
     </div>
 
     <div
-      v-if="isPlayerActionsVisible && !isSelf"
+      v-if="isPlayerActionsVisible && canInteract"
       class="player-actions-popover"
       @click.stop
     >
@@ -194,7 +274,7 @@ onClickOutside(target, () => {
 
 .player-card__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
   margin-bottom: 6px;
@@ -205,6 +285,44 @@ onClickOutside(target, () => {
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.player-card__name-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.player-card__bot-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.player-card__bot-badge {
+  font-size: 8.5px;
+  padding: 2px 5px;
+  flex-shrink: 0;
+}
+
+.player-card__persona-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.player-card__status {
+  flex-shrink: 0;
 }
 
 .player-card__badge {
@@ -223,6 +341,21 @@ onClickOutside(target, () => {
   color: #ffffff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
   flex-shrink: 0;
+  overflow: hidden;
+
+  &--avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    box-shadow: 2px 2px 0 var(--outline);
+  }
+}
+
+.player-card__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .player-card__name {
@@ -233,6 +366,7 @@ onClickOutside(target, () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .player-card__balance {

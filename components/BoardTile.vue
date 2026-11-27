@@ -4,6 +4,7 @@ import type { Group, Player, Tile } from "~/types";
 import {
   getCartridgeGroupColor,
   getCartridgePlayerColor,
+  getCartridgePlayerTileTint,
   getTileSpriteUrl,
 } from "~/utils/cartridgeTheme";
 
@@ -72,11 +73,27 @@ const groupColor = computed(() => {
   return getCartridgeGroupColor(props.tile.groupId, fallback);
 });
 
+const ownerPlayer = computed(() => {
+  if (!props.tile.owner) return null;
+  return props.players.find((p) => p.username === props.tile.owner) ?? null;
+});
+
 const ownerColor = computed(() => {
   if (!props.tile.owner) return null;
-  const owner = props.players.find((p) => p.username === props.tile.owner);
-  return owner ? getCartridgePlayerColor(owner.color) : "#2667E8";
+  return ownerPlayer.value
+    ? getCartridgePlayerColor(ownerPlayer.value.color)
+    : "#2667E8";
 });
+
+const ownerTileTint = computed(() => {
+  if (!ownerColor.value || isCorner.value) return null;
+  return getCartridgePlayerTileTint(ownerPlayer.value?.color ?? ownerColor.value);
+});
+
+const tileStyle = computed(() => ({
+  ...gridPlacement.value,
+  ...(ownerTileTint.value ? { backgroundColor: ownerTileTint.value } : {}),
+}));
 
 const rentLevel = computed(() => props.tile.rentLevel ?? 0);
 
@@ -121,13 +138,14 @@ const handleClick = (event: MouseEvent) => {
       {
         'is-inspectable': isInspectable,
         'is-selected': props.isSelected,
+        'is-owned': Boolean(ownerColor) && !isCorner,
       },
     ]"
-    :style="gridPlacement"
+    :style="tileStyle"
     :title="`${formattedIndex} · ${props.tile.name}${priceLabel ? ` (${priceLabel})` : ''}`"
     @click="handleClick"
   >
-    <!-- Outer owner color rail (keeps white background & brand logo crisp) -->
+    <!-- Outer owner color rail paired with pastel full-tile wash -->
     <div
       v-if="ownerColor && !isCorner"
       class="tile-owner-rail"
@@ -211,7 +229,8 @@ const handleClick = (event: MouseEvent) => {
   user-select: none;
   min-width: 0;
   min-height: 0;
-  transition: outline-color 0.1s ease, box-shadow 0.1s ease;
+  transition: outline-color 0.1s ease, box-shadow 0.1s ease,
+    background-color 0.18s ease;
 
   &.is-inspectable {
     cursor: pointer;
@@ -331,28 +350,32 @@ const handleClick = (event: MouseEvent) => {
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 5px;
+    border-bottom: 1.5px solid var(--outline);
   }
 
   .side-bottom & {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 5px;
+    border-top: 1.5px solid var(--outline);
   }
 
   .side-left & {
     top: 0;
     bottom: 0;
     left: 0;
-    width: 4px;
+    width: 5px;
+    border-right: 1.5px solid var(--outline);
   }
 
   .side-right & {
     top: 0;
     bottom: 0;
     right: 0;
-    width: 4px;
+    width: 5px;
+    border-left: 1.5px solid var(--outline);
   }
 }
 
@@ -386,6 +409,22 @@ const handleClick = (event: MouseEvent) => {
   .side-right & {
     flex-direction: row-reverse;
     padding-right: 5px;
+  }
+
+  .side-top.is-owned & {
+    padding-top: 7px;
+  }
+
+  .side-bottom.is-owned & {
+    padding-bottom: 7px;
+  }
+
+  .side-left.is-owned & {
+    padding-left: 7px;
+  }
+
+  .side-right.is-owned & {
+    padding-right: 7px;
   }
 }
 
@@ -445,6 +484,12 @@ const handleClick = (event: MouseEvent) => {
   max-height: 100%;
   object-fit: contain;
   display: block;
+
+  .is-owned & {
+    filter:
+      drop-shadow(0 0 2px rgba(255, 255, 255, 0.96))
+      drop-shadow(0 0 4px rgba(255, 255, 255, 0.72));
+  }
 }
 
 .tile-corner-label {
@@ -467,8 +512,8 @@ const handleClick = (event: MouseEvent) => {
     45deg,
     rgba(30, 27, 58, 0.16),
     rgba(30, 27, 58, 0.16) 4px,
-    rgba(255, 255, 255, 0.85) 4px,
-    rgba(255, 255, 255, 0.85) 8px
+    rgba(255, 255, 255, 0.72) 4px,
+    rgba(255, 255, 255, 0.72) 8px
   );
   display: flex;
   align-items: center;

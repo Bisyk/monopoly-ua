@@ -1,7 +1,16 @@
 <script lang="ts" setup>
 import { computed, type PropType } from "vue";
 import type { BoardState, Player, Trade } from "~/types";
-import { getTileSpriteUrl } from "~/utils/cartridgeTheme";
+import {
+  getBotAvatarUrl,
+  getBotPersonaByUsername,
+} from "~/shared/constants/botNames";
+import {
+  getCartridgePlayerColor,
+  getCartridgePlayerTileTint,
+  getPlayerInitials,
+  getTileSpriteUrl,
+} from "~/utils/cartridgeTheme";
 
 const props = defineProps({
   tradePlayerUsername: {
@@ -63,6 +72,57 @@ defineEmits([
   "acceptTrade",
   "declineTrade",
 ]);
+
+interface TradePlayerIdentity {
+  username: string;
+  color: string;
+  tint: string;
+  avatarUrl: string | null;
+  initials: string;
+  isSelf: boolean;
+}
+
+const findPlayerByUsername = (username?: string | null): Player | null => {
+  if (!username) return null;
+  const fromList = props.players.find((p) => p.username === username);
+  if (fromList) return fromList;
+  if (props.player?.username === username) return props.player;
+  return null;
+};
+
+const buildPlayerIdentity = (
+  playerObj: Player | null,
+  fallbackUsername: string,
+  isSelf: boolean
+): TradePlayerIdentity => {
+  const username =
+    playerObj?.username || fallbackUsername || (isSelf ? "You" : "Player");
+  const persona = getBotPersonaByUsername(username);
+  const rawColor = playerObj?.color || persona?.bgColor;
+
+  return {
+    username,
+    color: getCartridgePlayerColor(rawColor),
+    tint: getCartridgePlayerTileTint(rawColor),
+    avatarUrl: getBotAvatarUrl(username),
+    initials: getPlayerInitials(username),
+    isSelf,
+  };
+};
+
+const selfIdentity = computed<TradePlayerIdentity>(() => {
+  const fallbackName = props.player?.username || props.activeTrade?.to || "You";
+  const playerObj = props.player ?? findPlayerByUsername(props.activeTrade?.to);
+  return buildPlayerIdentity(playerObj, fallbackName, true);
+});
+
+const counterpartyIdentity = computed<TradePlayerIdentity>(() => {
+  const targetUsername = props.send
+    ? props.tradePlayerUsername
+    : props.activeTrade?.from || props.tradePlayerUsername;
+  const playerObj = findPlayerByUsername(targetUsername);
+  return buildPlayerIdentity(playerObj, targetUsername, false);
+});
 
 const findTile = (propertyId: number) =>
   props.board.tiles.find((t) => t.id === propertyId);
@@ -161,77 +221,152 @@ const modalTitle = computed(() => {
     <!-- SEND TRADE VIEW -->
     <template v-if="send && tradePlayerUsername">
       <div class="trade-cols">
-        <div class="trade-pane">
-          <div class="trade-pane__head">
-            <span>YOU GIVE</span>
-            <span>TOTAL ${{ givenPropertiesPrice }}</span>
-          </div>
-          <input
-            v-model.number="tradeTiles.givenMoney"
-            type="number"
-            min="0"
-            step="10"
-            placeholder="0"
-            class="trade-input"
+        <div
+          class="trade-pane"
+          :style="{ backgroundColor: selfIdentity.tint }"
+        >
+          <div
+            class="trade-pane__stripe"
+            :style="{ backgroundColor: selfIdentity.color }"
           />
-          <div class="trade-chips">
-            <button
-              v-for="property in sortedYourProperties"
-              :key="property"
-              type="button"
-              class="trade-chip"
-              :class="{ 'is-selected': tradeTiles.given.has(property) }"
-              @click="toggleGivenProperty(property)"
-            >
-              <img
-                :src="getTileSpriteUrl(findTile(property)?.assetId)"
-                :alt="findTile(property)?.name"
-              />
-              <span>{{ findTile(property)?.name }}</span>
-              <span class="trade-chip__price">
-                ${{ findTile(property)?.price }}
-              </span>
-            </button>
-            <p v-if="!sortedYourProperties.length" class="trade-empty">
-              No tradable deeds
-            </p>
+          <div class="trade-pane__body">
+            <div class="trade-pane__head">
+              <div class="trade-pane__player">
+                <div
+                  class="trade-pane__avatar"
+                  :class="{ 'is-avatar': Boolean(selfIdentity.avatarUrl) }"
+                  :style="{ backgroundColor: selfIdentity.color }"
+                >
+                  <img
+                    v-if="selfIdentity.avatarUrl"
+                    :src="selfIdentity.avatarUrl"
+                    :alt="selfIdentity.username"
+                  />
+                  <template v-else>{{ selfIdentity.initials }}</template>
+                </div>
+                <div class="trade-pane__identity">
+                  <span
+                    class="trade-pane__role"
+                    :style="{ backgroundColor: selfIdentity.color }"
+                  >
+                    YOU GIVE
+                  </span>
+                  <span class="trade-pane__name" :title="selfIdentity.username">
+                    {{ selfIdentity.username }}
+                  </span>
+                </div>
+              </div>
+              <span class="trade-pane__total">${{ givenPropertiesPrice }}</span>
+            </div>
+
+            <input
+              v-model.number="tradeTiles.givenMoney"
+              type="number"
+              min="0"
+              step="10"
+              placeholder="0"
+              class="trade-input"
+            />
+            <div class="trade-chips">
+              <button
+                v-for="property in sortedYourProperties"
+                :key="property"
+                type="button"
+                class="trade-chip"
+                :class="{ 'is-selected': tradeTiles.given.has(property) }"
+                @click="toggleGivenProperty(property)"
+              >
+                <img
+                  :src="getTileSpriteUrl(findTile(property)?.assetId)"
+                  :alt="findTile(property)?.name"
+                />
+                <span>{{ findTile(property)?.name }}</span>
+                <span class="trade-chip__price">
+                  ${{ findTile(property)?.price }}
+                </span>
+              </button>
+              <p v-if="!sortedYourProperties.length" class="trade-empty">
+                No tradable deeds
+              </p>
+            </div>
           </div>
         </div>
 
-        <div class="trade-pane">
-          <div class="trade-pane__head">
-            <span>YOU RECEIVE ({{ tradePlayerUsername }})</span>
-            <span>TOTAL ${{ receivedPropertiesPrice }}</span>
-          </div>
-          <input
-            v-model.number="tradeTiles.receivedMoney"
-            type="number"
-            min="0"
-            step="10"
-            placeholder="0"
-            class="trade-input"
+        <div
+          class="trade-pane"
+          :style="{ backgroundColor: counterpartyIdentity.tint }"
+        >
+          <div
+            class="trade-pane__stripe"
+            :style="{ backgroundColor: counterpartyIdentity.color }"
           />
-          <div class="trade-chips">
-            <button
-              v-for="property in sortedOpponentProperties"
-              :key="property"
-              type="button"
-              class="trade-chip"
-              :class="{ 'is-selected': tradeTiles.received.has(property) }"
-              @click="toggleReceivedProperty(property)"
-            >
-              <img
-                :src="getTileSpriteUrl(findTile(property)?.assetId)"
-                :alt="findTile(property)?.name"
-              />
-              <span>{{ findTile(property)?.name }}</span>
-              <span class="trade-chip__price">
-                ${{ findTile(property)?.price }}
+          <div class="trade-pane__body">
+            <div class="trade-pane__head">
+              <div class="trade-pane__player">
+                <div
+                  class="trade-pane__avatar"
+                  :class="{
+                    'is-avatar': Boolean(counterpartyIdentity.avatarUrl),
+                  }"
+                  :style="{ backgroundColor: counterpartyIdentity.color }"
+                >
+                  <img
+                    v-if="counterpartyIdentity.avatarUrl"
+                    :src="counterpartyIdentity.avatarUrl"
+                    :alt="counterpartyIdentity.username"
+                  />
+                  <template v-else>{{ counterpartyIdentity.initials }}</template>
+                </div>
+                <div class="trade-pane__identity">
+                  <span
+                    class="trade-pane__role"
+                    :style="{ backgroundColor: counterpartyIdentity.color }"
+                  >
+                    YOU RECEIVE
+                  </span>
+                  <span
+                    class="trade-pane__name"
+                    :title="counterpartyIdentity.username"
+                  >
+                    {{ counterpartyIdentity.username }}
+                  </span>
+                </div>
+              </div>
+              <span class="trade-pane__total">
+                ${{ receivedPropertiesPrice }}
               </span>
-            </button>
-            <p v-if="!sortedOpponentProperties.length" class="trade-empty">
-              No tradable deeds
-            </p>
+            </div>
+
+            <input
+              v-model.number="tradeTiles.receivedMoney"
+              type="number"
+              min="0"
+              step="10"
+              placeholder="0"
+              class="trade-input"
+            />
+            <div class="trade-chips">
+              <button
+                v-for="property in sortedOpponentProperties"
+                :key="property"
+                type="button"
+                class="trade-chip"
+                :class="{ 'is-selected': tradeTiles.received.has(property) }"
+                @click="toggleReceivedProperty(property)"
+              >
+                <img
+                  :src="getTileSpriteUrl(findTile(property)?.assetId)"
+                  :alt="findTile(property)?.name"
+                />
+                <span>{{ findTile(property)?.name }}</span>
+                <span class="trade-chip__price">
+                  ${{ findTile(property)?.price }}
+                </span>
+              </button>
+              <p v-if="!sortedOpponentProperties.length" class="trade-empty">
+                No tradable deeds
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -273,61 +408,136 @@ const modalTitle = computed(() => {
     <!-- RECEIVE TRADE VIEW -->
     <template v-else-if="receive && activeTrade">
       <div class="trade-cols">
-        <div class="trade-pane">
-          <div class="trade-pane__head">
-            <span>YOU RECEIVE</span>
-            <span>TOTAL ${{ givenPropertiesPrice }}</span>
-          </div>
-          <div class="trade-cash-readout">
-            Cash: <strong>${{ activeTrade.givenMoney || 0 }}</strong>
-          </div>
-          <div class="trade-chips">
-            <div
-              v-for="property in sortedActiveGiven"
-              :key="property"
-              class="trade-chip is-readonly"
-            >
-              <img
-                :src="getTileSpriteUrl(findTile(property)?.assetId)"
-                :alt="findTile(property)?.name"
-              />
-              <span>{{ findTile(property)?.name }}</span>
-              <span class="trade-chip__price">
-                ${{ findTile(property)?.price }}
-              </span>
+        <div
+          class="trade-pane"
+          :style="{ backgroundColor: counterpartyIdentity.tint }"
+        >
+          <div
+            class="trade-pane__stripe"
+            :style="{ backgroundColor: counterpartyIdentity.color }"
+          />
+          <div class="trade-pane__body">
+            <div class="trade-pane__head">
+              <div class="trade-pane__player">
+                <div
+                  class="trade-pane__avatar"
+                  :class="{
+                    'is-avatar': Boolean(counterpartyIdentity.avatarUrl),
+                  }"
+                  :style="{ backgroundColor: counterpartyIdentity.color }"
+                >
+                  <img
+                    v-if="counterpartyIdentity.avatarUrl"
+                    :src="counterpartyIdentity.avatarUrl"
+                    :alt="counterpartyIdentity.username"
+                  />
+                  <template v-else>{{ counterpartyIdentity.initials }}</template>
+                </div>
+                <div class="trade-pane__identity">
+                  <span
+                    class="trade-pane__role"
+                    :style="{ backgroundColor: counterpartyIdentity.color }"
+                  >
+                    YOU RECEIVE
+                  </span>
+                  <span
+                    class="trade-pane__name"
+                    :title="counterpartyIdentity.username"
+                  >
+                    {{ counterpartyIdentity.username }}
+                  </span>
+                </div>
+              </div>
+              <span class="trade-pane__total">${{ givenPropertiesPrice }}</span>
             </div>
-            <p v-if="!sortedActiveGiven.length" class="trade-empty">
-              No deeds offered
-            </p>
+
+            <div class="trade-cash-readout">
+              Cash: <strong>${{ activeTrade.givenMoney || 0 }}</strong>
+            </div>
+            <div class="trade-chips">
+              <div
+                v-for="property in sortedActiveGiven"
+                :key="property"
+                class="trade-chip is-readonly"
+              >
+                <img
+                  :src="getTileSpriteUrl(findTile(property)?.assetId)"
+                  :alt="findTile(property)?.name"
+                />
+                <span>{{ findTile(property)?.name }}</span>
+                <span class="trade-chip__price">
+                  ${{ findTile(property)?.price }}
+                </span>
+              </div>
+              <p v-if="!sortedActiveGiven.length" class="trade-empty">
+                No deeds offered
+              </p>
+            </div>
           </div>
         </div>
 
-        <div class="trade-pane">
-          <div class="trade-pane__head">
-            <span>YOU GIVE</span>
-            <span>TOTAL ${{ receivedPropertiesPrice }}</span>
-          </div>
-          <div class="trade-cash-readout">
-            Cash: <strong>${{ activeTrade.receivedMoney || 0 }}</strong>
-          </div>
-          <div class="trade-chips">
-            <div
-              v-for="property in sortedActiveReceived"
-              :key="property"
-              class="trade-chip is-readonly"
-            >
-              <img
-                :src="getTileSpriteUrl(findTile(property)?.assetId)"
-                :alt="findTile(property)?.name"
-              />
-              <span>{{ findTile(property)?.name }}</span>
-              <span class="trade-chip__price">
-                ${{ findTile(property)?.price }}
+        <div
+          class="trade-pane"
+          :style="{ backgroundColor: selfIdentity.tint }"
+        >
+          <div
+            class="trade-pane__stripe"
+            :style="{ backgroundColor: selfIdentity.color }"
+          />
+          <div class="trade-pane__body">
+            <div class="trade-pane__head">
+              <div class="trade-pane__player">
+                <div
+                  class="trade-pane__avatar"
+                  :class="{ 'is-avatar': Boolean(selfIdentity.avatarUrl) }"
+                  :style="{ backgroundColor: selfIdentity.color }"
+                >
+                  <img
+                    v-if="selfIdentity.avatarUrl"
+                    :src="selfIdentity.avatarUrl"
+                    :alt="selfIdentity.username"
+                  />
+                  <template v-else>{{ selfIdentity.initials }}</template>
+                </div>
+                <div class="trade-pane__identity">
+                  <span
+                    class="trade-pane__role"
+                    :style="{ backgroundColor: selfIdentity.color }"
+                  >
+                    YOU GIVE
+                  </span>
+                  <span class="trade-pane__name" :title="selfIdentity.username">
+                    {{ selfIdentity.username }}
+                  </span>
+                </div>
+              </div>
+              <span class="trade-pane__total">
+                ${{ receivedPropertiesPrice }}
               </span>
             </div>
-            <p v-if="!sortedActiveReceived.length" class="trade-empty">
-              No deeds requested
-            </p>
+
+            <div class="trade-cash-readout">
+              Cash: <strong>${{ activeTrade.receivedMoney || 0 }}</strong>
+            </div>
+            <div class="trade-chips">
+              <div
+                v-for="property in sortedActiveReceived"
+                :key="property"
+                class="trade-chip is-readonly"
+              >
+                <img
+                  :src="getTileSpriteUrl(findTile(property)?.assetId)"
+                  :alt="findTile(property)?.name"
+                />
+                <span>{{ findTile(property)?.name }}</span>
+                <span class="trade-chip__price">
+                  ${{ findTile(property)?.price }}
+                </span>
+              </div>
+              <p v-if="!sortedActiveReceived.length" class="trade-empty">
+                No deeds requested
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -365,7 +575,20 @@ const modalTitle = computed(() => {
   background: var(--surface-alt);
   border: 2px solid var(--outline);
   border-radius: var(--radius-md);
-  padding: 12px;
+  box-shadow: 0 3px 0 var(--outline);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.trade-pane__stripe {
+  height: 6px;
+  border-bottom: 1.5px solid var(--outline);
+  flex-shrink: 0;
+}
+
+.trade-pane__body {
+  padding: 11px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -373,12 +596,93 @@ const modalTitle = computed(() => {
 
 .trade-pane__head {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.trade-pane__player {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.trade-pane__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  border: 2px solid var(--outline);
+  box-shadow:
+    2px 2px 0 var(--outline),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  display: grid;
+  place-items: center;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+  overflow: hidden;
+
+  &.is-avatar {
+    box-shadow: 2px 2px 0 var(--outline);
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.trade-pane__identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.trade-pane__role {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  padding: 2px 5px;
+  border: 1.5px solid var(--outline);
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.trade-pane__name {
+  font-family: var(--font-body);
+  font-size: 13px;
   font-weight: 800;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.15;
+}
+
+.trade-pane__total {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--outline);
+  border-radius: var(--radius-sm);
+  padding: 3px 7px;
+  box-shadow: 1.5px 1.5px 0 var(--outline);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .trade-input {

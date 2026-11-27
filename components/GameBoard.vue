@@ -16,6 +16,7 @@ import {
   type MeasuredTileRect,
 } from "~/composables/usePlayerMovementAnimation";
 import { getCoLocatedTokenOffset } from "~/utils/playerMovement";
+import { getBotAvatarUrl } from "~/shared/constants/botNames";
 import {
   getCartridgePlayerColor,
   getPlayerInitials,
@@ -62,10 +63,16 @@ const { displayedPositions, activePose, isAnimating, isReducedMotion } =
     () => tileRects.value
   );
 
+const isDiceSpinning = ref(false);
+
+const handleRollAnimationChange = (active: boolean) => {
+  isDiceSpinning.value = active;
+};
+
 watch(
-  isAnimating,
-  (animating) => {
-    emit("animationStateChange", animating);
+  [isAnimating, isDiceSpinning],
+  ([moving, spinning]) => {
+    emit("animationStateChange", moving || spinning);
   },
   { immediate: true }
 );
@@ -287,11 +294,24 @@ const latestLogEntry = computed(() => {
               <template v-if="latestLogEntry">
                 <span
                   class="log-tag"
+                  :class="{
+                    'log-tag--avatar': Boolean(
+                      getBotAvatarUrl(latestLogEntry.username)
+                    ),
+                  }"
                   :style="{
                     backgroundColor: getLogActorColor(latestLogEntry.username),
                   }"
                 >
-                  {{ getPlayerInitials(latestLogEntry.username) }}
+                  <img
+                    v-if="getBotAvatarUrl(latestLogEntry.username)"
+                    :src="getBotAvatarUrl(latestLogEntry.username)!"
+                    :alt="latestLogEntry.username"
+                    class="log-tag__img"
+                  />
+                  <template v-else>
+                    {{ getPlayerInitials(latestLogEntry.username) }}
+                  </template>
                 </span>
                 <span class="ticker-text">
                   <strong>{{ latestLogEntry.username }}</strong>
@@ -302,6 +322,12 @@ const latestLogEntry = computed(() => {
                 Roll the dice to begin the match.
               </span>
             </div>
+
+            <DiceSpinStage
+              :lastRoll="gameState.lastRoll"
+              :players="gameState.players"
+              @rollAnimationChange="handleRollAnimationChange"
+            />
           </div>
 
           <!-- All 40 Board Tiles -->
@@ -356,11 +382,22 @@ const latestLogEntry = computed(() => {
               >
                 <span
                   class="log-tag"
+                  :class="{
+                    'log-tag--avatar': Boolean(getBotAvatarUrl(entry.username)),
+                  }"
                   :style="{
                     backgroundColor: getLogActorColor(entry.username),
                   }"
                 >
-                  {{ getPlayerInitials(entry.username) }}
+                  <img
+                    v-if="getBotAvatarUrl(entry.username)"
+                    :src="getBotAvatarUrl(entry.username)!"
+                    :alt="entry.username"
+                    class="log-tag__img"
+                  />
+                  <template v-else>
+                    {{ getPlayerInitials(entry.username) }}
+                  </template>
                 </span>
                 <span class="log-msg">
                   <strong>{{ entry.username }}</strong> {{ entry.msg }}
@@ -730,6 +767,25 @@ const latestLogEntry = computed(() => {
   border-radius: 2px;
   flex-shrink: 0;
   margin-top: 1px;
+
+  &--avatar {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 4px;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+  }
+}
+
+.log-tag__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .log-msg {

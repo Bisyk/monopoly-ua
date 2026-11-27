@@ -1,6 +1,6 @@
-import { GameState, Player } from "~/types";
+import type { GameState, Player } from "~/types";
 import { changePlayerTurn } from "./changePlayerTurn";
-import { resolveBankruptcy } from ".";
+import { resolveBankruptcy } from "./resolveBankruptcy";
 
 export const payChance = (
   game: GameState,
@@ -8,7 +8,9 @@ export const payChance = (
   currentTurnPlayerIdx: number,
   parsedMessage: any
 ) => {
-  const amount = parsedMessage.payload.amount;
+  const amount = Number(
+    parsedMessage.payload.amount ?? game.activeChance?.amount ?? 0
+  );
 
   if (currentTurnPlayer.balance < amount) {
     resolveBankruptcy({
@@ -20,6 +22,10 @@ export const payChance = (
   }
 
   currentTurnPlayer.balance -= amount;
+  game.gameLog.push({
+    username: currentTurnPlayer.username,
+    msg: `paid $${amount} for chance`,
+  });
   game.currentAction = "roll";
   game.activeChance = { type: "" };
   changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);

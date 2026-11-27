@@ -1,5 +1,6 @@
-import { GameState, Player } from "../../../types";
-import { resolveBankruptcy } from ".";
+import type { GameState, Player } from "~/types";
+import { changePlayerTurn } from "./changePlayerTurn";
+import { resolveBankruptcy } from "./resolveBankruptcy";
 
 export const payTax = (
   game: GameState,
@@ -19,6 +20,11 @@ export const payTax = (
   }
 
   currentTurnPlayer.balance -= tax;
+  game.gameLog.push({
+    username: currentTurnPlayer.username,
+    msg: `paid $${tax} tax`,
+  });
   game.currentAction = "roll";
+  changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
   return;
 };

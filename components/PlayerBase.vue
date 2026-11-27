@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, type CSSProperties, type PropType } from "vue";
+import { getBotAvatarUrl } from "~/shared/constants/botNames";
 import type { Player } from "~/types";
 import {
   getCartridgePlayerColor,
@@ -43,6 +44,9 @@ const props = defineProps({
 
 const tokenBg = computed(() => getCartridgePlayerColor(props.player.color));
 const initials = computed(() => getPlayerInitials(props.player.username));
+const avatarUrl = computed(() =>
+  props.player.isBot ? getBotAvatarUrl(props.player.username) : null
+);
 
 const anchorStyle = computed<CSSProperties>(() => ({
   transform: `translate3d(${props.x}px, ${props.y}px, 0) translate(-50%, -50%)`,
@@ -79,11 +83,18 @@ const tokenStyle = computed<CSSProperties>(() => {
       :class="{
         'player-token--moving': isMoving,
         'player-token--active': isActiveTurn,
+        'player-token--avatar': Boolean(avatarUrl),
       }"
       :style="tokenStyle"
       :title="player.username"
     >
-      <span class="player-token__initials">{{ initials }}</span>
+      <img
+        v-if="avatarUrl"
+        :src="avatarUrl"
+        :alt="player.username"
+        class="player-token__img"
+      />
+      <span v-else class="player-token__initials">{{ initials }}</span>
     </div>
   </div>
 </template>
@@ -98,14 +109,22 @@ const tokenStyle = computed<CSSProperties>(() => {
 }
 
 .player-token {
-  width: clamp(22px, 3vmin, 30px);
-  height: clamp(22px, 3vmin, 30px);
-  border-radius: 4px;
+  width: clamp(24px, 3.2vmin, 32px);
+  height: clamp(24px, 3.2vmin, 32px);
+  border-radius: 5px;
   border: 2px solid #ffffff;
   outline: 1.5px solid var(--outline);
   display: grid;
   place-items: center;
+  overflow: hidden;
   will-change: transform;
+}
+
+.player-token__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .player-token__initials {

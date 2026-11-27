@@ -20,6 +20,7 @@ export const handleRollDice = (
 ): PlayerMoveEvent | null => {
   const boardSize = GAME_RULES.BOARD_SIZE;
   const { left, right } = parsedMessage.payload.turnResult;
+  game.lastDiceRoll = { left, right };
   const startPosition = currentTurnPlayer.position;
   const segments: MoveSegment[] = [];
 
@@ -139,6 +140,20 @@ export const handleRollDice = (
       username: game.currentTurn,
       msg: `You have to pay rent to ${tilePlayerOn!.owner}`,
     });
+  }
+
+  if (
+    ["property", "car", "bonus-property"].includes(tilePlayerOn!.type) &&
+    tilePlayerOn!.owner &&
+    tilePlayerOn!.owner !== currentTurnPlayer.username &&
+    tilePlayerOn!.mortgaged
+  ) {
+    game.gameLog.push({
+      username: game.currentTurn,
+      msg: `${tilePlayerOn!.name} is mortgaged — no rent owed`,
+    });
+    game.currentAction = "roll";
+    changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
   }
 
   if (tilePlayerOn!.owner === currentTurnPlayer.username) {

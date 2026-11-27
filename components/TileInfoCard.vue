@@ -28,8 +28,9 @@ const props = defineProps({
     required: true,
   },
   player: {
-    type: Object as PropType<Player>,
-    required: true,
+    type: Object as PropType<Player | null>,
+    required: false,
+    default: null,
   },
   tiles: {
     type: Array as PropType<Tile[]>,
@@ -58,6 +59,8 @@ const props = defineProps({
 });
 
 const checkIfUpgradeable = (propertyId: number) => {
+  if (!props.player?.username) return false;
+
   const property = props.tiles.find((t) => t.id === propertyId);
   if (!property || property.type !== "property") return false;
 
@@ -81,7 +84,7 @@ const checkIfUpgradeable = (propertyId: number) => {
   const isAnyMortgaged = propertiesInGroup.some((p) => p.mortgaged);
   if (isAnyMortgaged) return false;
 
-  const isOwner = props.player.properties.includes(propertyId);
+  const isOwner = Boolean(props.player?.properties?.includes(propertyId));
   if (!isOwner) return false;
 
   const propGroup = props.propertyGroups.find(
@@ -98,11 +101,13 @@ const checkIfUpgradeable = (propertyId: number) => {
 };
 
 const checkIfMortgageable = (propertyId: number) => {
+  if (!props.player?.username) return false;
+
   const property = props.tiles.find((t) => t.id === propertyId);
   if (!property || !["car", "property", "bonus-property"].includes(property.type))
     return false;
 
-  if (!props.player.properties.includes(propertyId)) return false;
+  if (!props.player?.properties?.includes(propertyId)) return false;
   if (property.mortgaged) return false;
   if ((property.rentLevel ?? 0) !== 0) return false;
 
@@ -117,15 +122,19 @@ const checkIfMortgageable = (propertyId: number) => {
 };
 
 const checkIfBuybackAble = (propertyId: number) => {
+  if (!props.player?.username) return false;
+
   const property = props.tiles.find((t) => t.id === propertyId);
   if (!property || !["car", "property", "bonus-property"].includes(property.type))
     return false;
-  if (!props.player.properties.includes(propertyId)) return false;
+  if (!props.player?.properties?.includes(propertyId)) return false;
   return Boolean(property.mortgaged);
 };
 
 const checkIfSellable = (propertyId: number) => {
-  if (!props.player.properties.includes(propertyId)) return false;
+  if (!props.player?.username) return false;
+  if (!props.player?.properties?.includes(propertyId)) return false;
+
   const property = props.tiles.find((t) => t.id === propertyId);
   if (!property || property.type !== "property") return false;
   if ((property.rentLevel ?? 0) < 1) return false;
@@ -191,7 +200,12 @@ const rentRows = computed(() => {
   return [];
 });
 
-const isMyTurn = computed(() => props.currentTurn === props.username);
+const isMyTurn = computed(
+  () =>
+    Boolean(props.player?.username) &&
+    props.currentTurn === props.username &&
+    props.player?.username === props.username
+);
 const canMortgage = computed(
   () => isMyTurn.value && checkIfMortgageable(props.selectedTile.id)
 );
@@ -295,7 +309,7 @@ const hasAnyAction = computed(
           v-if="canUpgrade"
           variant="positive"
           size="sm"
-          :disabled="player.balance < upgradePrice || isSending"
+          :disabled="(player?.balance ?? 0) < upgradePrice || isSending"
           @click="$emit('upgradeProperty', selectedTile.id)"
         >
           <GameIcon name="up" :size="15" />
@@ -331,7 +345,8 @@ const hasAnyAction = computed(
           block
           class="deed-actions__full"
           :disabled="
-            player.balance < (selectedTile.buybackPrice ?? 0) || isSending
+            (player?.balance ?? 0) < (selectedTile.buybackPrice ?? 0) ||
+            isSending
           "
           @click="$emit('buyBackProperty', selectedTile.id)"
         >

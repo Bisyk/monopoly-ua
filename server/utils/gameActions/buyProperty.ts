@@ -1,5 +1,5 @@
-import { GameState, Player, Tile } from "~/types";
-import { changePlayerTurn, checkIsFullPropertySet } from ".";
+import type { GameState, Player, Tile } from "~/types";
+import { changePlayerTurn } from "./changePlayerTurn";
 import { assignPropertyToPlayer } from "./shared";
 
 export const buyProperty = (
@@ -14,16 +14,25 @@ export const buyProperty = (
     (t: Tile) => t.id === propertyId
   );
 
-  if (currentTurnPlayer.balance < boughtProperty!.price!) {
+  if (!boughtProperty || boughtProperty.price == null || boughtProperty.owner) {
+    return;
+  }
+
+  if (currentTurnPlayer.balance < boughtProperty.price) {
     return;
   }
 
   assignPropertyToPlayer(
     game,
-    boughtProperty!,
+    boughtProperty,
     currentTurnPlayer,
-    boughtProperty?.price!
+    boughtProperty.price
   );
+
+  game.gameLog.push({
+    username: currentTurnPlayer.username,
+    msg: `bought ${boughtProperty.name} for $${boughtProperty.price}`,
+  });
 
   changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);
 
