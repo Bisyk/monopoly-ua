@@ -1,11 +1,17 @@
 import type { BotDifficulty, GameState, Player, Tile, Trade } from "~/types";
 import { isTradePreviouslyDeclined } from "~/shared/utils/tradeSignature";
+import {
+  computeMortgageTransferFee,
+  getTileTradeParityValue,
+} from "~/shared/utils/mortgageTransferFee";
 import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties";
 import {
+  getActionReserve,
   getFullSetGroupIds,
   getGroupStrategicMultiplier,
   getGroupTiles,
   getSafetyReserve,
+  isOpponentLeading,
   isOwnableTile,
 } from "./valuation";
 
@@ -161,28 +167,158 @@ export function computePlayerPortfolioValue(
     }
   }
 
-  // 2. Cars (non-linear scaling 1 -> 4)
+  // 2. Cars (non-linear scaling 1 -> 4; 3–4 cars are high-impact rent engines)
   const ownedCars = game.board.tiles.filter(
     (t) => t.type === "car" && ownership.get(t.id) === username
   );
   if (ownedCars.length > 0) {
-    const carMultipliers = [1.0, 1.2, 1.45, 1.75];
-    const mult = carMultipliers[Math.min(4, ownedCars.length) - 1] ?? 1.0;
+    const carMultipliers = [1.1, 1.35, 1.75, 2.25];
+    const mult = carMultipliers[Math.min(4, ownedCars.length) - 1] ?? 1.1;
     const faceSum = ownedCars.reduce((s, t) => s + (t.price ?? 0), 0);
     total += faceSum * mult;
   }
 
-  // 3. Utilities / bonus-properties (scaling 1 -> 2)
+  // 3. Utilities / bonus-properties (scaling 1 -> 2; 2/2 = 10x dice roll rent)
   const ownedUtils = game.board.tiles.filter(
     (t) => t.type === "bonus-property" && ownership.get(t.id) === username
   );
   if (ownedUtils.length > 0) {
-    const mult = ownedUtils.length >= 2 ? 1.3 : 0.9;
+    const mult = ownedUtils.length >= 2 ? 1.85 : 1.1;
     const faceSum = ownedUtils.reduce((s, t) => s + (t.price ?? 0), 0);
     total += faceSum * mult;
   }
 
   return Math.round(total);
+}
+
+export function countSpecialTilesFromOwnership(
+  game: GameState,
+  ownership: Map<number, string>,
+  username: string,
+  tileType: "car" | "bonus-property"
+): number {
+  let count = 0;
+  for (const tile of game.board.tiles) {
+    if (tile.type === tileType && ownership.get(tile.id) === username) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * Protects high-value special sets (2/2 Energy Utilities = 10x dice rent,
+ * and 3–4 Cars = $100–$200 rent across 3–4 board tiles) on MEDIUM and HARD
+ * from being sold/broken or gifted to opponents for cash alone.
+ */
+function evaluateSpecialSetGate(
+  game: GameState,
+  ownershipBefore: Map<number, string>,
+  ownershipAfter: Map<number, string>,
+  botUsername: string,
+  fromUsername: string,
+  botNewMonopolies: number[],
+  difficultyPrefix: "medium" | "hard"
+): TradeEvaluationResult | null {
+  const botUtilsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    botUsername,
+    "bonus-property"
+  );
+  const botUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    botUsername,
+    "bonus-property"
+  );
+  const fromUtilsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    fromUsername,
+    "bonus-property"
+  );
+  const fromUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromUsername,
+    "bonus-property"
+  );
+
+  const botCarsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    botUsername,
+    "car"
+  );
+  const botCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    botUsername,
+    "car"
+  );
+  const fromCarsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    fromUsername,
+    "car"
+  );
+  const fromCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromUsername,
+    "car"
+  );
+
+  const botGainsColorMono = botNewMonopolies.length > 0;
+  const botGainsStrongCars =
+    botCarsAfter >= 3 && botCarsAfter > botCarsBefore;
+
+  // 1. Never break/sell bot's own 2/2 Energy Utilities (10x) without receiving a color monopoly or 3+ Cars
+  if (botUtilsBefore >= 2 && botUtilsAfter < 2) {
+    if (!botGainsColorMono && !botGainsStrongCars) {
+      return {
+        accept: false,
+        score: -300,
+        reason: `${difficultyPrefix}_protects_utility_set`,
+      };
+    }
+  }
+
+  // 2. Never break/sell bot's own 3–4 Car stack without receiving a color monopoly
+  if (botCarsBefore >= 3 && botCarsAfter < botCarsBefore) {
+    if (!botGainsColorMono) {
+      return {
+        accept: false,
+        score: -400,
+        reason: `${difficultyPrefix}_protects_car_set`,
+      };
+    }
+  }
+
+  // 3. Never gift opponent 3–4 Cars unless bot receives a color monopoly
+  if (fromCarsAfter >= 3 && fromCarsAfter > fromCarsBefore) {
+    if (!botGainsColorMono) {
+      return {
+        accept: false,
+        score: -400,
+        reason: `${difficultyPrefix}_refuses_opponent_car_set`,
+      };
+    }
+  }
+
+  // 4. Never gift opponent 2/2 Energy Utilities (10x) unless bot receives a color monopoly or 3+ Cars
+  if (fromUtilsBefore < 2 && fromUtilsAfter >= 2) {
+    if (!botGainsColorMono && !botGainsStrongCars) {
+      return {
+        accept: false,
+        score: -300,
+        reason: `${difficultyPrefix}_refuses_opponent_utility_set`,
+      };
+    }
+  }
+
+  return null;
 }
 
 function getTileById(game: GameState, id: number): Tile | undefined {
@@ -258,7 +394,7 @@ export function evaluateIncomingTrade(
     }
   }
 
-  // 3. Validate ownership & tradability (not mortgaged, not in an upgraded full set)
+  // 3. Validate ownership & tradability (mortgaged tiles are tradable under Strict Hasbro; upgraded full sets are not)
   const fullSetGroupIds = getFullSetGroupIds(game);
   const fromTradable = new Set(
     getPlayerTradableProperties(
@@ -296,9 +432,25 @@ export function evaluateIncomingTrade(
     return { accept: false, score: -Infinity, reason: "previously_declined" };
   }
 
+  const botMortgageFee = computeMortgageTransferFee(game.board.tiles, given);
+  const fromMortgageFee = computeMortgageTransferFee(
+    game.board.tiles,
+    received
+  );
+
   const difficulty: BotDifficulty = bot.botDifficulty ?? "MEDIUM";
-  const postBotBalance = bot.balance - receivedMoney + givenMoney;
-  const postFromBalance = fromPlayer.balance - givenMoney + receivedMoney;
+  const postBotBalance =
+    bot.balance - receivedMoney + givenMoney - botMortgageFee;
+  const postFromBalance =
+    fromPlayer.balance - givenMoney + receivedMoney - fromMortgageFee;
+
+  if (postBotBalance < 0 || postFromBalance < 0) {
+    return {
+      accept: false,
+      score: -Infinity,
+      reason: "insufficient_funds_for_mortgage_fee",
+    };
+  }
 
   // 5. Tier-specific deterministic evaluation
   if (difficulty === "EASY") {
@@ -308,6 +460,7 @@ export function evaluateIncomingTrade(
       received,
       givenMoney,
       receivedMoney,
+      botMortgageFee,
       postBotBalance
     );
   }
@@ -321,6 +474,7 @@ export function evaluateIncomingTrade(
       received,
       givenMoney,
       receivedMoney,
+      botMortgageFee,
       postBotBalance
     );
   }
@@ -332,6 +486,7 @@ export function evaluateIncomingTrade(
     trade,
     givenMoney,
     receivedMoney,
+    botMortgageFee,
     postBotBalance,
     postFromBalance
   );
@@ -343,19 +498,20 @@ function evaluateEasyTrade(
   received: number[],
   givenMoney: number,
   receivedMoney: number,
+  botMortgageFee: number,
   postBotBalance: number
 ): TradeEvaluationResult {
   const gainedFaceValue = given.reduce(
-    (sum, id) => sum + (getTileById(game, id)?.price ?? 0),
+    (sum, id) => sum + getTileTradeParityValue(getTileById(game, id)),
     0
   );
   const lostFaceValue = received.reduce(
-    (sum, id) => sum + (getTileById(game, id)?.price ?? 0),
+    (sum, id) => sum + getTileTradeParityValue(getTileById(game, id)),
     0
   );
 
   const gainedTotal = gainedFaceValue + givenMoney;
-  const lostTotal = lostFaceValue + receivedMoney;
+  const lostTotal = lostFaceValue + receivedMoney + botMortgageFee;
   const threshold = lostTotal * 0.95;
   const score = Math.round(gainedTotal - threshold);
 
@@ -378,6 +534,7 @@ function evaluateMediumTrade(
   received: number[],
   givenMoney: number,
   receivedMoney: number,
+  botMortgageFee: number,
   postBotBalance: number
 ): TradeEvaluationResult {
   const ownershipBefore = buildOwnershipMap(game);
@@ -399,6 +556,131 @@ function evaluateMediumTrade(
   );
   const fromFullAfter = new Set(
     getFullSetsFromOwnership(game, ownershipAfter, fromPlayer.username)
+  );
+
+  const botNewMonopolies = [...botFullAfter].filter((g) => !botFullBefore.has(g));
+  const botBrokenMonopolies = [...botFullBefore].filter((g) => !botFullAfter.has(g));
+  const fromNewMonopolies = [...fromFullAfter].filter((g) => !fromFullBefore.has(g));
+
+  // Strict monopoly gate (Idea A): MEDIUM bots never break a full set for cash only (even 2x+)
+  if (botBrokenMonopolies.length > 0) {
+    const brokenPower = botBrokenMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+    const newPower = botNewMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+    const netCash = givenMoney - receivedMoney;
+    const gainsComparableSet =
+      botNewMonopolies.length > 0 &&
+      newPower + Math.max(0, netCash) * 1.2 >= brokenPower;
+
+    if (!gainsComparableSet) {
+      return {
+        accept: false,
+        score: -Math.max(100, brokenPower - newPower),
+        reason: "medium_protects_existing_monopoly",
+      };
+    }
+  }
+
+  // Strict monopoly gate (Idea A): MEDIUM bots never sell a set-completing tile for cash only (even 2x+)
+  if (fromNewMonopolies.length > 0) {
+    const fromMonoPower = fromNewMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+    const botMonoPower = botNewMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+
+    if (botNewMonopolies.length === 0) {
+      return {
+        accept: false,
+        score: -Math.max(100, fromMonoPower),
+        reason: "medium_refuses_opponent_monopoly",
+      };
+    }
+
+    const netCash = givenMoney - receivedMoney;
+    const extraToBotVal = given.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && botNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const extraToFromVal = received.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && fromNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const effectiveBotPower =
+      botMonoPower + Math.max(0, netCash) * 1.25 + extraToBotVal * 0.9;
+    const effectiveFromPower =
+      fromMonoPower + Math.max(0, -netCash) * 1.1 + extraToFromVal * 0.85;
+    if (effectiveBotPower < effectiveFromPower * 0.85) {
+      return {
+        accept: false,
+        score: Math.round(effectiveBotPower - effectiveFromPower),
+        reason: "medium_opponent_monopoly_stronger",
+      };
+    }
+  }
+
+  const specialGateResult = evaluateSpecialSetGate(
+    game,
+    ownershipBefore,
+    ownershipAfter,
+    bot.username,
+    fromPlayer.username,
+    botNewMonopolies,
+    "medium"
+  );
+  if (specialGateResult) {
+    return specialGateResult;
+  }
+
+  const botCarsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    bot.username,
+    "car"
+  );
+  const botCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    bot.username,
+    "car"
+  );
+  const fromCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromPlayer.username,
+    "car"
+  );
+  const botUtilsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    bot.username,
+    "bonus-property"
+  );
+  const botUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    bot.username,
+    "bonus-property"
+  );
+  const fromUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromPlayer.username,
+    "bonus-property"
   );
 
   let gainedTileValue = 0;
@@ -433,25 +715,32 @@ function evaluateMediumTrade(
         }
       }
     } else if (tile.type === "car") {
-      const carsAfter = game.board.tiles.filter(
-        (t) => t.type === "car" && ownershipAfter.get(t.id) === bot.username
-      ).length;
-      if (carsAfter >= 2) {
-        multiplier += 0.15;
+      if (botCarsAfter >= 4) {
+        multiplier += 0.45;
+      } else if (botCarsAfter >= 3) {
+        multiplier += 0.3;
+      } else if (botCarsAfter >= 2) {
+        multiplier += 0.18;
       }
     } else if (tile.type === "bonus-property") {
-      const utilsAfter = game.board.tiles.filter(
-        (t) =>
-          t.type === "bonus-property" &&
-          ownershipAfter.get(t.id) === bot.username
-      ).length;
-      if (utilsAfter >= 2) {
-        multiplier += 0.15;
+      if (botUtilsAfter >= 2) {
+        multiplier += 0.35;
+      } else {
+        multiplier += 0.1;
       }
     }
 
-    gainedTileValue += price * multiplier;
+    let tileVal = price * multiplier;
+    if (tile.mortgaged) {
+      const buyback = tile.buybackPrice ?? Math.round(price * 0.6);
+      tileVal = Math.max(0, tileVal - buyback * 0.85);
+    }
+    gainedTileValue += tileVal;
   }
+
+  const isPureCashSale = given.length === 0 && received.length > 0;
+  const mediumSafetyReserve = getSafetyReserve(game, bot, "MEDIUM");
+  const botIsCashComfortable = bot.balance >= mediumSafetyReserve;
 
   let lostTileValue = 0;
   for (const id of received) {
@@ -485,24 +774,76 @@ function evaluateMediumTrade(
           }
         }
 
+        const fromCountBefore = group.properties.filter(
+          (pid) => ownershipBefore.get(pid) === fromPlayer.username
+        ).length;
+        const fromCountAfter = group.properties.filter(
+          (pid) => ownershipAfter.get(pid) === fromPlayer.username
+        ).length;
+
         // Opponent set-completion penalty (-30% on lost tile price)
         if (
           fromFullAfter.has(tile.groupId) &&
           !fromFullBefore.has(tile.groupId)
         ) {
           multiplier += 0.3;
+        } else if (
+          fromCountAfter >= 2 &&
+          fromCountAfter > fromCountBefore
+        ) {
+          // Opponent advancing from 1/3 -> 2/3 (dangerous set buildup)
+          multiplier += isPureCashSale && botIsCashComfortable ? 0.55 : 0.2;
         }
+
+        // Rich bots don't dump color deeds for small pure-cash markups (+$20)
+        if (isPureCashSale && botIsCashComfortable && multiplier < 1.35) {
+          multiplier = 1.35;
+        }
+      }
+    } else if (tile.type === "car") {
+      // Cars scale non-linearly ($25/$50/$100/$200) — never sell cheaply at 1.0x face value
+      multiplier = 1.25;
+      if (botCarsBefore >= 3) {
+        multiplier += 0.45;
+      } else if (botCarsBefore >= 2) {
+        multiplier += 0.25;
+      }
+      if (fromCarsAfter >= 3) {
+        multiplier += 0.55;
+      } else if (fromCarsAfter >= 2) {
+        multiplier += 0.3;
+      }
+      if (isPureCashSale && botIsCashComfortable && multiplier < 1.45) {
+        multiplier = 1.45;
+      }
+    } else if (tile.type === "bonus-property") {
+      // Energy Utilities (4x -> 10x dice) are high-value special tiles
+      multiplier = 1.25;
+      if (botUtilsBefore >= 2) {
+        multiplier += 0.55;
+      }
+      if (fromUtilsAfter >= 2) {
+        multiplier += 0.55;
+      }
+      if (isPureCashSale && botIsCashComfortable && multiplier < 1.45) {
+        multiplier = 1.45;
       }
     }
 
-    lostTileValue += price * multiplier;
+    let tileVal = price * multiplier;
+    if (tile.mortgaged) {
+      const buyback = tile.buybackPrice ?? Math.round(price * 0.6);
+      tileVal = Math.max(0, tileVal - buyback * 0.85);
+    }
+    lostTileValue += tileVal;
   }
 
   const gainedTotal = gainedTileValue + givenMoney;
-  const lostTotal = lostTileValue + receivedMoney;
+  const lostTotal = lostTileValue + receivedMoney + botMortgageFee;
   const score = Math.round(gainedTotal - lostTotal);
 
-  const helpsLowCashBot = givenMoney > receivedMoney && postBotBalance >= 0;
+  const helpsLowCashBot =
+    givenMoney > receivedMoney + botMortgageFee && postBotBalance >= 0;
   const hasLiquidity = postBotBalance >= 50 || helpsLowCashBot;
 
   if (!hasLiquidity) {
@@ -528,6 +869,7 @@ function evaluateHardTrade(
   trade: Trade,
   givenMoney: number,
   receivedMoney: number,
+  botMortgageFee: number,
   postBotBalance: number,
   postFromBalance: number
 ): TradeEvaluationResult {
@@ -566,7 +908,9 @@ function evaluateHardTrade(
   );
 
   const safetyReserve = getSafetyReserve(game, bot, "HARD");
+  const tradeReserve = getActionReserve(game, bot, "HARD", "trade");
   const fromSafetyReserve = getSafetyReserve(game, fromPlayer, "HARD");
+  const oppIsLeader = isOpponentLeading(game, bot.username, fromPlayer.username);
 
   // Rule A: Never break an existing full set the bot owns unless getting a strictly superior full set + cash
   if (botBrokenMonopolies.length > 0) {
@@ -592,7 +936,7 @@ function evaluateHardTrade(
     }
   }
 
-  // Rule B: Opponent monopoly gate
+  // Rule B: Opponent monopoly gate (with cash-balanced mutual swaps & leader awareness)
   if (fromNewMonopolies.length > 0) {
     const fromMonoPower = fromNewMonopolies.reduce(
       (sum, g) => sum + computeGroupMonopolyPower(game, g),
@@ -611,21 +955,73 @@ function evaluateHardTrade(
       };
     }
 
-    if (botMonoPower < fromMonoPower * 0.9) {
+    // Allow cash and sweetener properties to balance unequal mutual monopoly swaps
+    const netCashGain = givenMoney - receivedMoney;
+    const extraToBotVal = trade.given.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && botNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const extraToFromVal = trade.received.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && fromNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const effectiveBotPower =
+      botMonoPower + Math.max(0, netCashGain) * 1.35 + extraToBotVal * 0.95;
+    const effectiveFromPower =
+      fromMonoPower + Math.max(0, -netCashGain) * 1.15 + extraToFromVal * 0.9;
+
+    // Do not feed a runaway leader who already holds a monopoly unless clearly winning the swap
+    const oppIsRunawayLeader = oppIsLeader && fromFullBefore.length >= 1;
+    const requiredRatio = oppIsRunawayLeader ? 1.15 : 0.9;
+
+    if (effectiveBotPower < effectiveFromPower * requiredRatio) {
       return {
         accept: false,
-        score: Math.round(botMonoPower - fromMonoPower),
-        reason: "hard_opponent_monopoly_stronger",
+        score: Math.round(effectiveBotPower - effectiveFromPower),
+        reason: oppIsRunawayLeader
+          ? "hard_refuses_feeding_leader"
+          : "hard_opponent_monopoly_stronger",
       };
     }
 
-    if (postBotBalance < safetyReserve) {
+    // Require enough cash to immediately start building houses on the new monopoly
+    const cheapestNewSetUpgrade = Math.min(
+      ...botNewMonopolies.map(
+        (g) =>
+          game.board.groups.find((gr) => gr.groupId === g)?.upgradePrice ?? 100
+      )
+    );
+    const minUpgradeCash = Math.min(
+      safetyReserve,
+      Math.max(100, cheapestNewSetUpgrade)
+    );
+    if (postBotBalance < minUpgradeCash) {
       return {
         accept: false,
-        score: postBotBalance - safetyReserve,
+        score: postBotBalance - minUpgradeCash,
         reason: "hard_insufficient_cash_to_upgrade_after_mutual_monopoly",
       };
     }
+  }
+
+  // Rule B2: Special-set protection (2/2 Energy Utilities = 10x, 3–4 Cars = $100–$200)
+  const specialGateResult = evaluateSpecialSetGate(
+    game,
+    ownershipBefore,
+    ownershipAfter,
+    bot.username,
+    fromPlayer.username,
+    botNewMonopolies,
+    "hard"
+  );
+  if (specialGateResult) {
+    return specialGateResult;
   }
 
   // Rule C: Liquidity protection
@@ -637,11 +1033,11 @@ function evaluateHardTrade(
     };
   }
 
-  if (receivedMoney > givenMoney) {
+  if (receivedMoney + botMortgageFee > givenMoney) {
     const minCashAfterSpending =
       botNewMonopolies.length > 0
-        ? Math.min(safetyReserve, Math.max(80, Math.round(safetyReserve * 0.6)))
-        : safetyReserve;
+        ? Math.min(tradeReserve, Math.max(50, Math.round(tradeReserve * 0.45)))
+        : tradeReserve;
 
     if (postBotBalance < minCashAfterSpending) {
       return {
@@ -652,7 +1048,52 @@ function evaluateHardTrade(
     }
   }
 
-  // Rule D: Full portfolio strategic delta (bot gain minus weighted opponent strategic gain)
+  // Rule C2: Financially comfortable HARD bots refuse cheap pure-cash buyouts (e.g. $120 for a $100 deed)
+  if (
+    trade.given.length === 0 &&
+    trade.received.length > 0 &&
+    bot.balance >= safetyReserve
+  ) {
+    let minPureCashRequired = 0;
+    for (const id of trade.received) {
+      const tile = getTileById(game, id);
+      const parityPrice = getTileTradeParityValue(tile);
+      if (!tile || parityPrice <= 0) {
+        continue;
+      }
+
+      let requiredMult = 1.4;
+      if (tile.type === "property" && tile.groupId != null) {
+        const group = game.board.groups.find((g) => g.groupId === tile.groupId);
+        if (group) {
+          const fromCountBefore = group.properties.filter(
+            (pid) => ownershipBefore.get(pid) === fromPlayer.username
+          ).length;
+          const fromCountAfter = group.properties.filter(
+            (pid) => ownershipAfter.get(pid) === fromPlayer.username
+          ).length;
+          if (fromCountAfter >= 2 && fromCountAfter > fromCountBefore) {
+            // Advancing opponent to 2/3 of a color set for pure cash requires a real premium
+            requiredMult = 1.6;
+          }
+        }
+      } else if (tile.type === "car" || tile.type === "bonus-property") {
+        requiredMult = 1.55;
+      }
+
+      minPureCashRequired += parityPrice * requiredMult;
+    }
+
+    if (givenMoney < minPureCashRequired) {
+      return {
+        accept: false,
+        score: Math.round(givenMoney - minPureCashRequired),
+        reason: "hard_refuses_cheap_cash_buyout",
+      };
+    }
+  }
+
+  // Rule D: Full portfolio strategic delta (bot gain minus leader-aware opponent strategic gain)
   const botPortfolioBefore = computePlayerPortfolioValue(
     game,
     ownershipBefore,
@@ -690,7 +1131,14 @@ function evaluateHardTrade(
     postFromBalance -
     (fromPortfolioBefore + fromPlayer.balance);
 
-  const opponentWeight = fromNewMonopolies.length > 0 ? 0.5 : 0.35;
+  const opponentWeight =
+    fromNewMonopolies.length > 0
+      ? oppIsLeader
+        ? 0.65
+        : 0.5
+      : oppIsLeader
+        ? 0.45
+        : 0.35;
   const netScore = Math.round(botDelta - opponentWeight * Math.max(0, fromDelta));
 
   const accept = netScore > 0;

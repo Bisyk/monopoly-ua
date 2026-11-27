@@ -112,8 +112,8 @@ export const handleRollDice = (
     }
   }
 
-  const newPlayerPosition =
-    ((currentTurnPlayer.position + left + right - 1) % boardSize) + 1;
+  const rawPosition = currentTurnPlayer.position + left + right;
+  const newPlayerPosition = ((rawPosition - 1) % boardSize) + 1;
 
   currentTurnPlayer.position = newPlayerPosition;
   addSegment(startPosition, newPlayerPosition, "step");
@@ -121,6 +121,14 @@ export const handleRollDice = (
   const tilePlayerOn = game.board.tiles.find(
     (t: Tile) => t.id === newPlayerPosition
   );
+
+  if (rawPosition > boardSize && tilePlayerOn?.type !== "go") {
+    currentTurnPlayer.balance += GAME_RULES.PASS_GO_BONUS;
+    game.gameLog.push({
+      username: game.currentTurn,
+      msg: `You got $${GAME_RULES.PASS_GO_BONUS} for passing GO`,
+    });
+  }
 
   if (
     ["property", "car", "bonus-property"].includes(tilePlayerOn!.type) &&
@@ -207,10 +215,10 @@ export const handleRollDice = (
   }
 
   if (tilePlayerOn!.type === "go") {
-    currentTurnPlayer.balance += GAME_RULES.PASS_GO_BONUS;
+    currentTurnPlayer.balance += GAME_RULES.LAND_ON_GO_BONUS;
     game.gameLog.push({
       username: game.currentTurn,
-      msg: "You got 200$ for landing on go",
+      msg: `You got $${GAME_RULES.LAND_ON_GO_BONUS} for landing on GO`,
     });
     game.currentAction = "roll";
     changePlayerTurn(game, currentTurnPlayer, currentTurnPlayerIdx);

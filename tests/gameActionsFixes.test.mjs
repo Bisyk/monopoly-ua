@@ -430,3 +430,104 @@ test("mortgage, buyback, upgrade, and sell actions enforce ownership and Monopol
   upgradeProperty(game, alice, { payload: { propertyId: 2 } });
   assert.equal(atb.rentLevel, 1);
 });
+
+test("Cars and Energy Utilities can be mortgaged and redeemed (including when owning sets with rentLevel > 0)", () => {
+  const game = createTestGame([{ balance: 500 }, { balance: 1500 }]);
+  const alice = game.players[0];
+
+  const mercedes = game.board.tiles.find((t) => t.id === 6);
+  const porsche = game.board.tiles.find((t) => t.id === 16);
+  const ukrnafta = game.board.tiles.find((t) => t.id === 13);
+  const naftogaz = game.board.tiles.find((t) => t.id === 29);
+
+  // Assign 2 Cars + 2 Utilities so rentLevel becomes 1 on all of them
+  assignPropertyToPlayer(game, mercedes, alice, 0);
+  assignPropertyToPlayer(game, porsche, alice, 0);
+  assignPropertyToPlayer(game, ukrnafta, alice, 0);
+  assignPropertyToPlayer(game, naftogaz, alice, 0);
+
+  assert.equal(mercedes.rentLevel, 1);
+  assert.equal(ukrnafta.rentLevel, 1);
+
+  // Mortgage Car ($200 -> +$100) and Energy Utility ($150 -> +$75)
+  mortgageProperty(game, alice, { payload: { propertyId: 6 } });
+  assert.equal(mercedes.mortgaged, true);
+  assert.equal(alice.balance, 600);
+
+  mortgageProperty(game, alice, { payload: { propertyId: 13 } });
+  assert.equal(ukrnafta.mortgaged, true);
+  assert.equal(alice.balance, 675);
+
+  // Redeem Car (-$120) and Energy Utility (-$90)
+  buybackProperty(game, alice, { payload: { propertyId: 6 } });
+  assert.equal(mercedes.mortgaged, false);
+  assert.equal(alice.balance, 555);
+
+  buybackProperty(game, alice, { payload: { propertyId: 13 } });
+  assert.equal(ukrnafta.mortgaged, false);
+  assert.equal(alice.balance, 465);
+});
+
+test("acceptTrade supports mortgaged properties with Strict Hasbro 10% mortgage transfer fee", () => {
+  const game = createTestGame([{ balance: 500 }, { balance: 500 }]);
+  const alice = game.players[0];
+  const bob = game.players[1];
+
+  // Alice owns mortgaged EPAM (tile 20, price $200, mortgage $100 -> 10% fee = $10)
+  // Bob owns mortgaged Ukrnafta (tile 13, price $150, mortgage $75 -> 10% fee = ceil(7.5) = $8)
+  const epam = game.board.tiles.find((t) => t.id === 20);
+  const ukrnafta = game.board.tiles.find((t) => t.id === 13);
+  assignPropertyToPlayer(game, epam, alice, 0);
+  assignPropertyToPlayer(game, ukrnafta, bob, 0);
+  epam.mortgaged = true;
+  ukrnafta.mortgaged = true;
+
+  // Swap EPAM + $20 from Alice for Ukrnafta from Bob
+  game.currentAction = "trade";
+  game.activeTrade = {
+    from: "alice",
+    to: "bob",
+    given: [20],
+    received: [13],
+    givenMoney: 20,
+    receivedMoney: 0,
+    returnAction: "roll",
+  };
+
+  acceptTrade(game);
+
+  // Ownership transfers and both properties remain mortgaged
+  assert.equal(epam.owner, "bob");
+  assert.equal(epam.mortgaged, true);
+  assert.equal(ukrnafta.owner, "alice");
+  assert.equal(ukrnafta.mortgaged, true);
+
+  // Alice: 500 - 20 (cash) - 8 (10% of $75) = 472
+  // Bob:   500 + 20 (cash) - 10 (10% of $100) = 510
+  assert.equal(alice.balance, 472);
+  assert.equal(bob.balance, 510);
+  assert.ok(
+    game.gameLog.some((e) => e.username === "bob" && e.msg.includes("$10 mortgage transfer fee"))
+  );
+  assert.ok(
+    game.gameLog.some((e) => e.username === "alice" && e.msg.includes("$8 mortgage transfer fee"))
+  );
+
+  // If recipient cannot afford the 10% mortgage transfer fee, acceptTrade refuses to execute
+  alice.balance = 5; // cannot afford $10 fee for receiving mortgaged EPAM back
+  game.currentAction = "trade";
+  game.activeTrade = {
+    from: "bob",
+    to: "alice",
+    given: [20],
+    received: [],
+    givenMoney: 0,
+    receivedMoney: 0,
+    returnAction: "roll",
+  };
+  acceptTrade(game);
+  assert.equal(epam.owner, "bob", "trade must not execute when recipient cannot pay 10% fee");
+  assert.equal(alice.balance, 5);
+});
+
+

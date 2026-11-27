@@ -13,12 +13,51 @@ export function computeBoardOwnershipHash(game: GameState): string {
     .sort((a, b) => a.id - b.id);
 
   return ownableTiles
-    .map(
-      (tile) =>
-        `${tile.id}:${tile.owner || "_"}:${tile.mortgaged ? 1 : 0}:${
-          tile.rentLevel ?? 0
-        }`
-    )
+    .map((tile) => `${tile.id}:${tile.owner || "_"}`)
+    .join("|");
+}
+
+function extractRelevantOwnershipSlice(
+  game: GameState,
+  boardHash: string,
+  trade: TradeLike
+): string {
+  const involvedTileIds = new Set<number>([
+    ...(trade.given ?? []),
+    ...(trade.received ?? []),
+  ]);
+  const involvedGroupIds = new Set<number>();
+
+  for (const tid of involvedTileIds) {
+    const tile = game.board.tiles.find((t) => t.id === tid);
+    if (tile?.groupId != null) {
+      involvedGroupIds.add(tile.groupId);
+    }
+  }
+
+  const relevantTileIds = new Set<number>(involvedTileIds);
+  for (const tile of game.board.tiles) {
+    if (tile.groupId != null && involvedGroupIds.has(tile.groupId)) {
+      relevantTileIds.add(tile.id);
+    }
+  }
+
+  const from = trade.from || "";
+  const to = trade.to || "";
+
+  return boardHash
+    .split("|")
+    .filter((token) => {
+      const sep = token.indexOf(":");
+      if (sep <= 0) return false;
+      const id = Number(token.slice(0, sep));
+      const owner = token.slice(sep + 1);
+      return (
+        relevantTileIds.has(id) ||
+        (from.length > 0 && owner === from) ||
+        (to.length > 0 && owner === to)
+      );
+    })
     .join("|");
 }
 
@@ -52,14 +91,32 @@ export function isTradePreviouslyDeclined(
 
   const signature = buildTradeSignature(trade);
   const boardHash = computeBoardOwnershipHash(game);
-
-  return declined.some(
-    (entry) =>
-      entry.from === (trade.from || "") &&
-      entry.to === (trade.to || "") &&
-      entry.signature === signature &&
-      entry.boardHash === boardHash
+  const currentRelevantSlice = extractRelevantOwnershipSlice(
+    game,
+    boardHash,
+    trade
   );
+
+  return declined.some((entry) => {
+    if (
+      entry.from !== (trade.from || "") ||
+      entry.to !== (trade.to || "") ||
+      entry.signature !== signature
+    ) {
+      return false;
+    }
+
+    if (entry.boardHash === boardHash) {
+      return true;
+    }
+
+    // Ignore unrelated board purchases by third parties: keep trade declined until
+    // either party's portfolio or an involved color group changes ownership.
+    return (
+      extractRelevantOwnershipSlice(game, entry.boardHash, trade) ===
+      currentRelevantSlice
+    );
+  });
 }
 
 export function recordDeclinedTrade(game: GameState, trade: TradeLike): void {

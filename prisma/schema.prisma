@@ -71,6 +71,7 @@ type Player {
   bonusRoll             Boolean
   isBot                 Boolean @default(false)
   botDifficulty         String?
+  botRiskLevel          Float?
 }
 
 type BoardState {
@@ -123,4 +124,5 @@ type Trade {
   received      Int[]
   givenMoney    Int?
   receivedMoney Int?
+  returnAction  String?
 }

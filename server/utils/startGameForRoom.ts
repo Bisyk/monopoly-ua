@@ -83,6 +83,7 @@ export async function startGameForRoom(room: StartGameRoomInput) {
       color: persona ? persona.bgColor : pickHumanColor(),
       isBot,
       botDifficulty: isBot ? botDifficulty : null,
+      botRiskLevel: isBot ? Math.round(Math.random() * 100) / 100 : null,
     };
   });
 
@@ -111,6 +112,7 @@ export async function startGameForRoom(room: StartGameRoomInput) {
           received: [],
           givenMoney: 0,
           receivedMoney: 0,
+          returnAction: null,
         },
         lastDiceRoll: null,
         declinedTrades: [],

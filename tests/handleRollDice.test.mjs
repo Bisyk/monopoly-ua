@@ -133,3 +133,37 @@ test("handleRollDice returns null when jailed player fails to roll doubles", () 
   assert.equal(game.players[0].turnsInJail, 2);
   assert.equal(game.currentTurn, "bob");
 });
+
+test("handleRollDice awards $200 for passing GO and $400 for landing directly on GO", () => {
+  // Normal roll without crossing GO (1 -> 7): +$0
+  const normalGame = createTestGame([{ position: 1, balance: 1500 }]);
+  handleRollDice(normalGame, normalGame.players[0], 0, rollMessage(2, 4));
+  assert.equal(normalGame.players[0].position, 7);
+  assert.equal(normalGame.players[0].balance, 1500);
+
+  // Passing GO (39 -> 2, ATB): +$200
+  const passGoGame = createTestGame([{ position: 39, balance: 1500 }]);
+  handleRollDice(passGoGame, passGoGame.players[0], 0, rollMessage(1, 2));
+  assert.equal(passGoGame.players[0].position, 2);
+  assert.equal(passGoGame.players[0].balance, 1700);
+  assert.ok(
+    passGoGame.gameLog.some((entry) => entry.msg.includes("$200 for passing GO")),
+    "expected pass GO log entry"
+  );
+
+  // Landing directly on GO (38 -> 1): +$400 (NOT $600 and NOT $200)
+  const landGoGame = createTestGame([{ position: 38, balance: 1500 }]);
+  handleRollDice(landGoGame, landGoGame.players[0], 0, rollMessage(1, 2));
+  assert.equal(landGoGame.players[0].position, 1);
+  assert.equal(landGoGame.players[0].balance, 1900);
+  assert.ok(
+    landGoGame.gameLog.some((entry) => entry.msg.includes("$400 for landing on GO")),
+    "expected land on GO log entry"
+  );
+  assert.equal(
+    landGoGame.gameLog.some((entry) => entry.msg.includes("passing GO")),
+    false,
+    "landing directly on GO must not double-award passing GO"
+  );
+});
+

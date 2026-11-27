@@ -39,6 +39,7 @@ function createBotGame(botConfigs) {
     color: colors[idx % colors.length],
     isBot: true,
     botDifficulty: cfg.difficulty,
+    botRiskLevel: cfg.riskLevel ?? 0.5,
   }));
 
   return {
@@ -67,6 +68,7 @@ function createBotGame(botConfigs) {
       received: [],
       givenMoney: 0,
       receivedMoney: 0,
+      returnAction: null,
     },
     lastDiceRoll: null,
     declinedTrades: [],
@@ -163,24 +165,20 @@ function assertBoardInvariants(game) {
   }
 }
 
-test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-op spins, or state corruption", () => {
-  const game = createBotGame([
-    { username: "KyivBot", difficulty: "EASY" },
-    { username: "LvivBot", difficulty: "MEDIUM" },
-    { username: "OdesaBot", difficulty: "HARD" },
-  ]);
-
-  const rng = createSeededRng(42);
+function runSimulatedGame(botConfigs, seed, maxSteps = 2500) {
+  const game = createBotGame(botConfigs);
+  const rng = createSeededRng(seed);
   let lastTurnOwner = "";
   let proposedTradeThisTurn = false;
+  let proposedLiquidationTradeThisTurn = false;
+  let mortgagedTileIdsThisTurn = [];
   let turnStepCount = 0;
   const cooldowns = {};
   const actionCounts = {};
 
-  const MAX_STEPS = 2500;
   let steps = 0;
 
-  while (game.status !== "ENDED" && steps < MAX_STEPS) {
+  while (game.status !== "ENDED" && steps < maxSteps) {
     const actingBot = getActingBot(game);
     assert.ok(actingBot, `Expected an acting bot at step ${steps}`);
 
@@ -188,6 +186,8 @@ test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-o
     if (isOwnTurn && lastTurnOwner !== game.currentTurn) {
       lastTurnOwner = game.currentTurn;
       proposedTradeThisTurn = false;
+      proposedLiquidationTradeThisTurn = false;
+      mortgagedTileIdsThisTurn = [];
       turnStepCount = 0;
       const botCd = cooldowns[actingBot.username];
       if (botCd) {
@@ -203,6 +203,10 @@ test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-o
       actingBot,
       {
         proposedTradeThisTurn: isOwnTurn ? proposedTradeThisTurn : false,
+        proposedLiquidationTradeThisTurn: isOwnTurn
+          ? proposedLiquidationTradeThisTurn
+          : false,
+        mortgagedTileIdsThisTurn: isOwnTurn ? [...mortgagedTileIdsThisTurn] : [],
         turnStepCount: isOwnTurn ? turnStepCount : 0,
         tradeCooldownByTarget: { ...(cooldowns[actingBot.username] ?? {}) },
       },
@@ -215,6 +219,7 @@ test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-o
     );
 
     const beforeTurn = game.currentTurn;
+    const beforeAction = game.currentAction;
     const beforeSnapshot = JSON.stringify(game);
     const move = dispatchAction(game, decision);
     const afterSnapshot = JSON.stringify(game);
@@ -226,8 +231,18 @@ test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-o
 
     actionCounts[decision.action] = (actionCounts[decision.action] ?? 0) + 1;
 
+    if (isOwnTurn && decision.action === "MORTGAGE_PROPERTY") {
+      mortgagedTileIdsThisTurn.push(decision.payload.propertyId);
+    }
+
     if (decision.action === "TRADE") {
-      if (isOwnTurn) proposedTradeThisTurn = true;
+      if (isOwnTurn) {
+        if (beforeAction === "roll") {
+          proposedTradeThisTurn = true;
+        } else {
+          proposedLiquidationTradeThisTurn = true;
+        }
+      }
       const target = decision.payload.tradePlayerUsername;
       cooldowns[actingBot.username] = cooldowns[actingBot.username] ?? {};
       cooldowns[actingBot.username][target] = 3;
@@ -249,17 +264,34 @@ test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-o
 
     if (isOwnTurn && decision.action === "ROLL_DICE") {
       turnStepCount = 0;
+      proposedLiquidationTradeThisTurn = false;
+      mortgagedTileIdsThisTurn = [];
     }
 
     if (game.currentTurn !== beforeTurn) {
       lastTurnOwner = "";
       proposedTradeThisTurn = false;
+      proposedLiquidationTradeThisTurn = false;
+      mortgagedTileIdsThisTurn = [];
       turnStepCount = 0;
     }
 
     assertBoardInvariants(game);
     steps += 1;
   }
+
+  return { game, actionCounts, steps };
+}
+
+test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-op spins, or state corruption", () => {
+  const { game, actionCounts } = runSimulatedGame(
+    [
+      { username: "KyivBot", difficulty: "EASY", riskLevel: 0.4 },
+      { username: "LvivBot", difficulty: "MEDIUM", riskLevel: 0.6 },
+      { username: "OdesaBot", difficulty: "HARD", riskLevel: 0.85 },
+    ],
+    42
+  );
 
   assert.ok(actionCounts.ROLL_DICE > 20, "Bots should roll dice many times");
   assert.ok(actionCounts.BUY_PROPERTY > 5, "Bots should purchase properties");
@@ -268,6 +300,28 @@ test("full 3-bot game (EASY, MEDIUM, HARD) runs cleanly without soft-locks, no-o
   if (game.status === "ENDED") {
     assert.equal(game.players.length, 1);
     assert.equal(game.winnerUsername, game.players[0].username);
+  }
+});
+
+test("multi-seed 4-bot HARD/MEDIUM games with varied risk profiles run cleanly without soft-locks or corruption", () => {
+  for (const seed of [7, 19, 101, 2026]) {
+    const { game, actionCounts } = runSimulatedGame(
+      [
+        { username: "CautiousHard", difficulty: "HARD", riskLevel: 0.1 },
+        { username: "BalancedMed", difficulty: "MEDIUM", riskLevel: 0.5 },
+        { username: "AggressiveHard", difficulty: "HARD", riskLevel: 0.85 },
+        { username: "RecklessHard", difficulty: "HARD", riskLevel: 0.98 },
+      ],
+      seed,
+      1800
+    );
+
+    assert.ok(actionCounts.ROLL_DICE > 20, `seed ${seed}: expected >20 rolls`);
+    assert.ok(actionCounts.BUY_PROPERTY > 10, `seed ${seed}: expected >10 buys`);
+    if (game.status === "ENDED") {
+      assert.equal(game.players.length, 1);
+      assert.equal(game.winnerUsername, game.players[0].username);
+    }
   }
 });
 
