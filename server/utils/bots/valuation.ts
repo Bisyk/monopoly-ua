@@ -702,10 +702,10 @@ export function evaluateTileStrategicValue(
     ).length;
 
     const resultingCount = Math.min(4, ownedByMeOther + 1);
-    const carMultipliers = [1.0, 1.2, 1.45, 1.75];
-    value = basePrice * (carMultipliers[resultingCount - 1] ?? 1.0);
+    const carMultipliers = [1.1, 1.35, 1.75, 2.25];
+    value = basePrice * (carMultipliers[resultingCount - 1] ?? 1.1);
 
-    // Blocking bonus if a single opponent already holds 2 or 3 other cars
+    // Blocking bonus if a single opponent already holds 1–3 other cars
     const oppCounts = new Map<string, number>();
     for (const c of otherCars) {
       if (c.owner && c.owner !== perspectiveUsername) {
@@ -714,9 +714,11 @@ export function evaluateTileStrategicValue(
     }
     const maxOppCars = Math.max(0, ...oppCounts.values());
     if (maxOppCars >= 3) {
-      value += basePrice * 0.45;
+      value += basePrice * 0.75;
     } else if (maxOppCars === 2) {
-      value += basePrice * 0.2;
+      value += basePrice * 0.45;
+    } else if (maxOppCars === 1) {
+      value += basePrice * 0.15;
     }
   } else if (tile.type === "bonus-property") {
     const otherUtils = game.board.tiles.filter(
@@ -726,13 +728,14 @@ export function evaluateTileStrategicValue(
       (t) => t.owner === perspectiveUsername
     ).length;
 
-    value = basePrice * (ownedByMeOther >= 1 ? 1.3 : 0.9);
+    // 2/2 Energy Utilities = 10x dice roll rent (~$70 avg, unmortgageable powerhouse)
+    value = basePrice * (ownedByMeOther >= 1 ? 1.85 : 1.1);
 
     const opponentOwnsOther = otherUtils.some(
       (t) => Boolean(t.owner) && t.owner !== perspectiveUsername
     );
     if (opponentOwnsOther) {
-      value += basePrice * 0.2;
+      value += basePrice * 0.45;
     }
   }
 

@@ -163,28 +163,158 @@ export function computePlayerPortfolioValue(
     }
   }
 
-  // 2. Cars (non-linear scaling 1 -> 4)
+  // 2. Cars (non-linear scaling 1 -> 4; 3–4 cars are high-impact rent engines)
   const ownedCars = game.board.tiles.filter(
     (t) => t.type === "car" && ownership.get(t.id) === username
   );
   if (ownedCars.length > 0) {
-    const carMultipliers = [1.0, 1.2, 1.45, 1.75];
-    const mult = carMultipliers[Math.min(4, ownedCars.length) - 1] ?? 1.0;
+    const carMultipliers = [1.1, 1.35, 1.75, 2.25];
+    const mult = carMultipliers[Math.min(4, ownedCars.length) - 1] ?? 1.1;
     const faceSum = ownedCars.reduce((s, t) => s + (t.price ?? 0), 0);
     total += faceSum * mult;
   }
 
-  // 3. Utilities / bonus-properties (scaling 1 -> 2)
+  // 3. Utilities / bonus-properties (scaling 1 -> 2; 2/2 = 10x dice roll rent)
   const ownedUtils = game.board.tiles.filter(
     (t) => t.type === "bonus-property" && ownership.get(t.id) === username
   );
   if (ownedUtils.length > 0) {
-    const mult = ownedUtils.length >= 2 ? 1.3 : 0.9;
+    const mult = ownedUtils.length >= 2 ? 1.85 : 1.1;
     const faceSum = ownedUtils.reduce((s, t) => s + (t.price ?? 0), 0);
     total += faceSum * mult;
   }
 
   return Math.round(total);
+}
+
+export function countSpecialTilesFromOwnership(
+  game: GameState,
+  ownership: Map<number, string>,
+  username: string,
+  tileType: "car" | "bonus-property"
+): number {
+  let count = 0;
+  for (const tile of game.board.tiles) {
+    if (tile.type === tileType && ownership.get(tile.id) === username) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * Protects high-value special sets (2/2 Energy Utilities = 10x dice rent,
+ * and 3–4 Cars = $100–$200 rent across 3–4 board tiles) on MEDIUM and HARD
+ * from being sold/broken or gifted to opponents for cash alone.
+ */
+function evaluateSpecialSetGate(
+  game: GameState,
+  ownershipBefore: Map<number, string>,
+  ownershipAfter: Map<number, string>,
+  botUsername: string,
+  fromUsername: string,
+  botNewMonopolies: number[],
+  difficultyPrefix: "medium" | "hard"
+): TradeEvaluationResult | null {
+  const botUtilsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    botUsername,
+    "bonus-property"
+  );
+  const botUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    botUsername,
+    "bonus-property"
+  );
+  const fromUtilsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    fromUsername,
+    "bonus-property"
+  );
+  const fromUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromUsername,
+    "bonus-property"
+  );
+
+  const botCarsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    botUsername,
+    "car"
+  );
+  const botCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    botUsername,
+    "car"
+  );
+  const fromCarsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    fromUsername,
+    "car"
+  );
+  const fromCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromUsername,
+    "car"
+  );
+
+  const botGainsColorMono = botNewMonopolies.length > 0;
+  const botGainsStrongCars =
+    botCarsAfter >= 3 && botCarsAfter > botCarsBefore;
+
+  // 1. Never break/sell bot's own 2/2 Energy Utilities (10x) without receiving a color monopoly or 3+ Cars
+  if (botUtilsBefore >= 2 && botUtilsAfter < 2) {
+    if (!botGainsColorMono && !botGainsStrongCars) {
+      return {
+        accept: false,
+        score: -300,
+        reason: `${difficultyPrefix}_protects_utility_set`,
+      };
+    }
+  }
+
+  // 2. Never break/sell bot's own 3–4 Car stack without receiving a color monopoly
+  if (botCarsBefore >= 3 && botCarsAfter < botCarsBefore) {
+    if (!botGainsColorMono) {
+      return {
+        accept: false,
+        score: -400,
+        reason: `${difficultyPrefix}_protects_car_set`,
+      };
+    }
+  }
+
+  // 3. Never gift opponent 3–4 Cars unless bot receives a color monopoly
+  if (fromCarsAfter >= 3 && fromCarsAfter > fromCarsBefore) {
+    if (!botGainsColorMono) {
+      return {
+        accept: false,
+        score: -400,
+        reason: `${difficultyPrefix}_refuses_opponent_car_set`,
+      };
+    }
+  }
+
+  // 4. Never gift opponent 2/2 Energy Utilities (10x) unless bot receives a color monopoly or 3+ Cars
+  if (fromUtilsBefore < 2 && fromUtilsAfter >= 2) {
+    if (!botGainsColorMono && !botGainsStrongCars) {
+      return {
+        accept: false,
+        score: -300,
+        reason: `${difficultyPrefix}_refuses_opponent_utility_set`,
+      };
+    }
+  }
+
+  return null;
 }
 
 function getTileById(game: GameState, id: number): Tile | undefined {
@@ -478,6 +608,56 @@ function evaluateMediumTrade(
     }
   }
 
+  const specialGateResult = evaluateSpecialSetGate(
+    game,
+    ownershipBefore,
+    ownershipAfter,
+    bot.username,
+    fromPlayer.username,
+    botNewMonopolies,
+    "medium"
+  );
+  if (specialGateResult) {
+    return specialGateResult;
+  }
+
+  const botCarsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    bot.username,
+    "car"
+  );
+  const botCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    bot.username,
+    "car"
+  );
+  const fromCarsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromPlayer.username,
+    "car"
+  );
+  const botUtilsBefore = countSpecialTilesFromOwnership(
+    game,
+    ownershipBefore,
+    bot.username,
+    "bonus-property"
+  );
+  const botUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    bot.username,
+    "bonus-property"
+  );
+  const fromUtilsAfter = countSpecialTilesFromOwnership(
+    game,
+    ownershipAfter,
+    fromPlayer.username,
+    "bonus-property"
+  );
+
   let gainedTileValue = 0;
   for (const id of given) {
     const tile = getTileById(game, id);
@@ -510,20 +690,18 @@ function evaluateMediumTrade(
         }
       }
     } else if (tile.type === "car") {
-      const carsAfter = game.board.tiles.filter(
-        (t) => t.type === "car" && ownershipAfter.get(t.id) === bot.username
-      ).length;
-      if (carsAfter >= 2) {
-        multiplier += 0.15;
+      if (botCarsAfter >= 4) {
+        multiplier += 0.45;
+      } else if (botCarsAfter >= 3) {
+        multiplier += 0.3;
+      } else if (botCarsAfter >= 2) {
+        multiplier += 0.18;
       }
     } else if (tile.type === "bonus-property") {
-      const utilsAfter = game.board.tiles.filter(
-        (t) =>
-          t.type === "bonus-property" &&
-          ownershipAfter.get(t.id) === bot.username
-      ).length;
-      if (utilsAfter >= 2) {
-        multiplier += 0.15;
+      if (botUtilsAfter >= 2) {
+        multiplier += 0.35;
+      } else {
+        multiplier += 0.1;
       }
     }
 
@@ -569,6 +747,28 @@ function evaluateMediumTrade(
         ) {
           multiplier += 0.3;
         }
+      }
+    } else if (tile.type === "car") {
+      // Cars scale non-linearly ($25/$50/$100/$200) — never sell cheaply at 1.0x face value
+      multiplier = 1.25;
+      if (botCarsBefore >= 3) {
+        multiplier += 0.45;
+      } else if (botCarsBefore >= 2) {
+        multiplier += 0.25;
+      }
+      if (fromCarsAfter >= 3) {
+        multiplier += 0.55;
+      } else if (fromCarsAfter >= 2) {
+        multiplier += 0.3;
+      }
+    } else if (tile.type === "bonus-property") {
+      // Energy Utilities (4x -> 10x dice) are high-value special tiles
+      multiplier = 1.25;
+      if (botUtilsBefore >= 2) {
+        multiplier += 0.55;
+      }
+      if (fromUtilsAfter >= 2) {
+        multiplier += 0.55;
       }
     }
 
@@ -743,6 +943,20 @@ function evaluateHardTrade(
         reason: "hard_insufficient_cash_to_upgrade_after_mutual_monopoly",
       };
     }
+  }
+
+  // Rule B2: Special-set protection (2/2 Energy Utilities = 10x, 3–4 Cars = $100–$200)
+  const specialGateResult = evaluateSpecialSetGate(
+    game,
+    ownershipBefore,
+    ownershipAfter,
+    bot.username,
+    fromPlayer.username,
+    botNewMonopolies,
+    "hard"
+  );
+  if (specialGateResult) {
+    return specialGateResult;
   }
 
   // Rule C: Liquidity protection

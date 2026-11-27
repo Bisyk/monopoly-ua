@@ -1405,4 +1405,177 @@ test("HARD bots propose and accept 2-for-1 mutual monopoly swaps using a sweeten
   );
 });
 
+test("MEDIUM and HARD bots refuse selling 2/2 Energy Utilities (10x) or completing opponent's pair for cash", () => {
+  for (const difficulty of ["MEDIUM", "HARD"]) {
+    // Case 1: Bot owns BOTH Energy Utilities (13 Ukrnafta + 29 Naftogaz); human offers $300 or even $800 cash
+    const game1 = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 2000 },
+    ]);
+    assignTiles(game1, "bot", [13, 29]);
+
+    for (const offerCash of [300, 600, 800]) {
+      const res = evaluateIncomingTrade(game1, game1.players[0], {
+        from: "human",
+        to: "bot",
+        given: [],
+        received: [13, 29],
+        givenMoney: offerCash,
+        receivedMoney: 0,
+      });
+      assert.equal(
+        res.accept,
+        false,
+        `${difficulty} must refuse selling 2/2 Energy Utilities for $${offerCash} cash (got ${res.reason})`
+      );
+    }
+
+    // Case 2: Human already owns Ukrnafta (13), offers $300 (2x) for bot's Naftogaz (29)
+    const game2 = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 2000 },
+    ]);
+    assignTiles(game2, "human", [13]);
+    assignTiles(game2, "bot", [29]);
+
+    const res2 = evaluateIncomingTrade(game2, game2.players[0], {
+      from: "human",
+      to: "bot",
+      given: [],
+      received: [29],
+      givenMoney: 300,
+      receivedMoney: 0,
+    });
+    assert.equal(
+      res2.accept,
+      false,
+      `${difficulty} must refuse gifting 2nd Energy Utility (10x) for cash (got ${res2.reason})`
+    );
+
+    // Case 3: Single utility at 1.0x face value ($150) is also rejected
+    const game3 = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 2000 },
+    ]);
+    assignTiles(game3, "bot", [13]);
+    const res3 = evaluateIncomingTrade(game3, game3.players[0], {
+      from: "human",
+      to: "bot",
+      given: [],
+      received: [13],
+      givenMoney: 150,
+      receivedMoney: 0,
+    });
+    assert.equal(
+      res3.accept,
+      false,
+      `${difficulty} must refuse selling single Energy Utility at 1.0x face price`
+    );
+  }
+});
+
+test("MEDIUM and HARD bots protect Cars (3-4 car stacks, opponent 3rd/4th car, and 1.0x face-value dumps)", () => {
+  for (const difficulty of ["MEDIUM", "HARD"]) {
+    // Case 1: Bot owns 3 Cars (6, 16, 26); human offers $1200 (2x) cash for all 3 or $400 for 1
+    const game1 = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 2500 },
+    ]);
+    assignTiles(game1, "bot", [6, 16, 26]);
+
+    const resAll = evaluateIncomingTrade(game1, game1.players[0], {
+      from: "human",
+      to: "bot",
+      given: [],
+      received: [6, 16, 26],
+      givenMoney: 1200,
+      receivedMoney: 0,
+    });
+    assert.equal(
+      resAll.accept,
+      false,
+      `${difficulty} must refuse selling 3-car stack for cash`
+    );
+
+    // Case 2: Human already owns 2 Cars (6, 16), offers $400 (2x) for bot's 3rd Car (26)
+    const game2 = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 2000 },
+    ]);
+    assignTiles(game2, "human", [6, 16]);
+    assignTiles(game2, "bot", [26]);
+
+    const res3rd = evaluateIncomingTrade(game2, game2.players[0], {
+      from: "human",
+      to: "bot",
+      given: [],
+      received: [26],
+      givenMoney: 400,
+      receivedMoney: 0,
+    });
+    assert.equal(
+      res3rd.accept,
+      false,
+      `${difficulty} must refuse gifting opponent a 3rd Car for cash`
+    );
+
+    // Case 3: Single Car at 1.0x face value ($200) is also rejected
+    const game3 = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 2000 },
+    ]);
+    assignTiles(game3, "bot", [6]);
+
+    const resFace = evaluateIncomingTrade(game3, game3.players[0], {
+      from: "human",
+      to: "bot",
+      given: [],
+      received: [6],
+      givenMoney: 200,
+      receivedMoney: 0,
+    });
+    assert.equal(
+      resFace.accept,
+      false,
+      `${difficulty} must refuse selling single Car at 1.0x face value`
+    );
+  }
+});
+
+test("Bots DO trade away 2/2 Energy Utilities when receiving a strong color monopoly, and never offer them in cash-raises", () => {
+  const game = createGame([
+    { username: "bot", isBot: true, botDifficulty: "HARD", balance: 40 },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1500 },
+  ]);
+
+  // Bot owns 2/2 Energy Utilities (13, 29) + 2 orange tiles (17, 19); human owns tile 20 (completes orange!)
+  assignTiles(game, "bot", [13, 29, 17, 19]);
+  assignTiles(game, "human", [20]);
+
+  // Pre-mortgage / low-cash offer must NEVER try to sell one of bot's 2/2 Energy Utilities for cash
+  const tile13 = game.board.tiles.find((t) => t.id === 13);
+  assert.equal(
+    findPreMortgageTradeOffer(game, game.players[0], tile13, {
+      isBankruptcyEmergency: false,
+    }),
+    null
+  );
+
+  // Trading 2/2 Energy Utilities in exchange for completing Orange monopoly (+ $150 cash) IS acceptable
+  const swapRes = evaluateIncomingTrade(game, game.players[0], {
+    from: "human",
+    to: "bot",
+    given: [20],
+    received: [13, 29],
+    givenMoney: 150,
+    receivedMoney: 0,
+  });
+  assert.equal(
+    swapRes.accept,
+    true,
+    `expected HARD bot to trade 2/2 Utilities when receiving Orange monopoly + cash, got ${swapRes.reason}`
+  );
+});
+
+
 

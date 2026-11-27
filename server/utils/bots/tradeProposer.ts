@@ -9,6 +9,7 @@ import {
   buildOwnershipMap,
   computeGroupMonopolyPower,
   computePlayerPortfolioValue,
+  countSpecialTilesFromOwnership,
   evaluateIncomingTrade,
   getFullSetsFromOwnership,
 } from "./tradeEvaluator";
@@ -428,8 +429,26 @@ export function findBestTradeProposal(
   const cashRaiseThreshold =
     difficulty === "EASY" ? reserve : Math.max(100, Math.round(reserve * 0.65));
   if (bot.balance < cashRaiseThreshold && botGiveableTiles.length > 0) {
+    const botCarsCount = countSpecialTilesFromOwnership(
+      game,
+      ownershipBefore,
+      bot.username,
+      "car"
+    );
+    const botUtilsCount = countSpecialTilesFromOwnership(
+      game,
+      ownershipBefore,
+      bot.username,
+      "bonus-property"
+    );
     const singletons = botGiveableTiles
       .filter((t) => {
+        if (t.type === "bonus-property") {
+          return botUtilsCount < 2;
+        }
+        if (t.type === "car") {
+          return botCarsCount < 2;
+        }
         if (t.type !== "property" || t.groupId == null) return true;
         const g = game.board.groups.find((gr) => gr.groupId === t.groupId);
         if (!g) return true;
@@ -538,6 +557,35 @@ export function findBestTradeProposal(
 
     const botNewMonos = botFullAfter.filter((g) => !botFullBefore.includes(g));
     const oppNewMonos = oppFullAfter.filter((g) => !oppFullBefore.includes(g));
+
+    // MEDIUM & HARD guard: never propose breaking/gifting special sets (2/2 Energy Utilities or 3-4 Cars)
+    // unless bot receives a color monopoly (or 3+ Cars for utilities)
+    if (difficulty !== "EASY") {
+      const botUtilsB = countSpecialTilesFromOwnership(game, ownershipBefore, bot.username, "bonus-property");
+      const botUtilsA = countSpecialTilesFromOwnership(game, ownershipAfter, bot.username, "bonus-property");
+      const oppUtilsB = countSpecialTilesFromOwnership(game, ownershipBefore, opp.username, "bonus-property");
+      const oppUtilsA = countSpecialTilesFromOwnership(game, ownershipAfter, opp.username, "bonus-property");
+      const botCarsB = countSpecialTilesFromOwnership(game, ownershipBefore, bot.username, "car");
+      const botCarsA = countSpecialTilesFromOwnership(game, ownershipAfter, bot.username, "car");
+      const oppCarsB = countSpecialTilesFromOwnership(game, ownershipBefore, opp.username, "car");
+      const oppCarsA = countSpecialTilesFromOwnership(game, ownershipAfter, opp.username, "car");
+
+      const botGainsColorMono = botNewMonos.length > 0;
+      const botGainsStrongCars = botCarsA >= 3 && botCarsA > botCarsB;
+
+      if (botUtilsB >= 2 && botUtilsA < 2 && !botGainsColorMono && !botGainsStrongCars) {
+        continue;
+      }
+      if (botCarsB >= 3 && botCarsA < botCarsB && !botGainsColorMono) {
+        continue;
+      }
+      if (oppCarsA >= 3 && oppCarsA > oppCarsB && !botGainsColorMono) {
+        continue;
+      }
+      if (oppUtilsB < 2 && oppUtilsA >= 2 && !botGainsColorMono && !botGainsStrongCars) {
+        continue;
+      }
+    }
 
     // MEDIUM & HARD guard: never propose handing opponent a monopoly unless bot gets a comparable/stronger one (cash/sweetener-balanced)
     if (difficulty !== "EASY" && oppNewMonos.length > 0) {
@@ -763,13 +811,30 @@ export function findPreMortgageTradeOffer(
   }
 
   const botFullSets = new Set(getPlayerFullSetGroupIds(game, bot.username));
-  if (
-    tileToMortgage.type === "property" &&
-    tileToMortgage.groupId != null &&
-    botFullSets.has(tileToMortgage.groupId) &&
-    !options.isBankruptcyEmergency
-  ) {
-    return null;
+  if (!options.isBankruptcyEmergency) {
+    if (
+      tileToMortgage.type === "property" &&
+      tileToMortgage.groupId != null &&
+      botFullSets.has(tileToMortgage.groupId)
+    ) {
+      return null;
+    }
+    if (tileToMortgage.type === "bonus-property") {
+      const botUtils = game.board.tiles.filter(
+        (t) => t.type === "bonus-property" && t.owner === bot.username
+      ).length;
+      if (botUtils >= 2) {
+        return null;
+      }
+    }
+    if (tileToMortgage.type === "car") {
+      const botCars = game.board.tiles.filter(
+        (t) => t.type === "car" && t.owner === bot.username
+      ).length;
+      if (botCars >= 3) {
+        return null;
+      }
+    }
   }
 
   const cooldownByTarget = options.cooldownByTarget ?? {};
@@ -832,7 +897,11 @@ export function findPreMortgageTradeOffer(
           t.owner === opp.username
       ).length;
       if (oppCars >= 2) {
-        needFactor = 1.95; // 3rd or 4th car is huge value
+        // Never gift 3rd or 4th car for cash outside literal bankruptcy emergency
+        if (!options.isBankruptcyEmergency) {
+          continue;
+        }
+        needFactor = 2.0;
       } else if (oppCars === 1) {
         needFactor = 1.65;
       }
@@ -844,7 +913,11 @@ export function findPreMortgageTradeOffer(
           t.owner === opp.username
       ).length;
       if (oppUtils >= 1) {
-        needFactor = 1.65;
+        // Never gift 2nd Energy Utility (10x) for cash outside literal bankruptcy emergency
+        if (!options.isBankruptcyEmergency) {
+          continue;
+        }
+        needFactor = 2.0;
       }
     }
 
