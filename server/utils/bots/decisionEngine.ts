@@ -1,27 +1,37 @@
-import type { BotDifficulty, GameState, Player, Tile } from "~/types";
+import type { BotDifficulty, GameState, Player, Tile, Trade } from "~/types";
 import { GAME_RULES } from "~/shared/constants/gameRules";
 import { rollDice } from "~/utils/gameFunctions";
 import { evaluateIncomingTrade } from "./tradeEvaluator";
-import { findBestTradeProposal } from "./tradeProposer";
 import {
+  findBestPreMortgageTradeOffer,
+  findBestTradeProposal,
+  findPreMortgageTradeOffer,
+} from "./tradeProposer";
+import {
+  canSurviveWithoutTile,
   doesTileBlockOpponentSet,
   doesTileCompleteOrBlockSet,
   doesTileCompleteSet,
   evaluateTileStrategicValue,
   findBestUnmortgageTile,
   findBestUpgradeTile,
+  findProactiveMortgageForUpgrade,
+  getActionReserve,
   getAmountOwedForCurrentAction,
+  getBotRiskLevel,
+  getEligibleMortgageTilesForTrade,
+  getForwardBoardRisk,
   getGameStage,
   getLegalLiquidationCandidates,
   getLegalUpgradeCandidates,
-  getMaxOpponentRent,
-  getSafetyReserve,
   getUnownedTileFraction,
   planNextLiquidationAction,
 } from "./valuation";
 
 export interface BotTurnContext {
   proposedTradeThisTurn: boolean;
+  proposedLiquidationTradeThisTurn?: boolean;
+  mortgagedTileIdsThisTurn?: number[];
   turnStepCount: number;
   tradeCooldownByTarget: Record<string, number>;
 }
@@ -45,6 +55,22 @@ export interface BotDecision {
     | "ACCEPT_TRADE"
     | "DECLINE_TRADE";
   payload: Record<string, any>;
+}
+
+function buildTradeDecision(bot: Player, proposal: Trade): BotDecision {
+  return {
+    action: "TRADE",
+    payload: {
+      username: bot.username,
+      tradePlayerUsername: proposal.to,
+      tradeTiles: {
+        given: proposal.given,
+        received: proposal.received,
+        givenMoney: proposal.givenMoney ?? 0,
+        receivedMoney: proposal.receivedMoney ?? 0,
+      },
+    },
+  };
 }
 
 function findActiveBotByUsername(
@@ -96,8 +122,8 @@ export function getActingBot(game: GameState): Player | null {
  * Determinism guarantees:
  * - Incoming trade evaluation (`ACCEPT_TRADE` / `DECLINE_TRADE`) NEVER calls `rng`
  *   across ANY difficulty (`EASY`, `MEDIUM`, `HARD`).
- * - `HARD` NEVER calls `rng` on any strategic decision (only dice rolls are random
- *   via `rollDice()`).
+ * - `HARD` NEVER calls `rng` on any strategic decision (its per-game `botRiskLevel`
+ *   is rolled once at game start; only dice rolls use randomness via `rollDice()`).
  * - `MEDIUM` uses mild noise on non-trade decisions.
  * - `EASY` uses higher randomness on non-trade decisions.
  */
@@ -118,6 +144,9 @@ export function decideBotAction(
   const difficulty: BotDifficulty = bot.botDifficulty ?? "MEDIUM";
   const ctx: BotTurnContext = {
     proposedTradeThisTurn: context?.proposedTradeThisTurn ?? false,
+    proposedLiquidationTradeThisTurn:
+      context?.proposedLiquidationTradeThisTurn ?? false,
+    mortgagedTileIdsThisTurn: context?.mortgagedTileIdsThisTurn ?? [],
     turnStepCount: context?.turnStepCount ?? 0,
     tradeCooldownByTarget: context?.tradeCooldownByTarget ?? {},
   };
@@ -206,12 +235,16 @@ function decideAuctionAction(
   }
 
   let shouldBid = false;
+  const risk = getBotRiskLevel(bot);
 
   if (difficulty === "HARD") {
     const strategicValue = evaluateTileStrategicValue(game, tile, bot.username);
-    const reserve = getSafetyReserve(game, bot, "HARD");
+    const auctionReserve = getActionReserve(game, bot, "HARD", "auction");
     const highPriority = doesTileCompleteOrBlockSet(game, tile, bot.username);
-    const reserveForTile = highPriority ? Math.round(reserve * 0.5) : reserve;
+    // Aggressive bots & set-completing/blocking auctions drop reserve close to $0
+    const reserveForTile = highPriority
+      ? Math.round(auctionReserve * (1 - risk) * 0.4)
+      : auctionReserve;
     const maxBid = Math.min(
       bot.balance - reserveForTile,
       Math.round(strategicValue * 1.15)
@@ -220,9 +253,13 @@ function decideAuctionAction(
   } else if (difficulty === "MEDIUM") {
     const completes = doesTileCompleteSet(game, tile, bot.username);
     const blocks = doesTileBlockOpponentSet(game, tile, bot.username);
-    const mult = completes ? 1.3 : blocks ? 1.18 : 1.05;
+    const mult = completes ? 1.35 : blocks ? 1.25 : 1.08;
     const noise = 0.95 + rng() * 0.15;
-    const reserve = completes ? 60 : getSafetyReserve(game, bot, "MEDIUM");
+    const auctionReserve = getActionReserve(game, bot, "MEDIUM", "auction");
+    const reserve =
+      completes || blocks
+        ? Math.round((1 - risk) * 40)
+        : auctionReserve;
     const maxBid = Math.min(
       bot.balance - reserve,
       Math.round(basePrice * mult * noise)
@@ -254,6 +291,57 @@ function decidePaymentAction(
     if (difficulty === "HARD" || difficulty === "MEDIUM") {
       const plan = planNextLiquidationAction(game, bot);
       if (plan) {
+        // Before mortgaging, scan ALL mortgageable non-set tiles for a "good moment" to offer
+        // up to 2x face price to an opponent who genuinely needs one (instead of mortgaging for 0.5x).
+        // Do not let normal roll-phase trade cooldown block an actual liquidation offer;
+        // `isTradePreviouslyDeclined` and `proposedLiquidationTradeThisTurn` still prevent spam.
+        if (
+          plan.action === "MORTGAGE_PROPERTY" &&
+          !ctx.proposedLiquidationTradeThisTurn
+        ) {
+          const amountNeeded = Math.max(0, owed - bot.balance);
+          const nonSetMortgageables = getEligibleMortgageTilesForTrade(
+            game,
+            bot,
+            false
+          );
+          let preMortgageOffer = findBestPreMortgageTradeOffer(
+            game,
+            bot,
+            nonSetMortgageables,
+            {
+              cooldownByTarget: {},
+              isBankruptcyEmergency: false,
+              amountNeeded,
+            }
+          );
+
+          if (!preMortgageOffer) {
+            const tileToMortgage = game.board.tiles.find(
+              (t) => t.id === plan.propertyId
+            );
+            if (
+              tileToMortgage &&
+              !canSurviveWithoutTile(game, bot, tileToMortgage.id, owed)
+            ) {
+              preMortgageOffer = findPreMortgageTradeOffer(
+                game,
+                bot,
+                tileToMortgage,
+                {
+                  cooldownByTarget: {},
+                  isBankruptcyEmergency: true,
+                  amountNeeded,
+                }
+              );
+            }
+          }
+
+          if (preMortgageOffer && preMortgageOffer.to) {
+            return buildTradeDecision(bot, preMortgageOffer);
+          }
+        }
+
         return {
           action: plan.action,
           payload: { username: bot.username, propertyId: plan.propertyId },
@@ -264,7 +352,9 @@ function decidePaymentAction(
       const candidates = getLegalLiquidationCandidates(game, bot);
       if (candidates.length > 0 && rng() < 0.55) {
         const picked =
-          candidates[Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))];
+          candidates[
+            Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))
+          ];
         return {
           action: picked.action,
           payload: { username: bot.username, propertyId: picked.propertyId },
@@ -329,9 +419,10 @@ function decideBuyAction(
 
   let shouldBuy = false;
   const remainingCash = bot.balance - price;
+  const risk = getBotRiskLevel(bot);
 
   if (difficulty === "HARD") {
-    const reserve = getSafetyReserve(game, bot, "HARD");
+    const buyReserve = getActionReserve(game, bot, "HARD", "buy");
     const stage = getGameStage(game);
     const completesOrBlocks = doesTileCompleteOrBlockSet(
       game,
@@ -342,19 +433,23 @@ function decideBuyAction(
 
     shouldBuy =
       completesOrBlocks ||
-      remainingCash >= Math.round(reserve * 0.7) ||
-      (stage === "early" && remainingCash >= 50) ||
-      (strategicValue >= price * 1.2 && remainingCash >= 80);
+      remainingCash >= buyReserve ||
+      (stage === "early" && remainingCash >= Math.round((1 - risk) * 35)) ||
+      (strategicValue >= price * 1.15 &&
+        remainingCash >= Math.round((1 - risk) * 60));
   } else if (difficulty === "MEDIUM") {
-    const completes = doesTileCompleteSet(game, tile, bot.username);
-    if (completes) {
+    const completesOrBlocks = doesTileCompleteOrBlockSet(
+      game,
+      tile,
+      bot.username
+    );
+    const buyReserve = getActionReserve(game, bot, "MEDIUM", "buy");
+    if (completesOrBlocks || remainingCash >= buyReserve) {
       shouldBuy = true;
-    } else if (remainingCash >= 180) {
-      shouldBuy = true;
-    } else if (remainingCash >= 100) {
-      shouldBuy = rng() < 0.85;
+    } else if (remainingCash >= Math.round((1 - risk) * 80)) {
+      shouldBuy = rng() < 0.8 + risk * 0.15;
     } else {
-      shouldBuy = rng() < 0.2;
+      shouldBuy = rng() < 0.25 + risk * 0.35;
     }
   } else {
     // EASY: ~65% buy when affordable
@@ -374,40 +469,75 @@ function decideRollPhaseAction(
   ctx: BotTurnContext,
   rng: () => number
 ): BotDecision {
+  const risk = getBotRiskLevel(bot);
+
   // --- Pre-roll asset management & proactive trading ---
-  if (ctx.turnStepCount < 6) {
-    // 1. Unmortgage
+  if (ctx.turnStepCount < 8) {
+    const mortgagedThisTurn = ctx.mortgagedTileIdsThisTurn ?? [];
+
+    // 1. Unmortgage blocked FULL-SET tiles first (unlocking building beats everything else)
     if (difficulty === "HARD") {
-      const reserve = getSafetyReserve(game, bot, "HARD");
-      const unmortgageTile = findBestUnmortgageTile(game, bot, reserve);
-      if (unmortgageTile) {
+      const fullSetReserve = getActionReserve(
+        game,
+        bot,
+        "HARD",
+        "unmortgage_full_set"
+      );
+      const unmortgageFullSet = findBestUnmortgageTile(
+        game,
+        bot,
+        fullSetReserve,
+        fullSetReserve,
+        { onlyFullSet: true, excludeTileIds: mortgagedThisTurn }
+      );
+      if (unmortgageFullSet) {
         return {
           action: "BUY_BACK_PROPERTY",
-          payload: { username: bot.username, propertyId: unmortgageTile.id },
+          payload: { username: bot.username, propertyId: unmortgageFullSet.id },
         };
       }
     } else if (difficulty === "MEDIUM") {
-      const unmortgageTile = findBestUnmortgageTile(game, bot, 250);
-      if (unmortgageTile && rng() < 0.85) {
+      const fullSetReserve = getActionReserve(
+        game,
+        bot,
+        "MEDIUM",
+        "unmortgage_full_set"
+      );
+      const unmortgageFullSet = findBestUnmortgageTile(
+        game,
+        bot,
+        fullSetReserve,
+        fullSetReserve,
+        { onlyFullSet: true, excludeTileIds: mortgagedThisTurn }
+      );
+      if (unmortgageFullSet && (risk >= 0.5 || rng() < 0.9)) {
         return {
           action: "BUY_BACK_PROPERTY",
-          payload: { username: bot.username, propertyId: unmortgageTile.id },
+          payload: { username: bot.username, propertyId: unmortgageFullSet.id },
         };
       }
     } else {
-      const unmortgageTile = findBestUnmortgageTile(game, bot, 100);
-      if (unmortgageTile && rng() < 0.25) {
+      const unmortgageFullSet = findBestUnmortgageTile(game, bot, 40, 40, {
+        onlyFullSet: true,
+        excludeTileIds: mortgagedThisTurn,
+      });
+      if (unmortgageFullSet && rng() < 0.25) {
         return {
           action: "BUY_BACK_PROPERTY",
-          payload: { username: bot.username, propertyId: unmortgageTile.id },
+          payload: { username: bot.username, propertyId: unmortgageFullSet.id },
         };
       }
     }
 
-    // 2. Upgrade
+    // 2. Upgrade (risk- & board-aware reserve down to $0, trap-based tile priority)
     if (difficulty === "HARD") {
-      const reserve = getSafetyReserve(game, bot, "HARD");
-      const upgradeTile = findBestUpgradeTile(game, bot, "HARD", reserve);
+      const upgradeReserve = getActionReserve(game, bot, "HARD", "upgrade");
+      const upgradeTile = findBestUpgradeTile(
+        game,
+        bot,
+        "HARD",
+        upgradeReserve
+      );
       if (upgradeTile) {
         return {
           action: "UPGRADE_PROPERTY",
@@ -415,8 +545,14 @@ function decideRollPhaseAction(
         };
       }
     } else if (difficulty === "MEDIUM") {
-      const upgradeTile = findBestUpgradeTile(game, bot, "MEDIUM", 180);
-      if (upgradeTile && rng() < 0.85) {
+      const upgradeReserve = getActionReserve(game, bot, "MEDIUM", "upgrade");
+      const upgradeTile = findBestUpgradeTile(
+        game,
+        bot,
+        "MEDIUM",
+        upgradeReserve
+      );
+      if (upgradeTile && (risk >= 0.6 || rng() < 0.92)) {
         return {
           action: "UPGRADE_PROPERTY",
           payload: { username: bot.username, propertyId: upgradeTile.id },
@@ -426,7 +562,9 @@ function decideRollPhaseAction(
       const candidates = getLegalUpgradeCandidates(game, bot, 50);
       if (candidates.length > 0 && rng() < 0.4) {
         const picked =
-          candidates[Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))];
+          candidates[
+            Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))
+          ];
         return {
           action: "UPGRADE_PROPERTY",
           payload: { username: bot.username, propertyId: picked.id },
@@ -434,13 +572,94 @@ function decideRollPhaseAction(
       }
     }
 
-    // 3. Proactive Trade
+    // 3. Proactive mortgage of weak non-set singletons to fund full-set upgrades
+    //    (preceded by a multi-tile pre-mortgage 1.4x–2.0x offer scan if someone genuinely needs one!)
+    if (difficulty === "HARD" || difficulty === "MEDIUM") {
+      const proactivePlan = findProactiveMortgageForUpgrade(
+        game,
+        bot,
+        difficulty
+      );
+      if (proactivePlan) {
+        if (!ctx.proposedTradeThisTurn && !ctx.proposedLiquidationTradeThisTurn) {
+          const preMortgageOffer = findBestPreMortgageTradeOffer(
+            game,
+            bot,
+            proactivePlan.eligibleTiles,
+            {
+              cooldownByTarget: {},
+              isBankruptcyEmergency: false,
+              amountNeeded: Math.max(0, proactivePlan.upgradePrice - bot.balance),
+            }
+          );
+          if (preMortgageOffer && preMortgageOffer.to) {
+            return buildTradeDecision(bot, preMortgageOffer);
+          }
+        }
+
+        return {
+          action: "MORTGAGE_PROPERTY",
+          payload: {
+            username: bot.username,
+            propertyId: proactivePlan.tileToMortgage.id,
+          },
+        };
+      }
+    }
+
+    // 4. Unmortgage non-set tiles (only when we did NOT proactively mortgage this turn
+    //    and no upgradeable full set needed the cash first)
+    if (mortgagedThisTurn.length === 0) {
+      if (difficulty === "HARD") {
+        const normalReserve = getActionReserve(game, bot, "HARD", "unmortgage");
+        const unmortgageTile = findBestUnmortgageTile(
+          game,
+          bot,
+          normalReserve,
+          normalReserve,
+          { excludeTileIds: mortgagedThisTurn }
+        );
+        if (unmortgageTile) {
+          return {
+            action: "BUY_BACK_PROPERTY",
+            payload: { username: bot.username, propertyId: unmortgageTile.id },
+          };
+        }
+      } else if (difficulty === "MEDIUM") {
+        const normalReserve = getActionReserve(game, bot, "MEDIUM", "unmortgage");
+        const unmortgageTile = findBestUnmortgageTile(
+          game,
+          bot,
+          normalReserve,
+          normalReserve,
+          { excludeTileIds: mortgagedThisTurn }
+        );
+        if (unmortgageTile && (risk >= 0.5 || rng() < 0.9)) {
+          return {
+            action: "BUY_BACK_PROPERTY",
+            payload: { username: bot.username, propertyId: unmortgageTile.id },
+          };
+        }
+      } else {
+        const unmortgageTile = findBestUnmortgageTile(game, bot, 100, 40, {
+          excludeTileIds: mortgagedThisTurn,
+        });
+        if (unmortgageTile && rng() < 0.25) {
+          return {
+            action: "BUY_BACK_PROPERTY",
+            payload: { username: bot.username, propertyId: unmortgageTile.id },
+          };
+        }
+      }
+    }
+
+    // 5. Proactive Trade
     if (!ctx.proposedTradeThisTurn) {
       const shouldTryTrade =
         difficulty === "HARD"
           ? true
           : difficulty === "MEDIUM"
-            ? rng() < 0.8
+            ? rng() < 0.85
             : rng() < 0.25;
 
       if (shouldTryTrade) {
@@ -450,40 +669,38 @@ function decideRollPhaseAction(
           ctx.tradeCooldownByTarget
         );
         if (proposal && proposal.to) {
-          return {
-            action: "TRADE",
-            payload: {
-              username: bot.username,
-              tradePlayerUsername: proposal.to,
-              tradeTiles: {
-                given: proposal.given,
-                received: proposal.received,
-                givenMoney: proposal.givenMoney ?? 0,
-                receivedMoney: proposal.receivedMoney ?? 0,
-              },
-            },
-          };
+          return buildTradeDecision(bot, proposal);
         }
       }
     }
   }
 
-  // --- Jail decision ---
+  // --- Board-aware Jail decision (inspect actual tiles 2..12 steps outside Jail = pos 11) ---
   if (bot.jailed && bot.balance >= GAME_RULES.JAIL_FINE) {
     let shouldPayJail = false;
+    const jailExitRisk = getForwardBoardRisk(game, bot, 11);
 
     if (difficulty === "HARD") {
       const stage = getGameStage(game);
       const unownedFraction = getUnownedTileFraction(game);
-      const { maxRent } = getMaxOpponentRent(game, bot.username);
-      const safeToLeaveJail =
-        unownedFraction >= 0.35 || (stage !== "late" && maxRent < 250);
+      const safeExit =
+        jailExitRisk.maxRentAhead < 250 && jailExitRisk.expectedRentAhead < 45;
+      const juicyUnownedExit =
+        (jailExitRisk.expectedUnownedAhead >= 0.25 || unownedFraction >= 0.35) &&
+        jailExitRisk.maxRentAhead < 300;
+      const minCashAfterFine = Math.round((1 - risk) * 60);
+
       shouldPayJail =
-        safeToLeaveJail && bot.balance - GAME_RULES.JAIL_FINE >= 80;
+        (juicyUnownedExit || (stage !== "late" && safeExit)) &&
+        bot.balance - GAME_RULES.JAIL_FINE >= minCashAfterFine;
     } else if (difficulty === "MEDIUM") {
       const stage = getGameStage(game);
+      const exitNotLethal = jailExitRisk.maxRentAhead < 300;
       shouldPayJail =
-        stage !== "late" && bot.balance >= 200 && rng() < 0.85;
+        stage !== "late" &&
+        exitNotLethal &&
+        bot.balance >= Math.round(180 - risk * 80) &&
+        rng() < 0.85;
     } else {
       shouldPayJail = rng() < 0.5;
     }
@@ -505,3 +722,4 @@ function decideRollPhaseAction(
     },
   };
 }
+

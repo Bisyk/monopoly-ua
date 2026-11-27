@@ -12,6 +12,12 @@ export const sendTrade = (game: GameState, parsedMessage: any) => {
 
   const normalizedGivenMoney = Number(givenMoney) || 0;
   const normalizedReceivedMoney = Number(receivedMoney) || 0;
+  const returnAction =
+    game.currentAction === "payRent" ||
+    game.currentAction === "payTax" ||
+    game.currentAction === "chance"
+      ? game.currentAction
+      : "roll";
 
   game.currentAction = "trade";
   game.activeTrade = {
@@ -21,6 +27,7 @@ export const sendTrade = (game: GameState, parsedMessage: any) => {
     received,
     givenMoney: normalizedGivenMoney,
     receivedMoney: normalizedReceivedMoney,
+    returnAction,
   };
   game.gameLog.push({
     username,

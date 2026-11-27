@@ -51,6 +51,7 @@ export interface Player {
   bonusRoll: boolean;
   isBot?: boolean;
   botDifficulty?: BotDifficulty | null;
+  botRiskLevel?: number | null;
 }
 
 export interface Group {
@@ -136,4 +137,5 @@ export interface Trade {
   received: number[];
   givenMoney: number | null;
   receivedMoney: number | null;
+  returnAction?: string | null;
 }

@@ -31,6 +31,7 @@ export const broadcastGameState = async (
         received: newGameState.activeTrade.received ?? [],
         givenMoney: newGameState.activeTrade.givenMoney ?? 0,
         receivedMoney: newGameState.activeTrade.receivedMoney ?? 0,
+        returnAction: newGameState.activeTrade.returnAction ?? null,
       }
     : {
         from: "",
@@ -39,6 +40,7 @@ export const broadcastGameState = async (
         received: [],
         givenMoney: 0,
         receivedMoney: 0,
+        returnAction: null,
       };
 
   const updatedGame = await prisma.game.update({

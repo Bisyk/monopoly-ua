@@ -2,10 +2,12 @@ import type { BotDifficulty, GameState, Player, Tile, Trade } from "~/types";
 import { isTradePreviouslyDeclined } from "~/shared/utils/tradeSignature";
 import { getPlayerTradableProperties } from "~/utils/getPlayerTradableProperties";
 import {
+  getActionReserve,
   getFullSetGroupIds,
   getGroupStrategicMultiplier,
   getGroupTiles,
   getSafetyReserve,
+  isOpponentLeading,
   isOwnableTile,
 } from "./valuation";
 
@@ -401,6 +403,81 @@ function evaluateMediumTrade(
     getFullSetsFromOwnership(game, ownershipAfter, fromPlayer.username)
   );
 
+  const botNewMonopolies = [...botFullAfter].filter((g) => !botFullBefore.has(g));
+  const botBrokenMonopolies = [...botFullBefore].filter((g) => !botFullAfter.has(g));
+  const fromNewMonopolies = [...fromFullAfter].filter((g) => !fromFullBefore.has(g));
+
+  // Strict monopoly gate (Idea A): MEDIUM bots never break a full set for cash only (even 2x+)
+  if (botBrokenMonopolies.length > 0) {
+    const brokenPower = botBrokenMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+    const newPower = botNewMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+    const netCash = givenMoney - receivedMoney;
+    const gainsComparableSet =
+      botNewMonopolies.length > 0 &&
+      newPower + Math.max(0, netCash) * 1.2 >= brokenPower;
+
+    if (!gainsComparableSet) {
+      return {
+        accept: false,
+        score: -Math.max(100, brokenPower - newPower),
+        reason: "medium_protects_existing_monopoly",
+      };
+    }
+  }
+
+  // Strict monopoly gate (Idea A): MEDIUM bots never sell a set-completing tile for cash only (even 2x+)
+  if (fromNewMonopolies.length > 0) {
+    const fromMonoPower = fromNewMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+    const botMonoPower = botNewMonopolies.reduce(
+      (sum, g) => sum + computeGroupMonopolyPower(game, g),
+      0
+    );
+
+    if (botNewMonopolies.length === 0) {
+      return {
+        accept: false,
+        score: -Math.max(100, fromMonoPower),
+        reason: "medium_refuses_opponent_monopoly",
+      };
+    }
+
+    const netCash = givenMoney - receivedMoney;
+    const extraToBotVal = given.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && botNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const extraToFromVal = received.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && fromNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const effectiveBotPower =
+      botMonoPower + Math.max(0, netCash) * 1.25 + extraToBotVal * 0.9;
+    const effectiveFromPower =
+      fromMonoPower + Math.max(0, -netCash) * 1.1 + extraToFromVal * 0.85;
+    if (effectiveBotPower < effectiveFromPower * 0.85) {
+      return {
+        accept: false,
+        score: Math.round(effectiveBotPower - effectiveFromPower),
+        reason: "medium_opponent_monopoly_stronger",
+      };
+    }
+  }
+
   let gainedTileValue = 0;
   for (const id of given) {
     const tile = getTileById(game, id);
@@ -566,7 +643,9 @@ function evaluateHardTrade(
   );
 
   const safetyReserve = getSafetyReserve(game, bot, "HARD");
+  const tradeReserve = getActionReserve(game, bot, "HARD", "trade");
   const fromSafetyReserve = getSafetyReserve(game, fromPlayer, "HARD");
+  const oppIsLeader = isOpponentLeading(game, bot.username, fromPlayer.username);
 
   // Rule A: Never break an existing full set the bot owns unless getting a strictly superior full set + cash
   if (botBrokenMonopolies.length > 0) {
@@ -592,7 +671,7 @@ function evaluateHardTrade(
     }
   }
 
-  // Rule B: Opponent monopoly gate
+  // Rule B: Opponent monopoly gate (with cash-balanced mutual swaps & leader awareness)
   if (fromNewMonopolies.length > 0) {
     const fromMonoPower = fromNewMonopolies.reduce(
       (sum, g) => sum + computeGroupMonopolyPower(game, g),
@@ -611,18 +690,56 @@ function evaluateHardTrade(
       };
     }
 
-    if (botMonoPower < fromMonoPower * 0.9) {
+    // Allow cash and sweetener properties to balance unequal mutual monopoly swaps
+    const netCashGain = givenMoney - receivedMoney;
+    const extraToBotVal = trade.given.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && botNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const extraToFromVal = trade.received.reduce((sum, id) => {
+      const t = getTileById(game, id);
+      if (!t || (t.type === "property" && t.groupId != null && fromNewMonopolies.includes(t.groupId))) {
+        return sum;
+      }
+      return sum + (t.price ?? 0);
+    }, 0);
+    const effectiveBotPower =
+      botMonoPower + Math.max(0, netCashGain) * 1.35 + extraToBotVal * 0.95;
+    const effectiveFromPower =
+      fromMonoPower + Math.max(0, -netCashGain) * 1.15 + extraToFromVal * 0.9;
+
+    // Do not feed a runaway leader who already holds a monopoly unless clearly winning the swap
+    const oppIsRunawayLeader = oppIsLeader && fromFullBefore.length >= 1;
+    const requiredRatio = oppIsRunawayLeader ? 1.15 : 0.9;
+
+    if (effectiveBotPower < effectiveFromPower * requiredRatio) {
       return {
         accept: false,
-        score: Math.round(botMonoPower - fromMonoPower),
-        reason: "hard_opponent_monopoly_stronger",
+        score: Math.round(effectiveBotPower - effectiveFromPower),
+        reason: oppIsRunawayLeader
+          ? "hard_refuses_feeding_leader"
+          : "hard_opponent_monopoly_stronger",
       };
     }
 
-    if (postBotBalance < safetyReserve) {
+    // Require enough cash to immediately start building houses on the new monopoly
+    const cheapestNewSetUpgrade = Math.min(
+      ...botNewMonopolies.map(
+        (g) =>
+          game.board.groups.find((gr) => gr.groupId === g)?.upgradePrice ?? 100
+      )
+    );
+    const minUpgradeCash = Math.min(
+      safetyReserve,
+      Math.max(100, cheapestNewSetUpgrade)
+    );
+    if (postBotBalance < minUpgradeCash) {
       return {
         accept: false,
-        score: postBotBalance - safetyReserve,
+        score: postBotBalance - minUpgradeCash,
         reason: "hard_insufficient_cash_to_upgrade_after_mutual_monopoly",
       };
     }
@@ -640,8 +757,8 @@ function evaluateHardTrade(
   if (receivedMoney > givenMoney) {
     const minCashAfterSpending =
       botNewMonopolies.length > 0
-        ? Math.min(safetyReserve, Math.max(80, Math.round(safetyReserve * 0.6)))
-        : safetyReserve;
+        ? Math.min(tradeReserve, Math.max(50, Math.round(tradeReserve * 0.45)))
+        : tradeReserve;
 
     if (postBotBalance < minCashAfterSpending) {
       return {
@@ -652,7 +769,7 @@ function evaluateHardTrade(
     }
   }
 
-  // Rule D: Full portfolio strategic delta (bot gain minus weighted opponent strategic gain)
+  // Rule D: Full portfolio strategic delta (bot gain minus leader-aware opponent strategic gain)
   const botPortfolioBefore = computePlayerPortfolioValue(
     game,
     ownershipBefore,
@@ -690,7 +807,14 @@ function evaluateHardTrade(
     postFromBalance -
     (fromPortfolioBefore + fromPlayer.balance);
 
-  const opponentWeight = fromNewMonopolies.length > 0 ? 0.5 : 0.35;
+  const opponentWeight =
+    fromNewMonopolies.length > 0
+      ? oppIsLeader
+        ? 0.65
+        : 0.5
+      : oppIsLeader
+        ? 0.45
+        : 0.35;
   const netScore = Math.round(botDelta - opponentWeight * Math.max(0, fromDelta));
 
   const accept = netScore > 0;

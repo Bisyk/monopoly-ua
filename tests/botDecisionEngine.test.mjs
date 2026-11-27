@@ -5,15 +5,26 @@ import {
   defaultPropertyGroups,
   defaultTiles,
 } from "~/server/constants";
-import { recordDeclinedTrade } from "~/shared/utils/tradeSignature";
 import {
+  isTradePreviouslyDeclined,
+  recordDeclinedTrade,
+} from "~/shared/utils/tradeSignature";
+import { sendTrade } from "~/server/utils/gameActions/sendTrade";
+import { acceptTrade } from "~/server/utils/gameActions/acceptTrade";
+import { declineTrade } from "~/server/utils/gameActions/declineTrade";
+import { mortgageProperty } from "~/server/utils/gameActions/mortgageProperty";
+import {
+  canSurviveWithoutTile,
   decideBotAction,
   evaluateIncomingTrade,
   evaluateTileStrategicValue,
   findBestTradeProposal,
   findBestUnmortgageTile,
   findBestUpgradeTile,
+  findPreMortgageTradeOffer,
+  findProactiveMortgageForUpgrade,
   getActingBot,
+  getActionReserve,
   getAmountOwedForCurrentAction,
   getGameStage,
   getMaxOpponentRent,
@@ -751,20 +762,28 @@ test("tradeProposer does not propose non-tradable mortgaged tiles", () => {
   assert.equal(proposal, null);
 });
 
-test("tradeProposer proposes cash-raising singleton sale when bot is low on cash", () => {
+test("tradeProposer avoids cheap fire-sale on HARD and sells singleton at 1.4x-2.0x when opponent needs it", () => {
   const game = createGame([
     { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 40 },
     { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
   ]);
 
-  assignTiles(game, "bot_hard", [7]); // singleton worth 100
+  assignTiles(game, "bot_hard", [7]); // group 2 singleton worth 100
+  // Human doesn't need group 2 -> HARD refuses cheap 0.9x-1.25x bargain fire-sale
+  assert.equal(findBestTradeProposal(game, game.players[0], {}), null);
+
+  // Give human a matching tile in group 2 (tile 9; tile 10 unowned so not set-completing)
+  assignTiles(game, "human", [9]);
   const proposal = findBestTradeProposal(game, game.players[0], {});
-  assert.ok(proposal, "expected a cash-raising proposal");
+  assert.ok(proposal, "expected a targeted high-value cash-raising proposal");
   assert.equal(proposal.from, "bot_hard");
   assert.equal(proposal.to, "human");
   assert.deepEqual(proposal.given, [7]);
   assert.deepEqual(proposal.received, []);
-  assert.ok((proposal.receivedMoney ?? 0) >= 80);
+  assert.ok(
+    (proposal.receivedMoney ?? 0) >= 140 && (proposal.receivedMoney ?? 0) <= 200,
+    `expected 1.4x-2.0x ask, got ${proposal.receivedMoney}`
+  );
 });
 
 test("planNextLiquidationAction returns null when no legal liquidation exists", () => {
@@ -777,3 +796,613 @@ test("planNextLiquidationAction returns null when no legal liquidation exists", 
   assignTiles(game, "bot_hard", [6]);
   assert.equal(planNextLiquidationAction(game, game.players[0]), null);
 });
+
+// =============================================================================
+// 6. Harder Bot AI: Anti-Stupid Trades, Risk Profiles, Pre-Mortgage 2x Offers,
+//    Board-Aware Tactics (#1-#8)
+// =============================================================================
+
+test("MEDIUM bot rejects selling a full-set-completing tile or breaking own full set even for 2x+ cash", () => {
+  const game = createGame([
+    { username: "human", isBot: false, botDifficulty: null, balance: 2500 },
+    { username: "bot_med", isBot: true, botDifficulty: "MEDIUM", balance: 800 },
+  ]);
+
+  // Human owns 17, 19 (Group 4); bot owns 20 ($200) and full Group 1 (2, 4)
+  assignTiles(game, "human", [17, 19]);
+  assignTiles(game, "bot_med", [20, 2, 4]);
+  const bot = game.players[1];
+
+  // Even 2.5x cash ($500 for $200 tile) cannot buy a completing tile from MEDIUM
+  const cashForOppMono = {
+    from: "human",
+    to: "bot_med",
+    given: [],
+    received: [20],
+    givenMoney: 500,
+    receivedMoney: 0,
+  };
+  const res1 = evaluateIncomingTrade(game, bot, cashForOppMono);
+  assert.equal(res1.accept, false);
+  assert.equal(res1.reason, "medium_refuses_opponent_monopoly");
+
+  // Even 3x cash ($180 for $60 tile) cannot break MEDIUM's existing full set
+  const cashToBreakOwnSet = {
+    from: "human",
+    to: "bot_med",
+    given: [],
+    received: [2],
+    givenMoney: 180,
+    receivedMoney: 0,
+  };
+  const res2 = evaluateIncomingTrade(game, bot, cashToBreakOwnSet);
+  assert.equal(res2.accept, false);
+  assert.equal(res2.reason, "medium_protects_existing_monopoly");
+});
+
+test("MEDIUM and HARD bots do not propose cash-only trades to buy a set-completing tile", () => {
+  for (const difficulty of ["MEDIUM", "HARD"]) {
+    const game = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 1500 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+    ]);
+
+    // Bot owns 17, 19 (no extra tiles to swap); human owns 20
+    assignTiles(game, "bot", [17, 19]);
+    assignTiles(game, "human", [20]);
+
+    const proposal = findBestTradeProposal(game, game.players[0], {});
+    assert.equal(
+      proposal,
+      null,
+      `${difficulty} bot must not propose cash-only offer for a completing tile`
+    );
+  }
+});
+
+test("Risky bot spends down to $0 on upgrades while cautious bot preserves buffer before enemy monopoly", () => {
+  const riskyGame = createGame([
+    {
+      username: "bot_risky",
+      isBot: true,
+      botDifficulty: "HARD",
+      botRiskLevel: 0.95,
+      position: 35, // close to passing GO!
+      balance: 100, // exact cost of 1 Group 4 house
+    },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+  ]);
+  assignTiles(riskyGame, "bot_risky", [17, 19, 20]);
+
+  const riskyDecision = decideBotAction(
+    riskyGame,
+    riskyGame.players[0],
+    { proposedTradeThisTurn: true, turnStepCount: 0, tradeCooldownByTarget: {} },
+    forbiddenRng
+  );
+  assert.equal(riskyDecision?.action, "UPGRADE_PROPERTY");
+
+  const cautiousGame = createGame([
+    {
+      username: "bot_safe",
+      isBot: true,
+      botDifficulty: "HARD",
+      botRiskLevel: 0.05,
+      position: 12, // directly upstream from human's upgraded Group 4 (17, 19, 20)
+      balance: 120,
+    },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+  ]);
+  assignTiles(cautiousGame, "bot_safe", [2, 4]); // upgradePrice 50
+  assignTiles(cautiousGame, "human", [17, 19, 20], { rentLevel: 3 });
+
+  const cautiousReserve = getActionReserve(
+    cautiousGame,
+    cautiousGame.players[0],
+    "HARD",
+    "upgrade"
+  );
+  assert.ok(cautiousReserve >= 100, `expected cautious reserve >= 100, got ${cautiousReserve}`);
+  const cautiousDecision = decideBotAction(
+    cautiousGame,
+    cautiousGame.players[0],
+    { proposedTradeThisTurn: true, turnStepCount: 0, tradeCooldownByTarget: {} },
+    forbiddenRng
+  );
+  assert.equal(cautiousDecision?.action, "ROLL_DICE");
+});
+
+test("HARD bot proactively mortgages weak singleton to fund houses on a full set", () => {
+  const game = createGame([
+    {
+      username: "bot_hard",
+      isBot: true,
+      botDifficulty: "HARD",
+      botRiskLevel: 0.85,
+      position: 1,
+      balance: 60, // needs $100 for Group 4 house; tile 7 mortgages for $50 -> $110
+    },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+  ]);
+
+  assignTiles(game, "bot_hard", [17, 19, 20, 7]);
+  const plan = findProactiveMortgageForUpgrade(game, game.players[0], "HARD");
+  assert.ok(plan, "expected proactive mortgage plan");
+  assert.equal(plan.tileToMortgage.id, 7);
+
+  const decision = decideBotAction(
+    game,
+    game.players[0],
+    { proposedTradeThisTurn: true, turnStepCount: 0, tradeCooldownByTarget: {} },
+    forbiddenRng
+  );
+  assert.deepEqual(decision, {
+    action: "MORTGAGE_PROPERTY",
+    payload: { username: "bot_hard", propertyId: 7 },
+  });
+});
+
+test("Pre-mortgage nice offer triggers before reactive debt mortgage (up to 2x max) and restores payRent cleanly", () => {
+  const game = createGame([
+    {
+      username: "bot_hard",
+      isBot: true,
+      botDifficulty: "HARD",
+      position: 40,
+      balance: 50,
+    },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1500 },
+  ]);
+
+  // Human owns tile 40 (rent 200) and tile 17 (1 of 3 in Group 4)
+  assignTiles(game, "human", [38, 40], { rentLevel: 1 });
+  assignTiles(game, "human", [17]);
+  // Bot owns singleton tile 19 ($180, Group 4 — advances human 1->2 of 3, does NOT complete set!)
+  assignTiles(game, "bot_hard", [19]);
+
+  game.currentTurn = "bot_hard";
+  game.currentAction = "payRent";
+
+  // Step 1: Instead of mortgaging tile 19 for $90, bot makes a nice offer (up to 2x = $360) to human!
+  const step1 = decideBotAction(
+    game,
+    game.players[0],
+    {
+      proposedTradeThisTurn: false,
+      proposedLiquidationTradeThisTurn: false,
+      turnStepCount: 0,
+      tradeCooldownByTarget: {},
+    },
+    forbiddenRng
+  );
+  assert.equal(step1?.action, "TRADE");
+  assert.equal(step1?.payload.tradePlayerUsername, "human");
+  assert.deepEqual(step1?.payload.tradeTiles.given, [19]);
+  assert.ok(
+    step1.payload.tradeTiles.receivedMoney >= 250 &&
+      step1.payload.tradeTiles.receivedMoney <= 360,
+    `expected ask between 1.4x and 2.0x ($250..$360), got ${step1.payload.tradeTiles.receivedMoney}`
+  );
+
+  // Apply sendTrade -> switches to trade and records returnAction = "payRent"
+  sendTrade(game, step1);
+  assert.equal(game.currentAction, "trade");
+  assert.equal(game.activeTrade?.returnAction, "payRent");
+
+  // Branch A: If human declines, game resumes payRent and bot falls back to mortgaging tile 19
+  const declineClone = structuredClone(game);
+  declineTrade(declineClone);
+  assert.equal(declineClone.currentAction, "payRent");
+  const afterDecline = decideBotAction(
+    declineClone,
+    declineClone.players[0],
+    {
+      proposedTradeThisTurn: false,
+      proposedLiquidationTradeThisTurn: true,
+      turnStepCount: 1,
+      tradeCooldownByTarget: { human: 3 },
+    },
+    forbiddenRng
+  );
+  assert.deepEqual(afterDecline, {
+    action: "MORTGAGE_PROPERTY",
+    payload: { username: "bot_hard", propertyId: 19 },
+  });
+
+  // Branch B: If human accepts, game resumes payRent and bot pays rent directly without mortgaging!
+  acceptTrade(game);
+  assert.equal(game.currentAction, "payRent");
+  assert.ok(game.players[0].balance >= 200);
+  const afterAccept = decideBotAction(
+    game,
+    game.players[0],
+    {
+      proposedTradeThisTurn: false,
+      proposedLiquidationTradeThisTurn: true,
+      turnStepCount: 1,
+      tradeCooldownByTarget: { human: 3 },
+    },
+    forbiddenRng
+  );
+  assert.equal(afterAccept?.action, "PAY_RENT");
+});
+
+test("Pre-mortgage offer refuses to sell a set-completing tile unless literal bankruptcy emergency", () => {
+  const game = createGame([
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 50 },
+    { username: "human", isBot: false, botDifficulty: null, balance: 2000 },
+  ]);
+
+  // Human owns 17, 19 -> tile 20 ($200) completes human's Orange full set!
+  assignTiles(game, "human", [17, 19]);
+  // Bot owns 20 ($200) + 32 ($300, mortgage 150)
+  assignTiles(game, "bot_hard", [20, 32]);
+  const tile20 = game.board.tiles.find((t) => t.id === 20);
+
+  // Bot can survive $150 debt via tile 32 alone -> NOT bankruptcy emergency -> refuses selling tile 20!
+  assert.equal(canSurviveWithoutTile(game, game.players[0], 20, 150), true);
+  assert.equal(
+    findPreMortgageTradeOffer(game, game.players[0], tile20, {
+      isBankruptcyEmergency: false,
+    }),
+    null
+  );
+
+  // Bot owes $350 (50 + 150 = 200 < 350) -> literal bankruptcy emergency -> offers tile 20 at 2x ($400)!
+  assert.equal(canSurviveWithoutTile(game, game.players[0], 20, 350), false);
+  const emergencyOffer = findPreMortgageTradeOffer(
+    game,
+    game.players[0],
+    tile20,
+    { isBankruptcyEmergency: true, amountNeeded: 300 }
+  );
+  assert.ok(emergencyOffer);
+  assert.equal(emergencyOffer.receivedMoney, 400);
+});
+
+test("Full-set unmortgaging unlocks blocked monopolies with minimal cash floor (#1)", () => {
+  const game = createGame([
+    {
+      username: "bot_hard",
+      isBot: true,
+      botDifficulty: "HARD",
+      botRiskLevel: 0.7,
+      balance: 140, // buyback for tile 17 ($180) is 108 -> leaves $32 (well below normal safetyReserve!)
+    },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
+  ]);
+  assignTiles(game, "bot_hard", [17, 19, 20]);
+  game.board.tiles.find((t) => t.id === 17).mortgaged = true;
+
+  const decision = decideBotAction(
+    game,
+    game.players[0],
+    { proposedTradeThisTurn: true, turnStepCount: 0, tradeCooldownByTarget: {} },
+    forbiddenRng
+  );
+  assert.deepEqual(decision, {
+    action: "BUY_BACK_PROPERTY",
+    payload: { username: "bot_hard", propertyId: 17 },
+  });
+});
+
+test("HARD bot accepts cash-balanced mutual monopoly swap (#2) and refuses feeding runaway leader (#4)", () => {
+  // Cash-balanced mutual swap: Bot gets Group 3 (weaker) vs Human getting Group 4 (stronger)
+  const swapGame = createGame([
+    { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 400 },
+  ]);
+  assignTiles(swapGame, "bot_hard", [12, 14, 20]);
+  assignTiles(swapGame, "human", [17, 19, 15]);
+
+  // Without cash, Group 3 is weaker than Group 4 -> refused
+  const unbalancedSwap = {
+    from: "human",
+    to: "bot_hard",
+    given: [15],
+    received: [20],
+    givenMoney: 0,
+    receivedMoney: 0,
+  };
+  assert.equal(
+    evaluateIncomingTrade(swapGame, swapGame.players[1], unbalancedSwap).accept,
+    false
+  );
+
+  // With $300 cash to balance monopoly power & rush houses -> accepted!
+  const balancedSwap = {
+    from: "human",
+    to: "bot_hard",
+    given: [15],
+    received: [20],
+    givenMoney: 300,
+    receivedMoney: 0,
+  };
+  assert.equal(
+    evaluateIncomingTrade(swapGame, swapGame.players[1], balancedSwap).accept,
+    true
+  );
+
+  // Leader-aware guard: Human is already runaway leader with full Group 5 + huge cash
+  const leaderGame = createGame([
+    { username: "human", isBot: false, botDifficulty: null, balance: 2500 },
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 500 },
+  ]);
+  assignTiles(leaderGame, "human", [22, 24, 25, 17, 19, 15]);
+  assignTiles(leaderGame, "bot_hard", [12, 14, 20]);
+
+  // Roughly equal Group 3 vs Group 4 swap feeds the leader a 2nd monopoly -> refused!
+  const feedLeaderTrade = {
+    from: "human",
+    to: "bot_hard",
+    given: [15],
+    received: [20],
+    givenMoney: 0,
+    receivedMoney: 0,
+  };
+  const leaderRes = evaluateIncomingTrade(
+    leaderGame,
+    leaderGame.players[1],
+    feedLeaderTrade
+  );
+  assert.equal(leaderRes.accept, false);
+  assert.equal(leaderRes.reason, "hard_refuses_feeding_leader");
+});
+
+test("Board-aware jail stays in jail when opponent has houses right outside jail (#5)", () => {
+  const game = createGame([
+    {
+      username: "bot_hard",
+      isBot: true,
+      botDifficulty: "HARD",
+      jailed: true,
+      turnsInJail: 3,
+      position: 11,
+      balance: 700,
+    },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
+  ]);
+
+  // Mid-game: opponent has 3 houses on Group 4 (tiles 17, 19, 20 — prime 6, 8, 9 roll outside jail!)
+  assignTiles(game, "human", [17, 19, 20], { rentLevel: 3 });
+
+  const decision = decideBotAction(
+    game,
+    game.players[0],
+    { proposedTradeThisTurn: true, turnStepCount: 0, tradeCooldownByTarget: {} },
+    forbiddenRng
+  );
+  assert.equal(decision?.action, "ROLL_DICE");
+});
+
+test("Trap-based upgrading prioritizes monopoly where opponent is 7 steps upstream (#6)", () => {
+  const game = createGame([
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 1000 },
+    {
+      username: "human",
+      isBot: false,
+      botDifficulty: null,
+      position: 5, // 7 steps upstream of tile 12 (Group 3) — nowhere near Group 4 (17, 19, 20)!
+      balance: 1000,
+    },
+  ]);
+
+  // Bot owns both Group 3 (12, 14, 15, mult 1.2) and Group 4 (17, 19, 20, mult 1.35)
+  assignTiles(game, "bot_hard", [12, 14, 15, 17, 19, 20]);
+  // Without trap awareness, Group 4 (mult 1.35) beats Group 3 (mult 1.2).
+  // With human sitting at pos 5 (2d6 landing directly onto 12, 14, 15!), Group 3 wins!
+  const chosen = findBestUpgradeTile(game, game.players[0], "HARD", 0);
+  assert.ok(chosen);
+  assert.ok(
+    [12, 14, 15].includes(chosen.id),
+    `expected trap upgrade on Group 3 (12/14/15), got tile ${chosen.id}`
+  );
+});
+
+test("2-for-1 trade proposal adds cash sweetener when two cheap singletons fall short (#7)", () => {
+  const game = createGame([
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 1000 },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+  ]);
+
+  // Bot owns 32, 33 (Group 7, $300 each) + two cheap singletons 2 ($60) and 7 ($100)
+  // Human owns 35 ($320, completes Group 7)
+  assignTiles(game, "bot_hard", [32, 33, 2, 7]);
+  assignTiles(game, "human", [35]);
+
+  const proposal = findBestTradeProposal(game, game.players[0], {});
+  assert.ok(proposal, "expected a swap proposal for tile 35");
+  assert.deepEqual(proposal.received, [35]);
+  assert.ok(proposal.given.length >= 1, "must include property in swap, not pure cash");
+  assert.ok((proposal.givenMoney ?? 0) > 0, "should add cash sweetener to bridge value gap");
+});
+
+test("Threat-aware liquidation sells houses from cold set and keeps houses where opponent is approaching (#8)", () => {
+  const game = createGame([
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 0 },
+    {
+      username: "human",
+      isBot: false,
+      botDifficulty: null,
+      position: 5, // right behind Group 3 (12, 14, 15)!
+      balance: 1000,
+    },
+  ]);
+
+  // Bot owns upgraded Group 3 (12, 14, 15 @ level 2) and upgraded Group 4 (17, 19, 20 @ level 2)
+  // Normally Group 3 (mult 1.2) is sold before Group 4 (mult 1.35),
+  // but human is right behind Group 3 -> keep Group 3 houses and sell from cold Group 4!
+  assignTiles(game, "bot_hard", [12, 14, 15, 17, 19, 20], { rentLevel: 2 });
+
+  const plan = planNextLiquidationAction(game, game.players[0]);
+  assert.ok(plan);
+  assert.equal(plan.action, "SELL_PROPERTY");
+  assert.ok(
+    [17, 19, 20].includes(plan.propertyId),
+    `expected selling from cold Group 4 (17/19/20), got tile ${plan.propertyId}`
+  );
+});
+
+test("Proactive 2-step mortgage to upgrade never ping-pongs by unmortgaging the same tile", () => {
+  const game = createGame(
+    [
+      {
+        username: "bot_wild",
+        isBot: true,
+        botDifficulty: "HARD",
+        botRiskLevel: 0.9,
+        balance: 85,
+      },
+      { username: "human", isBot: false, botDifficulty: null, balance: 900 },
+    ],
+    { currentTurn: "bot_wild", currentAction: "roll" }
+  );
+
+  // Full red set (group 5: upgradePrice = 150) + two weak singletons (tile 7 mp=50, tile 2 mp=30)
+  assignTiles(game, "bot_wild", [22, 24, 25, 7, 2]);
+  const bot = game.players[0];
+
+  const ctx = {
+    proposedTradeThisTurn: false,
+    proposedLiquidationTradeThisTurn: false,
+    mortgagedTileIdsThisTurn: [],
+    turnStepCount: 0,
+    tradeCooldownByTarget: {},
+  };
+
+  // Step 1: mortgage first weak singleton (+30 or +50)
+  const d1 = decideBotAction(game, bot, ctx);
+  assert.equal(d1?.action, "MORTGAGE_PROPERTY");
+  mortgageProperty(game, bot, d1);
+  ctx.mortgagedTileIdsThisTurn.push(d1.payload.propertyId);
+  ctx.turnStepCount += 1;
+
+  // Step 2: MUST mortgage second singleton (NOT BUY_BACK_PROPERTY!)
+  const d2 = decideBotAction(game, bot, ctx);
+  assert.equal(
+    d2?.action,
+    "MORTGAGE_PROPERTY",
+    `expected 2nd MORTGAGE_PROPERTY instead of ping-pong, got ${d2?.action}`
+  );
+  mortgageProperty(game, bot, d2);
+  ctx.mortgagedTileIdsThisTurn.push(d2.payload.propertyId);
+  ctx.turnStepCount += 1;
+
+  // Step 3: Now has $85 + $30 + $50 = $165 >= $150 -> MUST UPGRADE_PROPERTY!
+  const d3 = decideBotAction(game, bot, ctx);
+  assert.equal(d3?.action, "UPGRADE_PROPERTY");
+  assert.ok([22, 24, 25].includes(d3?.payload.propertyId));
+});
+
+test("Declined-trade memory survives unrelated mortgages, upgrades, and 3rd-party buys", () => {
+  const game = createGame([
+    { username: "bot_hard", isBot: true, botDifficulty: "HARD", balance: 1000 },
+    { username: "human", isBot: false, botDifficulty: null, balance: 1000 },
+    { username: "third", isBot: true, botDifficulty: "HARD", balance: 1000 },
+  ]);
+
+  assignTiles(game, "bot_hard", [4, 14]);
+  assignTiles(game, "human", [25]);
+  assignTiles(game, "third", [2, 17, 19, 20]);
+
+  const offer = {
+    from: "bot_hard",
+    to: "human",
+    given: [4, 14],
+    received: [25],
+    givenMoney: 0,
+    receivedMoney: 0,
+  };
+  recordDeclinedTrade(game, offer);
+  assert.equal(isTradePreviouslyDeclined(game, offer), true);
+
+  // Unrelated mortgage + upgrade + 3rd party buying unrelated tile 32 must NOT clear declined memory
+  game.board.tiles.find((t) => t.id === 2).mortgaged = true;
+  game.board.tiles.find((t) => t.id === 17).rentLevel = 2;
+  assignTiles(game, "third", [32]);
+  assert.equal(
+    isTradePreviouslyDeclined(game, offer),
+    true,
+    "unrelated board changes must not re-enable rejected trade spam"
+  );
+
+  // Changing ownership in an involved group (group 5 tile 22 bought by bot_hard) DOES refresh it
+  assignTiles(game, "bot_hard", [22]);
+  assert.equal(
+    isTradePreviouslyDeclined(game, offer),
+    false,
+    "acquiring a tile in involved group should refresh trade eligibility"
+  );
+});
+
+test("Debt pre-mortgage scan checks ALL mortgageable non-set tiles and ignores normal trade cooldown", () => {
+  const game = createGame(
+    [
+      {
+        username: "bot_hard",
+        isBot: true,
+        botDifficulty: "HARD",
+        position: 22,
+        balance: 20,
+      },
+      { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
+    ],
+    { currentTurn: "bot_hard", currentAction: "payRent" }
+  );
+
+  // Human owns tile 22 (rent > $20) AND tile 17 (orange, group 4)
+  // Bot owns ATB (tile 2, $60 - unwanted, ranked #1 for mortgage) AND tile 19 (orange, $180 - human wants!)
+  assignTiles(game, "human", [22, 17]);
+  game.board.tiles.find((t) => t.id === 22).rentLevel = 1; // rent $90
+  assignTiles(game, "bot_hard", [2, 19]);
+
+  // Even when human is on normal trade cooldown (3), debt pre-mortgage scan finds tile 19 for 1.4x-2.0x!
+  const decision = decideBotAction(game, game.players[0], {
+    proposedTradeThisTurn: true,
+    proposedLiquidationTradeThisTurn: false,
+    mortgagedTileIdsThisTurn: [],
+    turnStepCount: 0,
+    tradeCooldownByTarget: { human: 3 },
+  });
+
+  assert.equal(decision?.action, "TRADE");
+  assert.equal(decision?.payload.tradePlayerUsername, "human");
+  assert.deepEqual(decision?.payload.tradeTiles.given, [19]);
+  assert.ok(
+    decision?.payload.tradeTiles.receivedMoney >= 250 &&
+      decision?.payload.tradeTiles.receivedMoney <= 360,
+    `expected 1.4x-2.0x ask on $180 tile, got ${decision?.payload.tradeTiles.receivedMoney}`
+  );
+});
+
+test("HARD bots propose and accept 2-for-1 mutual monopoly swaps using a sweetener tile", () => {
+  const game = createGame(
+    [
+      { username: "bot_a", isBot: true, botDifficulty: "HARD", balance: 250 },
+      { username: "bot_b", isBot: true, botDifficulty: "HARD", balance: 400 },
+    ],
+    { currentTurn: "bot_a", currentAction: "roll" }
+  );
+
+  // bot_a wants tile 20 to complete Group 4 (orange, power 1021)
+  // bot_b wants tile 15 to complete Group 3 (pink, power 634)
+  // bot_a only has $250 cash (cannot afford a big cash sweetener while keeping upgrade cash),
+  // BUT bot_a owns tile 32 ($300 green singleton) which bridges the monopoly power gap!
+  assignTiles(game, "bot_a", [17, 19, 15, 32]);
+  assignTiles(game, "bot_b", [12, 14, 20]);
+
+  const proposal = findBestTradeProposal(game, game.players[0], {});
+  assert.ok(proposal, "expected a mutual monopoly swap proposal");
+  assert.equal(proposal.to, "bot_b");
+  assert.deepEqual(proposal.received, [20]);
+  assert.ok(proposal.given.includes(15), "must give bot_b its completing tile 15");
+
+  const evalB = evaluateIncomingTrade(game, game.players[1], proposal);
+  assert.equal(
+    evalB.accept,
+    true,
+    `expected bot_b to accept balanced 2-for-1 mutual swap, got ${evalB.reason}`
+  );
+});
+
+

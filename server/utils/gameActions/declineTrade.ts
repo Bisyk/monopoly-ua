@@ -10,6 +10,8 @@ export const declineTrade = (game: GameState) => {
     });
   }
 
+  const returnAction = game.activeTrade?.returnAction || "roll";
+
   game.activeTrade = {
     from: "",
     to: "",
@@ -17,7 +19,8 @@ export const declineTrade = (game: GameState) => {
     received: [],
     givenMoney: 0,
     receivedMoney: 0,
+    returnAction: null,
   };
-  game.currentAction = "roll";
+  game.currentAction = returnAction;
   return;
 };

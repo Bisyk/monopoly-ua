@@ -60,6 +60,8 @@ interface RoomRunnerState {
   lastTurnOwner: string;
   turnCounter: number;
   proposedTradeThisTurn: boolean;
+  proposedLiquidationTradeThisTurn: boolean;
+  mortgagedTileIdsThisTurn: number[];
   turnStepCount: number;
   tradeCooldownByBotAndTarget: Record<string, Record<string, number>>;
 }
@@ -76,6 +78,8 @@ function getOrCreateRoomState(roomId: string): RoomRunnerState {
       lastTurnOwner: "",
       turnCounter: 0,
       proposedTradeThisTurn: false,
+      proposedLiquidationTradeThisTurn: false,
+      mortgagedTileIdsThisTurn: [],
       turnStepCount: 0,
       tradeCooldownByBotAndTarget: {},
     };
@@ -381,12 +385,20 @@ async function runBotStep(roomId: string): Promise<void> {
       state.lastTurnOwner = game.currentTurn;
       state.turnKey = `${game.currentTurn}:${state.turnCounter}`;
       state.proposedTradeThisTurn = false;
+      state.proposedLiquidationTradeThisTurn = false;
+      state.mortgagedTileIdsThisTurn = [];
       state.turnStepCount = 0;
       decrementBotCooldowns(state, actingBot.username);
     }
 
     const context: BotTurnContext = {
       proposedTradeThisTurn: isOwnTurn ? state.proposedTradeThisTurn : false,
+      proposedLiquidationTradeThisTurn: isOwnTurn
+        ? state.proposedLiquidationTradeThisTurn
+        : false,
+      mortgagedTileIdsThisTurn: isOwnTurn
+        ? [...state.mortgagedTileIdsThisTurn]
+        : [],
       turnStepCount: isOwnTurn ? state.turnStepCount : 0,
       tradeCooldownByTarget: {
         ...(state.tradeCooldownByBotAndTarget[actingBot.username] ?? {}),
@@ -399,6 +411,7 @@ async function runBotStep(roomId: string): Promise<void> {
     }
 
     const beforeTurn = game.currentTurn;
+    const beforeAction = game.currentAction;
     const beforeSnapshot = JSON.stringify(game);
 
     const { lastMove, lastRoll } = applyGameActionWithEvents(game, decision);
@@ -410,9 +423,23 @@ async function runBotStep(roomId: string): Promise<void> {
       return;
     }
 
+    if (isOwnTurn && decision.action === "MORTGAGE_PROPERTY") {
+      const mortgagedId = Number(decision.payload?.propertyId);
+      if (
+        Number.isFinite(mortgagedId) &&
+        !state.mortgagedTileIdsThisTurn.includes(mortgagedId)
+      ) {
+        state.mortgagedTileIdsThisTurn.push(mortgagedId);
+      }
+    }
+
     if (decision.action === "TRADE") {
       if (isOwnTurn) {
-        state.proposedTradeThisTurn = true;
+        if (beforeAction === "roll") {
+          state.proposedTradeThisTurn = true;
+        } else {
+          state.proposedLiquidationTradeThisTurn = true;
+        }
       }
       const targetUsername = decision.payload?.tradePlayerUsername;
       if (typeof targetUsername === "string" && targetUsername.length > 0) {
@@ -430,11 +457,15 @@ async function runBotStep(roomId: string): Promise<void> {
 
     if (isOwnTurn && decision.action === "ROLL_DICE") {
       state.turnStepCount = 0;
+      state.proposedLiquidationTradeThisTurn = false;
+      state.mortgagedTileIdsThisTurn = [];
     }
 
     if (game.currentTurn !== beforeTurn) {
       state.lastTurnOwner = "";
       state.proposedTradeThisTurn = false;
+      state.proposedLiquidationTradeThisTurn = false;
+      state.mortgagedTileIdsThisTurn = [];
       state.turnStepCount = 0;
     }
 

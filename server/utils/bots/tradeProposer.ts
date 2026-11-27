@@ -13,12 +13,14 @@ import {
   getFullSetsFromOwnership,
 } from "./tradeEvaluator";
 import {
+  doesTileCompleteSet,
   evaluateTileStrategicValue,
   getFullSetGroupIds,
   getGroupStrategicMultiplier,
   getGroupTiles,
   getPlayerFullSetGroupIds,
   getSafetyReserve,
+  isOpponentLeading,
 } from "./valuation";
 
 interface RankedProposal {
@@ -193,15 +195,18 @@ export function findBestTradeProposal(
       );
 
       // (a) Cash-only offer
-      if (surplusCash >= wantedPrice) {
+      // MEDIUM/HARD do not spam cash-only offers trying to buy a completing tile for a full set;
+      // they must negotiate real property swaps / mutual sets instead.
+      const allowCashOnlyOffer = difficulty === "EASY" || !isCompleting;
+      if (allowCashOnlyOffer && surplusCash >= wantedPrice) {
         const cashOfferRaw =
           difficulty === "EASY"
             ? wantedPrice * 1.1
             : difficulty === "MEDIUM"
-              ? Math.max(wantedPrice * 1.25, wantedValOpp * 1.05)
+              ? Math.max(wantedPrice * 1.2, wantedValOpp * 1.05)
               : Math.min(
                   wantedValBot * 0.85,
-                  Math.max(wantedPrice * 1.25, wantedValOpp * 1.1)
+                  Math.max(wantedPrice * 1.2, wantedValOpp * 1.08)
                 );
 
         const cashOffer = roundToTen(
@@ -225,7 +230,7 @@ export function findBestTradeProposal(
         (t) => !(t.type === "property" && t.groupId === group.groupId)
       );
 
-      // (b) 1-for-1 tile swap (+ optional cash sweetener / cash request)
+      // (b) 1-for-1 tile swap (+ smart cash balancing for mutual-set swaps)
       for (const giveTile of eligibleGiveTiles) {
         const givePrice = giveTile.price ?? 100;
         const giveValOpp = evaluateTileStrategicValue(
@@ -237,20 +242,48 @@ export function findBestTradeProposal(
         let givenMoney = 0;
         let receivedMoney = 0;
 
-        const targetBaseNeed = Math.max(wantedPrice, wantedValOpp);
-        if (giveValOpp < targetBaseNeed) {
-          const gap = roundToTen((targetBaseNeed - giveValOpp) * 1.05);
-          if (gap > 0 && gap <= surplusCash) {
-            givenMoney = gap;
+        const isMutualMonopolySwap =
+          isCompleting &&
+          giveTile.type === "property" &&
+          giveTile.groupId != null &&
+          doesTileCompleteSet(game, giveTile, opp.username);
+
+        if (isMutualMonopolySwap && difficulty !== "EASY") {
+          const botSetPower = computeGroupMonopolyPower(game, group.groupId);
+          const oppSetPower = computeGroupMonopolyPower(game, giveTile.groupId!);
+          const powerDiff = botSetPower - oppSetPower;
+
+          if (powerDiff > 40) {
+            // Bot is getting the stronger set: offer cash sweetener to make swap realistic
+            const sweetener = roundToTen(Math.min(surplusCash, powerDiff * 0.55));
+            if (sweetener > 0) {
+              givenMoney = sweetener;
+            }
+          } else if (powerDiff < -40 && opp.balance >= 160) {
+            // Opponent is getting the stronger set: ask for cash to rush houses on our set
+            const ask = roundToTen(
+              Math.min(opp.balance - 100, Math.abs(powerDiff) * 0.65)
+            );
+            if (ask >= 40) {
+              receivedMoney = ask;
+            }
           }
-        } else if (
-          difficulty !== "EASY" &&
-          givePrice > wantedPrice + 40 &&
-          opp.balance >= 120
-        ) {
-          const ask = roundToTen((givePrice - wantedPrice) * 0.5);
-          if (ask > 0 && opp.balance - ask >= 100) {
-            receivedMoney = ask;
+        } else {
+          const targetBaseNeed = Math.max(wantedPrice, wantedValOpp);
+          if (giveValOpp < targetBaseNeed) {
+            const gap = roundToTen((targetBaseNeed - giveValOpp) * 1.05);
+            if (gap > 0 && gap <= surplusCash) {
+              givenMoney = gap;
+            }
+          } else if (
+            difficulty !== "EASY" &&
+            givePrice > wantedPrice + 40 &&
+            opp.balance >= 120
+          ) {
+            const ask = roundToTen((givePrice - wantedPrice) * 0.5);
+            if (ask > 0 && opp.balance - ask >= 100) {
+              receivedMoney = ask;
+            }
           }
         }
 
@@ -264,10 +297,9 @@ export function findBestTradeProposal(
         });
       }
 
-      // (c) 2-for-1 tile swap for completing a monopoly (MEDIUM / HARD)
+      // (c) 2-for-1 tile swap (+ optional cash sweetener/ask) for completing a monopoly (MEDIUM / HARD)
       if (difficulty !== "EASY" && isCompleting && eligibleGiveTiles.length >= 2) {
-        // Pick up to 5 lowest-value-to-bot singletons to keep search compact & deterministic
-        const singletons = eligibleGiveTiles
+        const lowValueSingletons = eligibleGiveTiles
           .filter((t) => {
             if (t.type !== "property" || t.groupId == null) return true;
             const g = game.board.groups.find((gr) => gr.groupId === t.groupId);
@@ -282,24 +314,109 @@ export function findBestTradeProposal(
               evaluateTileStrategicValue(game, a, bot.username) -
                 evaluateTileStrategicValue(game, b, bot.username) ||
               a.id - b.id
-          )
-          .slice(0, 5);
+          );
 
+        // (c1) 2-for-1 mutual monopoly swaps: opponent's completing tile + a sweetener singleton
+        //      (unlocks unequal monopoly trades even when cash alone can't bridge the power gap!)
+        const oppCompletingTiles = eligibleGiveTiles.filter(
+          (t) =>
+            t.type === "property" &&
+            t.groupId != null &&
+            doesTileCompleteSet(game, t, opp.username)
+        );
+        for (const compTile of oppCompletingTiles) {
+          const botSetPower = computeGroupMonopolyPower(game, group.groupId);
+          const oppSetPower = computeGroupMonopolyPower(game, compTile.groupId!);
+          const powerDiff = botSetPower - oppSetPower;
+
+          const sweeteners = lowValueSingletons
+            .filter(
+              (s) =>
+                s.id !== compTile.id &&
+                !(s.type === "property" && s.groupId === compTile.groupId)
+            )
+            .slice(0, 3);
+
+          for (const sweet of sweeteners) {
+            const sweetPower = (sweet.price ?? 0) * 0.9;
+            const residualDiff = powerDiff - sweetPower;
+            let givenMoney = 0;
+            let receivedMoney = 0;
+
+            if (residualDiff > 50) {
+              const cashSweet = roundToTen(
+                Math.min(surplusCash, residualDiff * 0.55)
+              );
+              if (cashSweet > 0) {
+                givenMoney = cashSweet;
+              }
+            } else if (residualDiff < -60 && opp.balance >= 160) {
+              const cashAsk = roundToTen(
+                Math.min(opp.balance - 100, Math.abs(residualDiff) * 0.6)
+              );
+              if (cashAsk >= 40) {
+                receivedMoney = cashAsk;
+              }
+            }
+
+            pushCandidate({
+              from: bot.username,
+              to: opp.username,
+              given: [compTile.id, sweet.id],
+              received: [wantedTile.id],
+              givenMoney,
+              receivedMoney,
+            });
+          }
+        }
+
+        // (c2) Standard 2-for-1 singleton package (useful against humans or EASY opponents)
+        const singletons = lowValueSingletons.slice(0, 5);
         for (let i = 0; i < singletons.length; i++) {
           for (let j = i + 1; j < singletons.length; j++) {
             const t1 = singletons[i];
             const t2 = singletons[j];
             const combinedFace = (t1.price ?? 0) + (t2.price ?? 0);
-            if (combinedFace > wantedPrice * 2.1) {
+            if (combinedFace > wantedPrice * 2.2) {
               continue;
             }
+
+            const combinedValOpp =
+              evaluateTileStrategicValue(game, t1, opp.username) +
+              evaluateTileStrategicValue(game, t2, opp.username);
+            const targetBaseNeed = Math.max(wantedPrice, wantedValOpp);
+
+            // Avoid pitching weak low-ball 2-for-1 junk to humans
+            if (!opp.isBot && combinedValOpp < wantedPrice * 1.15 && surplusCash < 60) {
+              continue;
+            }
+
+            let givenMoney = 0;
+            let receivedMoney = 0;
+            if (combinedValOpp < targetBaseNeed) {
+              const gap = roundToTen((targetBaseNeed - combinedValOpp) * 0.95);
+              if (gap > 0 && gap <= surplusCash) {
+                givenMoney = gap;
+              }
+            } else if (
+              combinedFace > wantedPrice + 80 &&
+              opp.balance >= 160
+            ) {
+              const ask = roundToTen(
+                Math.min(opp.balance - 100, (combinedFace - wantedPrice) * 0.45)
+              );
+              if (ask >= 30) {
+                receivedMoney = ask;
+              }
+            }
+
             pushCandidate({
               from: bot.username,
               to: opp.username,
               given: [t1.id, t2.id],
               received: [wantedTile.id],
-              givenMoney: 0,
-              receivedMoney: 0,
+              givenMoney,
+              receivedMoney,
             });
           }
         }
@@ -307,8 +424,10 @@ export function findBestTradeProposal(
     }
   }
 
-  // --- 2. Cash-raising offer when bot is low on cash ---
-  if (bot.balance < reserve && botGiveableTiles.length > 0) {
+  // --- 2. Cash-raising offer when bot is genuinely low on cash ---
+  const cashRaiseThreshold =
+    difficulty === "EASY" ? reserve : Math.max(100, Math.round(reserve * 0.65));
+  if (bot.balance < cashRaiseThreshold && botGiveableTiles.length > 0) {
     const singletons = botGiveableTiles
       .filter((t) => {
         if (t.type !== "property" || t.groupId == null) return true;
@@ -326,36 +445,52 @@ export function findBestTradeProposal(
       );
 
     if (singletons.length > 0) {
-      const tileToSell = singletons[0];
-      const basePrice = tileToSell.price ?? 100;
-
-      for (const opp of activeOpponents) {
-        if (opp.balance < Math.max(200, basePrice * 1.4)) {
-          continue;
+      // MEDIUM & HARD only sell singletons for cash when an opponent genuinely wants one
+      // at a lucrative 1.4x–2.0x price (no 0.93x–1.25x bargain fire-sales or tile hot-potato!)
+      const targetedOffer = findBestPreMortgageTradeOffer(
+        game,
+        bot,
+        singletons,
+        {
+          cooldownByTarget,
+          isBankruptcyEmergency: false,
         }
-        const valToOpp = evaluateTileStrategicValue(
-          game,
-          tileToSell,
-          opp.username
-        );
-        const askCash = roundToTen(
-          Math.min(
-            opp.balance - 100,
-            Math.max(basePrice * 0.9, Math.min(valToOpp * 0.95, basePrice * 1.25))
-          )
-        );
-        if (askCash >= Math.round(basePrice * 0.8) && askCash <= opp.balance - 100) {
-          pushCandidate(
-            {
-              from: bot.username,
-              to: opp.username,
-              given: [tileToSell.id],
-              received: [],
-              givenMoney: 0,
-              receivedMoney: askCash,
-            },
-            true
+      );
+      if (targetedOffer) {
+        pushCandidate(targetedOffer, true);
+      }
+
+      if (difficulty === "EASY") {
+        const tileToSell = singletons[0];
+        const basePrice = tileToSell.price ?? 100;
+        for (const opp of activeOpponents) {
+          if (opp.balance < Math.max(200, basePrice * 1.4)) {
+            continue;
+          }
+          const valToOpp = evaluateTileStrategicValue(
+            game,
+            tileToSell,
+            opp.username
           );
+          const askCash = roundToTen(
+            Math.min(
+              opp.balance - 100,
+              Math.max(basePrice * 0.9, Math.min(valToOpp * 0.95, basePrice * 1.25))
+            )
+          );
+          if (askCash >= Math.round(basePrice * 0.8) && askCash <= opp.balance - 100) {
+            pushCandidate(
+              {
+                from: bot.username,
+                to: opp.username,
+                given: [tileToSell.id],
+                received: [],
+                givenMoney: 0,
+                receivedMoney: askCash,
+              },
+              true
+            );
+          }
         }
       }
     }
@@ -404,8 +539,8 @@ export function findBestTradeProposal(
     const botNewMonos = botFullAfter.filter((g) => !botFullBefore.includes(g));
     const oppNewMonos = oppFullAfter.filter((g) => !oppFullBefore.includes(g));
 
-    // HARD bot guard: never propose handing opponent a monopoly unless bot gets a comparable/stronger one
-    if (difficulty === "HARD" && oppNewMonos.length > 0) {
+    // MEDIUM & HARD guard: never propose handing opponent a monopoly unless bot gets a comparable/stronger one (cash/sweetener-balanced)
+    if (difficulty !== "EASY" && oppNewMonos.length > 0) {
       if (botNewMonos.length === 0) {
         continue;
       }
@@ -417,11 +552,56 @@ export function findBestTradeProposal(
         (s, g) => s + computeGroupMonopolyPower(game, g),
         0
       );
-      if (botPower < oppPower * 0.95) {
+      const netCashForBot = receivedMoney - givenMoney;
+      const extraToBotVal = trade.received.reduce((s, id) => {
+        const t = getTileById(game, id);
+        if (!t || (t.type === "property" && t.groupId != null && botNewMonos.includes(t.groupId))) {
+          return s;
+        }
+        return s + (t.price ?? 0);
+      }, 0);
+      const extraToOppVal = trade.given.reduce((s, id) => {
+        const t = getTileById(game, id);
+        if (!t || (t.type === "property" && t.groupId != null && oppNewMonos.includes(t.groupId))) {
+          return s;
+        }
+        return s + (t.price ?? 0);
+      }, 0);
+
+      const effectiveBotPower =
+        botPower + Math.max(0, netCashForBot) * 1.3 + extraToBotVal * 0.95;
+      const effectiveOppPower =
+        oppPower + Math.max(0, -netCashForBot) * 1.15 + extraToOppVal * 0.9;
+
+      const oppIsRunawayLeader =
+        difficulty === "HARD" &&
+        oppFullBefore.length >= 1 &&
+        isOpponentLeading(game, bot.username, opp.username);
+      const requiredRatio = oppIsRunawayLeader
+        ? 1.15
+        : difficulty === "HARD"
+          ? 0.92
+          : 0.85;
+
+      if (effectiveBotPower < effectiveOppPower * requiredRatio) {
         continue;
       }
-      if (postBotBalance < reserve) {
-        continue;
+
+      if (difficulty === "HARD") {
+        const cheapestNewSetUpgrade = Math.min(
+          ...botNewMonos.map(
+            (g) =>
+              game.board.groups.find((gr) => gr.groupId === g)?.upgradePrice ??
+              100
+          )
+        );
+        const minUpgradeCash = Math.min(
+          reserve,
+          Math.max(100, cheapestNewSetUpgrade)
+        );
+        if (postBotBalance < minUpgradeCash) {
+          continue;
+        }
       }
     }
 
@@ -446,6 +626,7 @@ export function findBestTradeProposal(
     }
 
     // Target fairness / plausibility check
+    const isMutualSwap = botNewMonos.length > 0 && oppNewMonos.length > 0;
     const offeredToOppVal =
       trade.given.reduce(
         (s, id) =>
@@ -459,13 +640,25 @@ export function findBestTradeProposal(
 
     const requestedFromOppVal =
       trade.received.reduce(
-        (s, id) => s + (getTileById(game, id)?.price ?? 0),
+        (s, id) =>
+          s +
+          (isMutualSwap
+            ? Math.max(
+                getTileById(game, id)?.price ?? 0,
+                evaluateTileStrategicValue(
+                  game,
+                  getTileById(game, id)!,
+                  bot.username
+                )
+              )
+            : getTileById(game, id)?.price ?? 0),
         0
       ) + receivedMoney;
 
     if (requestedFromOppVal > 0) {
       const ratio = offeredToOppVal / requestedFromOppVal;
-      if (ratio < 0.78 || ratio > 2.2) {
+      const maxRatio = isMutualSwap ? 2.6 : 2.2;
+      if (ratio < 0.72 || ratio > maxRatio) {
         continue;
       }
     }
@@ -483,8 +676,8 @@ export function findBestTradeProposal(
       // For human targets, slightly favor clean, attractive offers
       if (
         requestedFromOppVal > 0 &&
-        offeredToOppVal >= requestedFromOppVal * 0.95 &&
-        offeredToOppVal <= requestedFromOppVal * 1.5
+        offeredToOppVal >= requestedFromOppVal * 0.9 &&
+        offeredToOppVal <= requestedFromOppVal * 1.6
       ) {
         plausibilityBonus = 100;
       }
@@ -519,3 +712,261 @@ export function findBestTradeProposal(
 
   return ranked[0].trade;
 }
+
+export interface PreMortgageOfferOptions {
+  cooldownByTarget?: Record<string, number>;
+  isBankruptcyEmergency?: boolean;
+  amountNeeded?: number;
+}
+
+/**
+ * Evaluates whether there is a "good moment" to offer `tileToMortgage` to an opponent
+ * who genuinely needs it for up to 2x face price BEFORE mortgaging it for 0.5x.
+ *
+ * Strict rule:
+ * - Never offers a set-completing tile for cash unless `isBankruptcyEmergency` is true
+ *   (bot has zero other assets sufficient to avoid bankruptcy).
+ * - Only triggers when an active opponent owns matching group/car/utility tiles AND
+ *   has comfortable spare cash to pay 1.4x–2.0x face price.
+ */
+export function findPreMortgageTradeOffer(
+  game: GameState,
+  bot: Player,
+  tileToMortgage: Tile,
+  options: PreMortgageOfferOptions = {}
+): Trade | null {
+  if (game.status === "ENDED") {
+    return null;
+  }
+
+  const eliminated = new Set(game.eliminatedPlayers ?? []);
+  if (eliminated.has(bot.username)) {
+    return null;
+  }
+
+  const difficulty: BotDifficulty = bot.botDifficulty ?? "MEDIUM";
+  if (difficulty === "EASY") {
+    return null;
+  }
+
+  const basePrice = tileToMortgage.price ?? 0;
+  if (basePrice <= 0 || tileToMortgage.mortgaged) {
+    return null;
+  }
+
+  const fullSetGroupIds = getFullSetGroupIds(game);
+  const botTradable = new Set(
+    getPlayerTradableProperties(game.board.tiles, fullSetGroupIds, bot.username)
+  );
+  if (!botTradable.has(tileToMortgage.id)) {
+    return null;
+  }
+
+  const botFullSets = new Set(getPlayerFullSetGroupIds(game, bot.username));
+  if (
+    tileToMortgage.type === "property" &&
+    tileToMortgage.groupId != null &&
+    botFullSets.has(tileToMortgage.groupId) &&
+    !options.isBankruptcyEmergency
+  ) {
+    return null;
+  }
+
+  const cooldownByTarget = options.cooldownByTarget ?? {};
+  const activeOpponents = game.players.filter(
+    (p) =>
+      p.username !== bot.username &&
+      !eliminated.has(p.username) &&
+      (cooldownByTarget[p.username] ?? 0) <= 0
+  );
+
+  if (!activeOpponents.length) {
+    return null;
+  }
+
+  const mortgageValue = tileToMortgage.mortgagePrice ?? Math.round(basePrice * 0.5);
+  const minAttractiveAsk = Math.max(
+    Math.round(basePrice * 1.4),
+    Math.round(mortgageValue * 2.4)
+  );
+  const maxAllowedAsk = Math.round(basePrice * 2.0);
+
+  const candidates: Array<{ trade: Trade; score: number; targetName: string }> = [];
+
+  for (const opp of activeOpponents) {
+    const completesOppSet = doesTileCompleteSet(game, tileToMortgage, opp.username);
+    if (completesOppSet && !options.isBankruptcyEmergency) {
+      continue;
+    }
+
+    // Determine whether `opp` genuinely needs this tile and how strong the need is
+    let needFactor = 0;
+
+    if (tileToMortgage.type === "property" && tileToMortgage.groupId != null) {
+      const group = game.board.groups.find(
+        (g) => g.groupId === tileToMortgage.groupId
+      );
+      if (group) {
+        const oppOwnedInGroup = group.properties.filter((pid) => {
+          if (pid === tileToMortgage.id) return false;
+          const t = getTileById(game, pid);
+          return t?.owner === opp.username;
+        }).length;
+
+        if (oppOwnedInGroup >= 1) {
+          const mult = getGroupStrategicMultiplier(group.groupId);
+          if (completesOppSet) {
+            needFactor = 2.0; // Bankruptcy survival emergency: ask full 2x max
+          } else if (mult >= 1.2) {
+            needFactor = 1.85; // Strong color group advancement (1 -> 2 of 3)
+          } else {
+            needFactor = 1.65; // Standard group advancement
+          }
+        }
+      }
+    } else if (tileToMortgage.type === "car") {
+      const oppCars = game.board.tiles.filter(
+        (t) =>
+          t.type === "car" &&
+          t.id !== tileToMortgage.id &&
+          t.owner === opp.username
+      ).length;
+      if (oppCars >= 2) {
+        needFactor = 1.95; // 3rd or 4th car is huge value
+      } else if (oppCars === 1) {
+        needFactor = 1.65;
+      }
+    } else if (tileToMortgage.type === "bonus-property") {
+      const oppUtils = game.board.tiles.filter(
+        (t) =>
+          t.type === "bonus-property" &&
+          t.id !== tileToMortgage.id &&
+          t.owner === opp.username
+      ).length;
+      if (oppUtils >= 1) {
+        needFactor = 1.65;
+      }
+    }
+
+    if (needFactor <= 0) {
+      continue;
+    }
+
+    // Buyer must have comfortable cash above the ask so the offer is realistic
+    const oppCashBuffer = Math.max(100, Math.round(basePrice * 0.4));
+    const maxAffordableByOpp = opp.balance - oppCashBuffer;
+    if (maxAffordableByOpp < minAttractiveAsk) {
+      continue;
+    }
+
+    // Scale ask price cleanly between 1.4x and 2.0x max
+    const desiredAsk = Math.min(maxAllowedAsk, Math.round(basePrice * needFactor));
+    const askCash = Math.min(
+      maxAllowedAsk,
+      roundToTen(Math.min(maxAffordableByOpp, desiredAsk))
+    );
+
+    if (askCash < minAttractiveAsk || askCash > maxAffordableByOpp) {
+      continue;
+    }
+
+    let chosenCandidate: Trade | null = null;
+    const initialCandidate: Trade = {
+      from: bot.username,
+      to: opp.username,
+      given: [tileToMortgage.id],
+      received: [],
+      givenMoney: 0,
+      receivedMoney: askCash,
+    };
+
+    if (!isTradePreviouslyDeclined(game, initialCandidate)) {
+      if (!opp.isBot || evaluateIncomingTrade(game, opp, initialCandidate).accept) {
+        chosenCandidate = initialCandidate;
+      } else {
+        // If a bot opponent declines the top 1.65x–2.0x ask, try the 1.4x floor
+        // (still ~2.8x mortgage value) before giving up and mortgaging for 0.5x.
+        const floorAsk = Math.min(maxAffordableByOpp, roundToTen(minAttractiveAsk));
+        if (floorAsk >= minAttractiveAsk && floorAsk < askCash) {
+          const floorCandidate: Trade = {
+            ...initialCandidate,
+            receivedMoney: floorAsk,
+          };
+          if (
+            !isTradePreviouslyDeclined(game, floorCandidate) &&
+            evaluateIncomingTrade(game, opp, floorCandidate).accept
+          ) {
+            chosenCandidate = floorCandidate;
+          }
+        }
+      }
+    }
+
+    if (!chosenCandidate) {
+      continue;
+    }
+
+    const finalAsk = chosenCandidate.receivedMoney ?? 0;
+    const coversNeedBonus =
+      typeof options.amountNeeded === "number" && finalAsk >= options.amountNeeded
+        ? 100
+        : 0;
+
+    candidates.push({
+      trade: chosenCandidate,
+      score: finalAsk + coversNeedBonus,
+      targetName: opp.username,
+    });
+  }
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    return a.targetName.localeCompare(b.targetName);
+  });
+
+  return candidates[0].trade;
+}
+
+/**
+ * Scans all eligible mortgageable `candidateTiles` to find the highest-value
+ * pre-mortgage offer (1.4x–2.0x) to an opponent who genuinely needs one of them.
+ */
+export function findBestPreMortgageTradeOffer(
+  game: GameState,
+  bot: Player,
+  candidateTiles: Tile[],
+  options: PreMortgageOfferOptions = {}
+): Trade | null {
+  let best: { trade: Trade; score: number; sig: string } | null = null;
+
+  for (const tile of candidateTiles) {
+    const offer = findPreMortgageTradeOffer(game, bot, tile, options);
+    if (!offer) {
+      continue;
+    }
+    const ask = offer.receivedMoney ?? 0;
+    const coversBonus =
+      typeof options.amountNeeded === "number" && ask >= options.amountNeeded
+        ? 150
+        : 0;
+    const score = ask + coversBonus;
+    const sig = buildTradeSignature(offer);
+
+    if (
+      !best ||
+      score > best.score ||
+      (score === best.score && sig.localeCompare(best.sig) < 0)
+    ) {
+      best = { trade: offer, score, sig };
+    }
+  }
+
+  return best?.trade ?? null;
+}
+
