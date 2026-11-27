@@ -708,6 +708,10 @@ function evaluateMediumTrade(
     gainedTileValue += price * multiplier;
   }
 
+  const isPureCashSale = given.length === 0 && received.length > 0;
+  const mediumSafetyReserve = getSafetyReserve(game, bot, "MEDIUM");
+  const botIsCashComfortable = bot.balance >= mediumSafetyReserve;
+
   let lostTileValue = 0;
   for (const id of received) {
     const tile = getTileById(game, id);
@@ -740,12 +744,30 @@ function evaluateMediumTrade(
           }
         }
 
+        const fromCountBefore = group.properties.filter(
+          (pid) => ownershipBefore.get(pid) === fromPlayer.username
+        ).length;
+        const fromCountAfter = group.properties.filter(
+          (pid) => ownershipAfter.get(pid) === fromPlayer.username
+        ).length;
+
         // Opponent set-completion penalty (-30% on lost tile price)
         if (
           fromFullAfter.has(tile.groupId) &&
           !fromFullBefore.has(tile.groupId)
         ) {
           multiplier += 0.3;
+        } else if (
+          fromCountAfter >= 2 &&
+          fromCountAfter > fromCountBefore
+        ) {
+          // Opponent advancing from 1/3 -> 2/3 (dangerous set buildup)
+          multiplier += isPureCashSale && botIsCashComfortable ? 0.55 : 0.2;
+        }
+
+        // Rich bots don't dump color deeds for small pure-cash markups (+$20)
+        if (isPureCashSale && botIsCashComfortable && multiplier < 1.35) {
+          multiplier = 1.35;
         }
       }
     } else if (tile.type === "car") {
@@ -761,6 +783,9 @@ function evaluateMediumTrade(
       } else if (fromCarsAfter >= 2) {
         multiplier += 0.3;
       }
+      if (isPureCashSale && botIsCashComfortable && multiplier < 1.45) {
+        multiplier = 1.45;
+      }
     } else if (tile.type === "bonus-property") {
       // Energy Utilities (4x -> 10x dice) are high-value special tiles
       multiplier = 1.25;
@@ -769,6 +794,9 @@ function evaluateMediumTrade(
       }
       if (fromUtilsAfter >= 2) {
         multiplier += 0.55;
+      }
+      if (isPureCashSale && botIsCashComfortable && multiplier < 1.45) {
+        multiplier = 1.45;
       }
     }
 
@@ -979,6 +1007,51 @@ function evaluateHardTrade(
         accept: false,
         score: postBotBalance - minCashAfterSpending,
         reason: "hard_below_safety_reserve",
+      };
+    }
+  }
+
+  // Rule C2: Financially comfortable HARD bots refuse cheap pure-cash buyouts (e.g. $120 for a $100 deed)
+  if (
+    trade.given.length === 0 &&
+    trade.received.length > 0 &&
+    bot.balance >= safetyReserve
+  ) {
+    let minPureCashRequired = 0;
+    for (const id of trade.received) {
+      const tile = getTileById(game, id);
+      const price = tile?.price ?? 0;
+      if (!tile || price <= 0) {
+        continue;
+      }
+
+      let requiredMult = 1.4;
+      if (tile.type === "property" && tile.groupId != null) {
+        const group = game.board.groups.find((g) => g.groupId === tile.groupId);
+        if (group) {
+          const fromCountBefore = group.properties.filter(
+            (pid) => ownershipBefore.get(pid) === fromPlayer.username
+          ).length;
+          const fromCountAfter = group.properties.filter(
+            (pid) => ownershipAfter.get(pid) === fromPlayer.username
+          ).length;
+          if (fromCountAfter >= 2 && fromCountAfter > fromCountBefore) {
+            // Advancing opponent to 2/3 of a color set for pure cash requires a real premium
+            requiredMult = 1.6;
+          }
+        }
+      } else if (tile.type === "car" || tile.type === "bonus-property") {
+        requiredMult = 1.55;
+      }
+
+      minPureCashRequired += price * requiredMult;
+    }
+
+    if (givenMoney < minPureCashRequired) {
+      return {
+        accept: false,
+        score: Math.round(givenMoney - minPureCashRequired),
+        reason: "hard_refuses_cheap_cash_buyout",
       };
     }
   }

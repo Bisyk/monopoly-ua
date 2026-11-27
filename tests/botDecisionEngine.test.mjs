@@ -1577,5 +1577,57 @@ test("Bots DO trade away 2/2 Energy Utilities when receiving a strong color mono
   );
 });
 
+test("MEDIUM and HARD bots never spam early-game or lowball (+$20 / 1.2x) cash-only offers and reject cheap cash buyouts when rich", () => {
+  for (const difficulty of ["MEDIUM", "HARD"]) {
+    // Exact Turn-2 screenshot scenario:
+    // Bot owns Riot Division (10, $120, Group 2), human owns Urban (9, $100, Group 2) + EPAM (20, $200),
+    // Staff (7, $100, Group 2) is still unowned; both players have $1,200+ cash.
+    const game = createGame([
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 1380 },
+      { username: "human", isBot: false, botDifficulty: null, balance: 1200 },
+      { username: "other", isBot: true, botDifficulty: difficulty, balance: 1360 },
+    ]);
+    assignTiles(game, "bot", [10]);
+    assignTiles(game, "human", [9, 20]);
+    assignTiles(game, "other", [12]);
 
+    // 1. Must NOT propose $120 cash-only offer for Urban while Staff is unowned
+    assert.equal(
+      findBestTradeProposal(game, game.players[0], {}),
+      null,
+      `${difficulty} bot must not spam early-game cash-only offer for Urban ($100)`
+    );
 
+    // 2. Even when Staff (7) IS owned by a 3rd player (1-1-1 split), bot must not send a 1.2x ($120) lowball to rich human
+    assignTiles(game, "other", [7]);
+    const splitProposal = findBestTradeProposal(game, game.players[0], {});
+    if (splitProposal && splitProposal.given.length === 0) {
+      assert.ok(
+        (splitProposal.givenMoney ?? 0) >= 160,
+        `${difficulty} cash-only offer to rich human must be >= 1.6x ($160), got ${splitProposal.givenMoney}`
+      );
+    }
+
+    // 3. Conversely, a rich MEDIUM/HARD bot must refuse selling Urban ($100) for $120 cash to a buyer advancing 1/3 -> 2/3
+    const reverseGame = createGame([
+      { username: "human", isBot: false, botDifficulty: null, balance: 1380 },
+      { username: "bot", isBot: true, botDifficulty: difficulty, balance: 1200 },
+    ]);
+    assignTiles(reverseGame, "human", [10]);
+    assignTiles(reverseGame, "bot", [9, 20]);
+
+    const lowballBuyout = evaluateIncomingTrade(reverseGame, reverseGame.players[1], {
+      from: "human",
+      to: "bot",
+      given: [],
+      received: [9],
+      givenMoney: 120,
+      receivedMoney: 0,
+    });
+    assert.equal(
+      lowballBuyout.accept,
+      false,
+      `${difficulty} rich bot must refuse $120 pure-cash buyout for Urban ($100) advancing opponent to 2/3`
+    );
+  }
+});

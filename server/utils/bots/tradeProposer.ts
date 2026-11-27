@@ -196,25 +196,35 @@ export function findBestTradeProposal(
       );
 
       // (a) Cash-only offer
-      // MEDIUM/HARD do not spam cash-only offers trying to buy a completing tile for a full set;
-      // they must negotiate real property swaps / mutual sets instead.
-      const allowCashOnlyOffer = difficulty === "EASY" || !isCompleting;
+      // MEDIUM/HARD never spam cash-only offers trying to buy a completing tile for a full set,
+      // never try to snipe deeds for cheap cash while other tiles in that group are still unowned,
+      // and require either a cash-tight target (>= 1.4x) or a real premium (>= 1.6x) instead of +$20 lowballs.
+      const groupHasUnowned = groupTiles.some((t) => !t.owner);
+      const oppIsCashTight = opp.balance < Math.max(300, wantedPrice * 2);
+      const allowCashOnlyOffer =
+        difficulty === "EASY" || (!isCompleting && !groupHasUnowned);
+
       if (allowCashOnlyOffer && surplusCash >= wantedPrice) {
+        const minPremiumMult =
+          difficulty === "EASY"
+            ? 1.1
+            : oppIsCashTight
+              ? 1.4
+              : 1.6;
         const cashOfferRaw =
           difficulty === "EASY"
             ? wantedPrice * 1.1
-            : difficulty === "MEDIUM"
-              ? Math.max(wantedPrice * 1.2, wantedValOpp * 1.05)
-              : Math.min(
-                  wantedValBot * 0.85,
-                  Math.max(wantedPrice * 1.2, wantedValOpp * 1.08)
-                );
+            : Math.min(
+                wantedPrice * 2.0,
+                Math.max(wantedPrice * minPremiumMult, wantedValOpp * 1.2)
+              );
 
         const cashOffer = roundToTen(
-          Math.min(surplusCash, Math.max(wantedPrice, cashOfferRaw))
+          Math.min(surplusCash, Math.max(wantedPrice * minPremiumMult, cashOfferRaw))
         );
 
-        if (cashOffer >= wantedPrice && cashOffer <= surplusCash) {
+        const minRequiredCash = Math.round(wantedPrice * minPremiumMult);
+        if (cashOffer >= minRequiredCash && cashOffer <= surplusCash) {
           pushCandidate({
             from: bot.username,
             to: opp.username,
@@ -721,11 +731,45 @@ export function findBestTradeProposal(
         continue;
       }
     } else {
-      // For human targets, slightly favor clean, attractive offers
+      // For human targets on MEDIUM/HARD, never spam insulting lowball or non-plausible offers
+      if (difficulty !== "EASY") {
+        if (trade.given.length === 0 && trade.received.length > 0) {
+          const requestedFace = trade.received.reduce(
+            (s, id) => s + (getTileById(game, id)?.price ?? 0),
+            0
+          );
+          const minCashMult = opp.balance < 300 ? 1.4 : 1.6;
+          if (givenMoney < Math.round(requestedFace * minCashMult)) {
+            continue;
+          }
+        }
+
+        if (!isCashRaise && botNewMonos.length === 0) {
+          const simulatedMediumHuman: Player = {
+            ...opp,
+            isBot: true,
+            botDifficulty: "MEDIUM",
+          };
+          const simEval = evaluateIncomingTrade(game, simulatedMediumHuman, trade);
+          if (!simEval.accept) {
+            continue;
+          }
+        }
+
+        if (
+          botNewMonos.length > 0 &&
+          requestedFromOppVal > 0 &&
+          offeredToOppVal < requestedFromOppVal * 0.95
+        ) {
+          continue;
+        }
+      }
+
+      // Slightly favor clean, attractive offers for human targets
       if (
         requestedFromOppVal > 0 &&
-        offeredToOppVal >= requestedFromOppVal * 0.9 &&
-        offeredToOppVal <= requestedFromOppVal * 1.6
+        offeredToOppVal >= requestedFromOppVal * 0.95 &&
+        offeredToOppVal <= requestedFromOppVal * 1.65
       ) {
         plausibilityBonus = 100;
       }
